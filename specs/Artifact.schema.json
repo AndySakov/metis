@@ -4,14 +4,22 @@
   "title": "Artifact",
   "type": "object",
   "additionalProperties": true,
-  "required": ["id", "kind", "title", "uri", "checksum", "created_at", "created_by"],
+  "required": [
+    "id",
+    "kind",
+    "title",
+    "uri",
+    "checksum",
+    "created_at",
+    "created_by"
+  ],
   "properties": {
     "id": { "type": "string" },
     "kind": { "type": "string" },
     "title": { "type": "string" },
     "uri": { "type": "string" },
     "checksum": { "type": "string" },
-    "created_at": { "type": "string", "format": "date-time" },
+    "created_at": { "type": "integer" },
     "created_by": { "type": "string", "enum": ["user", "metis"] },
     "metadata": {},
     "provenance": {}
@@ -23,7 +31,7 @@
       "title": "PRD: Research Summarizer",
       "uri": "s3://artifacts/prd/research-summarizer.md",
       "checksum": "sha256:deadbeef",
-      "created_at": "2025-01-02T15:04:05Z",
+      "created_at": 1735872000,
       "created_by": "metis"
     }
   ]
