@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schema.metis.dev/capabilities/research.fetch@0.1.output.schema.json",
+  "title": "research.fetch@0.1 output",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "text": { "type": "string" },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "title": { "type": "string" },
+        "authors": { "type": "array", "items": { "type": "string" } },
+        "license": { "type": "string" }
+      }
+    }
+  },
+  "required": ["text"]
+}

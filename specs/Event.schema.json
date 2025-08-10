@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schema.metis.dev/Event.schema.json",
+  "title": "Event",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "ts", "type", "actor", "payload"],
+  "properties": {
+    "id": { "type": "string" },
+    "ts": { "type": "integer" },
+    "type": { "type": "string" },
+    "actor": { "type": "string", "enum": ["user", "metis"] },
+    "project": { "type": "string" },
+    "payload": {}
+  },
+  "examples": [
+    {
+      "id": "evt_001",
+      "ts": 1733872000,
+      "type": "PLAN_CREATED",
+      "actor": "metis",
+      "payload": { "planId": "plan_abc" }
+    }
+  ]
+}

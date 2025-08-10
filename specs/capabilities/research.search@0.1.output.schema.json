@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schema.metis.dev/capabilities/research.search@0.1.output.schema.json",
+  "title": "research.search@0.1 output",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "results": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["url", "title", "snippet", "score"],
+        "properties": {
+          "url": { "type": "string" },
+          "title": { "type": "string" },
+          "snippet": { "type": "string" },
+          "license": { "type": "string" },
+          "date": { "type": "string", "format": "date" },
+          "score": { "type": "number" }
+        }
+      }
+    }
+  },
+  "required": ["results"]
+}

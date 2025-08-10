@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schema.metis.dev/capabilities/research.summarize@0.1.input.schema.json",
+  "title": "research.summarize@0.1 input",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "chunks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["text"],
+        "properties": {
+          "text": { "type": "string" },
+          "source": { "type": "string" }
+        }
+      },
+      "minItems": 1
+    },
+    "style": { "type": "string" }
+  },
+  "required": ["chunks"]
+}

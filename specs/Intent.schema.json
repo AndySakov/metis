@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schema.metis.dev/Intent.schema.json",
+  "title": "Intent",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "id": { "type": "string" },
+    "ts": { "type": "string", "format": "date-time" },
+    "actor": { "type": "string", "pattern": "^(user|metis)(:[a-z0-9._-]+)?$" },
+    "goal": { "type": "string", "minLength": 1 },
+    "inputs": { "type": "object", "additionalProperties": true },
+    "constraints": { "type": "array", "items": { "type": "string" } },
+    "autonomy": { "type": "string", "enum": ["S0", "S1", "S2", "S3", "S4"] }
+  },
+  "required": ["id", "ts", "actor", "goal"],
+  "examples": [
+    {
+      "id": "intent_123",
+      "ts": "2025-01-02T15:04:05Z",
+      "actor": "user:andysakov",
+      "goal": "Draft a PRD for a research summarizer",
+      "autonomy": "S1"
+    }
+  ]
+}

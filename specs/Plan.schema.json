@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schema.metis.dev/Plan.schema.json",
+  "title": "Plan",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "id": { "type": "string" },
+    "intentId": { "type": "string" },
+    "steps": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/PlanStep" },
+      "minItems": 1
+    },
+    "assumptions": { "type": "array", "items": { "type": "string" } },
+    "risks": { "type": "array", "items": { "type": "string" } },
+    "expectedArtifacts": { "type": "array", "items": { "type": "string" } }
+  },
+  "required": ["id", "intentId", "steps"],
+  "$defs": {
+    "ToolCall": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["capability", "input"],
+      "properties": {
+        "capability": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_.-]*\\.[a-z][a-z0-9_.-]*@[0-9]+\\.[0-9]+$"
+        },
+        "tool": { "type": "string" },
+        "input": { "type": "object", "additionalProperties": true },
+        "budget": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "seconds": { "type": "number" },
+            "dollars": { "type": "number" },
+            "tokens": { "type": "number" }
+          }
+        }
+      }
+    },
+    "PlanStep": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": { "type": "string" },
+        "kind": {
+          "type": "string",
+          "enum": ["tool", "ask", "write", "decision"]
+        },
+        "description": { "type": "string" },
+        "requiresApproval": { "type": "boolean" },
+        "toolCall": { "$ref": "#/$defs/ToolCall" }
+      },
+      "required": ["id", "kind", "description"]
+    }
+  },
+  "examples": [
+    {
+      "id": "plan_abc",
+      "intentId": "intent_123",
+      "steps": [
+        {
+          "id": "step_1",
+          "kind": "tool",
+          "description": "Search for related literature",
+          "requiresApproval": false,
+          "toolCall": {
+            "capability": "research.search@0.1",
+            "tool": "research.search",
+            "input": { "query": "RAG state of the art" },
+            "budget": { "seconds": 10 }
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,161 @@
+openapi: 3.1.0
+info:
+  title: METIS Core API (stack-neutral)
+  version: 0.1.0
+servers:
+  - url: http://localhost:8080
+paths:
+  /intent:
+    post:
+      summary: Submit an intent; returns a planned execution
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: ../Intent.schema.json
+      responses:
+        '201':
+          description: Plan created
+          content:
+            application/json:
+              schema:
+                $ref: ../Plan.schema.json
+  /plans/{id}:
+    get:
+      summary: Get a plan by id
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: ../Plan.schema.json
+  /plans/{id}/execute:
+    post:
+      summary: Execute a plan (or step range) in the runner
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              properties:
+                steps: { type: array, items: { type: string } }
+                dryRun: { type: boolean, default: false }
+      responses:
+        '202':
+          description: Accepted; execution started
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  executionId: { type: string }
+                  status: { type: string, enum: [accepted, running, completed, failed] }
+                  startedAt: { type: string, format: date-time }
+                  stepResults:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        stepId: { type: string }
+                        status: { type: string, enum: [pending, running, completed, failed] }
+                        output: {}
+  /artifacts/{id}:
+    get:
+      summary: Get artifact metadata
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: ../Artifact.schema.json
+  /eventlog/{id}:
+    put:
+      summary: Append (idempotent) event to log
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: ../Event.schema.json
+      responses:
+        '201': { description: Created }
+        '200': { description: OK }
+  /eventlog:
+    get:
+      summary: Query events by time and type
+      parameters:
+        - name: fromTs
+          in: query
+          schema: { type: integer }
+        - name: toTs
+          in: query
+          schema: { type: integer }
+        - name: types
+          in: query
+          schema: { type: array, items: { type: string } }
+        - name: project
+          in: query
+          schema: { type: string }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: ../Event.schema.json }
+  /tools:
+    get:
+      summary: List registered capabilities
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: ../ToolSpec.schema.json }
+  /tools/validate:
+    post:
+      summary: Validate a ToolSpec against its schemas and tests
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: ../ToolSpec.schema.json
+      responses:
+        '200':
+          description: Validation report
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  valid: { type: boolean }
+                  errors: { type: array, items: { type: string } }

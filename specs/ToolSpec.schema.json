@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schema.metis.dev/ToolSpec.schema.json",
+  "title": "ToolSpec",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "name": { "type": "string", "minLength": 1 },
+    "version": {
+      "type": "string",
+      "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-[0-9A-Za-z-.]+)?(?:\\+[0-9A-Za-z-.]+)?$"
+    },
+    "capability": {
+      "type": "string",
+      "description": "CAP ID domain.action@MAJOR.MINOR",
+      "pattern": "^[a-z][a-z0-9_.-]*\\.[a-z][a-z0-9_.-]*@[0-9]+\\.[0-9]+$"
+    },
+    "implementation": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "kind": { "type": "string", "enum": ["container", "wasm"] },
+        "image": { "type": "string" },
+        "entrypoint": { "type": "string" }
+      },
+      "required": ["kind"]
+    },
+    "inputSchema": { "$ref": "#/$defs/JsonSchema" },
+    "outputSchema": { "$ref": "#/$defs/JsonSchema" },
+    "authScopes": { "type": "array", "items": { "type": "string" } },
+    "sandboxed": { "type": "boolean" },
+    "tests": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "input"],
+        "properties": {
+          "name": { "type": "string" },
+          "input": { "type": "object" },
+          "expect": {
+            "oneOf": [
+              { "type": "object" },
+              { "$ref": "#/$defs/JsonSchema" }
+            ]
+          }
+        }
+      }
+    }
+  },
+  "required": ["name", "version", "capability"],
+  "$defs": {
+    "JsonSchema": {
+      "type": "object",
+      "description": "Embedded JSON Schema (2020-12)",
+      "additionalProperties": true
+    }
+  },
+  "examples": [
+    {
+      "name": "research.search",
+      "version": "0.1.0",
+      "capability": "research.search@0.1",
+      "implementation": {
+        "kind": "container",
+        "image": "ghcr.io/metis/tools/research-search:0.1.0"
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": { "query": { "type": "string" } },
+        "required": ["query"]
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": { "results": { "type": "array" } }
+      },
+      "authScopes": ["public.web"],
+      "sandboxed": true
+    }
+  ]
+}

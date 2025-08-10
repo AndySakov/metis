@@ -1,0 +1,47 @@
+asyncapi: '2.6.0'
+info:
+  title: METIS Events (stack-neutral)
+  version: 0.1.0
+channels:
+  plan/created:
+    subscribe:
+      message:
+        name: PlanCreated
+        payload:
+          $ref: ../Event.schema.json
+  tool/started:
+    subscribe:
+      message:
+        name: ToolStarted
+        payload:
+          $ref: ../Event.schema.json
+  tool/completed:
+    subscribe:
+      message:
+        name: ToolCompleted
+        payload:
+          $ref: ../Event.schema.json
+  artifact/written:
+    subscribe:
+      message:
+        name: ArtifactWritten
+        payload:
+          $ref: ../Event.schema.json
+  approval/requested:
+    subscribe:
+      message:
+        name: ApprovalRequested
+        payload:
+          $ref: ../Event.schema.json
+  approval/granted:
+    subscribe:
+      message:
+        name: ApprovalGranted
+        payload:
+          $ref: ../Event.schema.json
+  preference/recorded:
+    subscribe:
+      message:
+        name: PreferenceRecorded
+        payload:
+          $ref: ../Event.schema.json

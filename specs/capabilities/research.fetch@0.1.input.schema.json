@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schema.metis.dev/capabilities/research.fetch@0.1.input.schema.json",
+  "title": "research.fetch@0.1 input",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "url": { "type": "string", "minLength": 1 }
+  },
+  "required": ["url"]
+}
