@@ -1,0 +1,26 @@
+{
+  "name": "eventlog idempotency",
+  "steps": [
+    {
+      "op": "put",
+      "event": {
+        "id": "evt_same",
+        "ts": 1700000000,
+        "type": "X",
+        "actor": "metis",
+        "payload": {}
+      }
+    },
+    {
+      "op": "put",
+      "event": {
+        "id": "evt_same",
+        "ts": 1700000001,
+        "type": "X",
+        "actor": "metis",
+        "payload": {}
+      }
+    },
+    { "op": "list", "expect": { "countAtLeast": 1, "uniqueIds": true } }
+  ]
+}

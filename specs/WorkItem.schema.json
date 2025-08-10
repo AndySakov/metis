@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schema.metis.dev/WorkItem.schema.json",
+  "title": "WorkItem",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "projectId", "title", "status"],
+  "properties": {
+    "id": { "type": "string" },
+    "projectId": { "type": "string" },
+    "title": { "type": "string" },
+    "status": { "type": "string", "enum": ["todo", "doing", "done"] },
+    "dependsOn": { "type": "array", "items": { "type": "string" } },
+    "produces": { "type": "array", "items": { "type": "string" } },
+    "owner": { "type": "string" }
+  }
+}

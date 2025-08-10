@@ -1,0 +1,24 @@
+{
+  "name": "research-search-basic",
+  "version": "0.1.0",
+  "capability": "research.search@0.1",
+  "implementation": {
+    "kind": "container",
+    "image": "ghcr.io/metis/tools/research-search:0.1.0"
+  },
+  "inputSchema": {
+    "$ref": "../../capabilities/research.search@0.1.input.schema.json"
+  },
+  "outputSchema": {
+    "$ref": "../../capabilities/research.search@0.1.output.schema.json"
+  },
+  "authScopes": ["public.web"],
+  "sandboxed": true,
+  "tests": [
+    {
+      "name": "minimal",
+      "input": { "query": "retrieval-augmented generation", "limit": 1 },
+      "expect": { "type": "object", "required": ["results"] }
+    }
+  ]
+}

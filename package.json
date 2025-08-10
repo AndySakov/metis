@@ -1,0 +1,14 @@
+{
+  "name": "metis-specs",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "lint:specs": "node ./scripts/validate-specs.mjs",
+    "lint": "npm run lint:specs"
+  },
+  "dependencies": {
+    "ajv": "^8.12.0",
+    "ajv-formats": "^2.1.1",
+    "globby": "^14.0.0"
+  }
+}

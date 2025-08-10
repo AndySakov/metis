@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schema.metis.dev/ProjectCharter.schema.json",
+  "title": "ProjectCharter",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "title", "purpose"],
+  "properties": {
+    "id": { "type": "string" },
+    "title": { "type": "string" },
+    "purpose": { "type": "string" },
+    "scope": { "type": "array", "items": { "type": "string" } },
+    "constraints": { "type": "array", "items": { "type": "string" } },
+    "success": { "type": "array", "items": { "type": "string" } },
+    "risks": { "type": "array", "items": { "type": "string" } },
+    "stakeholders": { "type": "array", "items": { "type": "string" } },
+    "schedule": { "type": "string" },
+    "budget": { "type": "string" },
+    "artifacts": { "type": "array", "items": { "type": "string" } }
+  }
+}

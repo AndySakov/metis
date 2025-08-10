@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schema.metis.dev/storage/GraphEdge.schema.json",
+  "title": "GraphEdge",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["from", "rel", "to"],
+  "properties": {
+    "from": { "type": "string" },
+    "rel": { "type": "string" },
+    "to": { "type": "string" },
+    "props": { "type": "object", "additionalProperties": true }
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "name": "research-fetch-basic",
+  "version": "0.1.0",
+  "capability": "research.fetch@0.1",
+  "implementation": {
+    "kind": "container",
+    "image": "ghcr.io/metis/tools/research-fetch:0.1.0"
+  },
+  "inputSchema": {
+    "$ref": "../../capabilities/research.fetch@0.1.input.schema.json"
+  },
+  "outputSchema": {
+    "$ref": "../../capabilities/research.fetch@0.1.output.schema.json"
+  },
+  "authScopes": ["public.web"],
+  "sandboxed": true,
+  "tests": [
+    {
+      "name": "shape-only",
+      "input": { "url": "https://example.com" },
+      "expect": { "type": "object", "required": ["text"] }
+    }
+  ]
+}

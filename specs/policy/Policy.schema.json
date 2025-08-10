@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schema.metis.dev/policy/Policy.schema.json",
+  "title": "Policy",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "version": { "type": "string" },
+    "approvals": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "thresholds": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "cost_usd": { "type": "number" },
+            "time_s": { "type": "number" }
+          }
+        },
+        "requiredForGears": {
+          "type": "array",
+          "items": { "type": "string", "enum": ["S3", "S4"] }
+        }
+      }
+    },
+    "scopes": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "allow": { "type": "array", "items": { "type": "string" } },
+        "deny": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "retention": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["bucket", "ttl_days"],
+        "properties": {
+          "bucket": { "type": "string" },
+          "ttl_days": { "type": "integer", "minimum": 0 },
+          "redact": { "type": "boolean" }
+        }
+      }
+    }
+  },
+  "required": ["version"]
+}

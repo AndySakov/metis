@@ -29,6 +29,14 @@
     "outputSchema": { "$ref": "#/$defs/JsonSchema" },
     "authScopes": { "type": "array", "items": { "type": "string" } },
     "sandboxed": { "type": "boolean" },
+    "costs": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "fixed": { "type": "number", "minimum": 0 },
+        "perUnit": { "type": "number", "minimum": 0 }
+      }
+    },
     "tests": {
       "type": "array",
       "items": {
@@ -39,10 +47,7 @@
           "name": { "type": "string" },
           "input": { "type": "object" },
           "expect": {
-            "oneOf": [
-              { "type": "object" },
-              { "$ref": "#/$defs/JsonSchema" }
-            ]
+            "anyOf": [{ "$ref": "#/$defs/JsonSchema" }, { "type": "object" }]
           }
         }
       }

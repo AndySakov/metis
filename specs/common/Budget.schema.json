@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schema.metis.dev/common/Budget.schema.json",
+  "title": "Budget",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "seconds": { "type": "number", "minimum": 0 },
+    "dollars": { "type": "number", "minimum": 0 },
+    "tokens": { "type": "number", "minimum": 0 }
+  }
+}
