@@ -1,5 +1,6 @@
 <script lang="ts">
   import { createEventDispatcher } from "svelte";
+  import { tick } from "svelte";
   import { marked } from "marked";
   import DOMPurify from "dompurify";
   export let open = false;
@@ -13,6 +14,7 @@
   let previewMarkdown = "";
   let showLogs = false;
   let lastPlanId: string = "";
+  let logEnd: HTMLDivElement | null = null;
   $: if (open && plan?.id && plan.id !== lastPlanId) {
     // Reset logs toggle when showing a different plan or after reopen
     lastPlanId = plan.id;
@@ -23,6 +25,42 @@
   function renderMarkdown(md: string): string {
     const html = marked.parse(md ?? "");
     return DOMPurify.sanitize(String(html));
+  }
+
+  $: if (showLogs && Array.isArray(trail)) {
+    // Keep the latest log entries visible when toggled or trail updates
+    tick().then(() => {
+      logEnd?.scrollIntoView({ behavior: "auto", block: "end" });
+    });
+  }
+
+  function linesForEvent(e: any): string[] {
+    try {
+      const p = e?.payload ?? {};
+      const lines: string[] = [];
+      if (typeof p.message === "string") {
+        lines.push(...p.message.split(/\r?\n/));
+      }
+      if (Array.isArray(p.log)) {
+        for (const entry of p.log) {
+          if (typeof entry === "string") lines.push(entry);
+          else lines.push(String(entry));
+        }
+      }
+      if (typeof p.error === "string") lines.push(`error: ${p.error}`);
+      if (typeof p.reason === "string") lines.push(`reason: ${p.reason}`);
+      if (typeof p.status === "string") lines.push(`status: ${p.status}`);
+      if (typeof p.verdict === "string") lines.push(`verdict: ${p.verdict}`);
+      if (typeof p.capability === "string")
+        lines.push(`capability: ${p.capability}`);
+      if (lines.length === 0) {
+        const json = JSON.stringify(p, null, 2);
+        if (json && json !== "{}") lines.push(...json.split("\n"));
+      }
+      return lines;
+    } catch {
+      return [];
+    }
   }
 </script>
 
@@ -95,10 +133,13 @@
             {:else}
               <div class="muted">No artifacts yet</div>
             {/if}
-            <div class="mt8">
-              <button on:click={() => (showLogs = !showLogs)}
-                >{showLogs ? "Hide" : "Show"} Execution Log</button
-              >
+          </div>
+          <div class="log-section" style="grid-column: 1 / -1;">
+            <div class="log-header">
+              <div class="log-title">Execution Log</div>
+              <button class="link" on:click={() => (showLogs = !showLogs)}>
+                {showLogs ? "Hide" : "Show"}
+              </button>
             </div>
             {#if showLogs}
               <div class="log">
@@ -108,14 +149,23 @@
                     <span class="log-type">{e.type}</span>
                     {#if e.payload?.stepId}
                       <span class="log-meta">step {e.payload.stepId}</span>
-                    {/if}
-                    {#if e.payload?.artifactId}
+                    {:else if e.payload?.artifactId}
                       <span class="log-meta"
                         >artifact {e.payload.artifactId}</span
                       >
+                    {:else}
+                      <span class="log-meta">&nbsp;</span>
                     {/if}
                   </div>
+                  {#if linesForEvent(e).length}
+                    <div class="log-text-row">
+                      {#each linesForEvent(e) as line}
+                        <div class="log-text">{line}</div>
+                      {/each}
+                    </div>
+                  {/if}
                 {/each}
+                <div bind:this={logEnd}></div>
               </div>
             {/if}
           </div>
@@ -162,6 +212,21 @@
     grid-template-columns: 1fr 1fr;
     gap: 16px;
   }
+  .log-section {
+    margin-top: 12px;
+  }
+  .log-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 6px;
+    border-top: 1px solid var(--border);
+    padding-top: 8px;
+  }
+  .log-title {
+    font-weight: 600;
+    color: var(--text);
+  }
   .muted {
     color: var(--muted);
   }
@@ -176,9 +241,28 @@
     border-radius: var(--radius-md);
     padding: 8px;
     background: var(--panel-muted);
+    height: 220px; /* fixed visual length */
+    overflow-y: auto; /* internally scrollable */
   }
   .log-row {
     display: contents;
+  }
+  .log-text-row {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 2px;
+    margin: 4px 0 8px 0;
+  }
+  .log-text {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas,
+      "Liberation Mono", "Courier New", monospace;
+    font-size: 12px;
+    color: var(--muted);
+    white-space: pre-wrap;
+    word-break: break-word;
+    border-left: 2px solid var(--border);
+    padding-left: 8px;
   }
   .log-ts {
     color: var(--muted);
