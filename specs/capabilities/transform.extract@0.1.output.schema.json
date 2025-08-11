@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "transform.extract output",
+  "type": "object",
+  "properties": {
+    "matches": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "match": { "type": "string" },
+          "index": { "type": "integer", "minimum": 0 }
+        },
+        "required": ["match", "index"],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": ["matches"],
+  "additionalProperties": false
+}

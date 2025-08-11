@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "transform.extract input",
+  "type": "object",
+  "properties": {
+    "text": { "type": "string" },
+    "pattern": {
+      "type": "string",
+      "description": "JavaScript regex (no flags)"
+    }
+  },
+  "required": ["text", "pattern"],
+  "additionalProperties": false
+}

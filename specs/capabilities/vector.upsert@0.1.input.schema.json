@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "vector.upsert input",
+  "type": "object",
+  "properties": {
+    "collection": { "type": "string" },
+    "id": { "type": "string" },
+    "embedding": {
+      "type": "array",
+      "items": { "type": "number" },
+      "minItems": 8
+    },
+    "meta": { "type": "object", "additionalProperties": true }
+  },
+  "required": ["collection", "id", "embedding"],
+  "additionalProperties": false
+}

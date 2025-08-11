@@ -1,0 +1,28 @@
+{
+  "name": "vector-upsert-basic",
+  "version": "0.1.0",
+  "capability": "vector.upsert@0.1",
+  "implementation": {
+    "kind": "container",
+    "image": "ghcr.io/metis/tools/vector-upsert:0.1.0"
+  },
+  "inputSchema": {
+    "$ref": "../../capabilities/vector.upsert@0.1.input.schema.json"
+  },
+  "outputSchema": {
+    "$ref": "../../capabilities/vector.upsert@0.1.output.schema.json"
+  },
+  "authScopes": [],
+  "sandboxed": true,
+  "tests": [
+    {
+      "name": "simple",
+      "input": {
+        "collection": "demo",
+        "id": "vec1",
+        "embedding": [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8]
+      },
+      "expect": { "type": "object", "required": ["ok"] }
+    }
+  ]
+}

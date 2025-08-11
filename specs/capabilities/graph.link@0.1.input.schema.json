@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "graph.link input",
+  "type": "object",
+  "properties": {
+    "from": { "type": "string" },
+    "rel": { "type": "string" },
+    "to": { "type": "string" },
+    "props": { "type": "object", "additionalProperties": true }
+  },
+  "required": ["from", "rel", "to"],
+  "additionalProperties": false
+}
