@@ -4,6 +4,7 @@ import { resolve } from "node:path"
 import { describe, expect, it } from "@effect/vitest"
 import { Effect, Layer, Schema } from "effect"
 
+import { uuidv7 } from "../../src/domain/Ids.js"
 import { Intent } from "../../src/domain/Intent.js"
 import { Policy } from "../../src/domain/Policy.js"
 import { ToolSpec } from "../../src/domain/ToolSpec.js"
@@ -319,4 +320,61 @@ describe("sampled verification (ADR-014 §4)", () => {
     const { events } = await runLoop("Draft a PRD", "S2", permissive, false, { sample: false })
     expect(events.find((e: { type: string }) => e.type === "VERIFICATION_SAMPLED")).toBeUndefined()
   }, 30_000)
+})
+
+/**
+ * A doom loop: the same capability called with the same input, over and over.
+ *
+ * Distinct step ids, identical `(capability, input)` — which is the shape the breaker has to key
+ * on. Keying on the step id would miss it entirely, since a loop that repeats is by definition
+ * producing new step identities each time round.
+ */
+const runRepeated = (copies: number) =>
+  Effect.runPromise(
+    Effect.scoped(
+      Effect.gen(function*() {
+        const planner = yield* Planner.Planner
+        const intent = intentFor("Draft a PRD for a research summarizer", "S2")
+        const full = yield* planner.plan(intent)
+        const step = full.steps.find((s) => s.toolCall?.capability === "design.prd@1.0")!
+        const steps = Array.from({ length: copies }, () => ({ ...step, id: uuidv7() as typeof step.id }))
+        // Spreading the step drops the class identity the schema gives it; the executor reads it
+        // structurally, so the double cast is the honest way to say so.
+        const plan = { ...full, steps } as unknown as typeof full
+
+        const report = yield* Executor.execute(intent, plan)
+        const log = yield* EventLogStore
+        const events = yield* Effect.orDie(log.read({}))
+        return { events, report }
+      })
+    ).pipe(Effect.provide(stack(permissive))) as Effect.Effect<any>
+  )
+
+describe("a repeated identical call trips the circuit breaker", () => {
+  it("does not fire below the threshold", async () => {
+    const { report } = await runRepeated(2)
+
+    expect(report.status).toBe("completed")
+    expect(report.steps.map((s: { status: string }) => s.status)).toEqual(["completed", "completed"])
+  })
+
+  it("forces approval on the third identical dispatch rather than denying it", async () => {
+    const { report } = await runRepeated(3)
+
+    expect(report.steps.map((s: { status: string }) => s.status)).toEqual([
+      "completed",
+      "completed",
+      "awaiting_approval"
+    ])
+    expect(report.status).toBe("awaiting_approval")
+  })
+
+  it("records the trip in the event log with the repeat count", async () => {
+    const { events } = await runRepeated(3)
+
+    const tripped = events.find((e: { type: string }) => e.type === "DOOM_LOOP_DETECTED")
+    expect(tripped, "a circuit-breaker trip must leave a record").toBeDefined()
+    expect(tripped.payload.capability).toBe("design.prd@1.0")
+    expect(tripped.payload.repeats).toBe(3)
+  })
 })

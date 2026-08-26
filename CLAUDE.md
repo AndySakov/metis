@@ -34,7 +34,7 @@ Settled. Do not relitigate without an ADR superseding them.
 
 ## Open decisions
 
-- WASM component host for real tool sandboxing. Intended destination, not yet started. Until then tool isolation is process-level only — say so plainly rather than implying otherwise.
+- WASM component host for real tool sandboxing. Still unbuilt, so tool isolation remains process-level only — say so plainly rather than implying otherwise. **ADR-020 fixes the vocabulary**: isolation is an ordered ladder (`none < process < container < wasm`) and a policy input, so a rule can require a tier. No descriptor may claim a tier above `process` until that tier exists.
 - Graph store: currently absent (ADR-013). Revisit only if a genuine deep-traversal workload appears.
 - ~~Timestamp representation in storage.~~ **Closed by ADR-019:** epoch seconds as `bigint` at every layer, no `timestamptz`.
 
@@ -86,8 +86,9 @@ contained while touching it.
 2. **The red team's one escape.** The suite reports seven attempts, six caught by rule, none caught
    by luck — and one through: an unknown capability at the highest gear. That is a rule gap, and it
    is the most concrete safety finding in the repo.
-3. **Tool sandboxing.** Isolation is still process-level only. The WASM component host is the
-   intended destination and has not been started.
+3. **Tool sandboxing.** Isolation is still process-level only. ADR-020 decided the shape — an
+   ordered ladder that policy can require a minimum of — but nothing above `process` is built, and
+   the schema change, rule grammar and conformance vector it calls for are not written yet.
 
 ## Traps
 

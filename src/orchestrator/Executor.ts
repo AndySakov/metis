@@ -79,6 +79,37 @@ const artifactBody = (output: unknown): string | undefined => {
   return undefined
 }
 
+/**
+ * How many identical dispatches before the breaker trips (OpenCode uses the same figure).
+ *
+ * Two identical calls are ordinary — a plan may legitimately ask for the same thing twice. Three
+ * in one walk of a plan is a loop, and a loop that nobody stops is an agent burning budget or
+ * repeating a side effect until something else breaks.
+ */
+const DOOM_LOOP_THRESHOLD = 3
+
+/**
+ * Identity of a call for repeat detection: capability plus input, with object keys ordered so two
+ * structurally equal inputs produce the same key regardless of how they were built.
+ *
+ * Deliberately *not* keyed on the step id. A loop produces a fresh step id every time round, so
+ * keying on identity would make the breaker unable to see the thing it exists to catch.
+ */
+const callKey = (capability: string, input: unknown): string => {
+  const stable = (value: unknown): unknown => {
+    if (Array.isArray(value)) return value.map(stable)
+    if (value !== null && typeof value === "object") {
+      return Object.fromEntries(
+        Object.keys(value as Record<string, unknown>)
+          .sort()
+          .map((key) => [key, stable((value as Record<string, unknown>)[key])])
+      )
+    }
+    return value
+  }
+  return `${capability}\u0000${JSON.stringify(stable(input))}`
+}
+
 export const execute = (
   intent: Intent,
   plan: Plan,
@@ -148,6 +179,10 @@ export const execute = (
 
     let halted = false
     let finalStatus: ExecutionStatus = "completed"
+
+    // Scoped to this invocation, like every other decision in here: on resume the executor
+    // re-derives rather than restores (ADR-016), and the repeat count is no exception.
+    const dispatches = new Map<string, number>()
 
     for (const step of plan.steps) {
       if (halted) {
@@ -226,11 +261,29 @@ export const execute = (
           })
         }
 
+        // ---- Circuit breaker ---------------------------------------------------------------
+        // A repeated identical call escalates to a human rather than being denied: the useful
+        // failure mode is "stop and ask", because a loop is usually a bug in what asked for the
+        // work, not an attack. Denying would also make the step unrecoverable by approval.
+        const key = callKey(step.toolCall.capability, step.toolCall.input)
+        const repeats = (dispatches.get(key) ?? 0) + 1
+        dispatches.set(key, repeats)
+        const loopTripped = repeats >= DOOM_LOOP_THRESHOLD
+        if (loopTripped) {
+          yield* emit("DOOM_LOOP_DETECTED", {
+            stepId: step.id,
+            capability: step.toolCall.capability,
+            repeats,
+            threshold: DOOM_LOOP_THRESHOLD
+          })
+        }
+
         // The gate can require approval even when the plan did not — policy changes between
         // planning and execution, and the decision that counts is the one made now.
         const needsApproval = step.requiresApproval ||
           decision.effect === "require_approval" ||
-          !verdict.permitted
+          !verdict.permitted ||
+          loopTripped
         if (needsApproval && !approved.has(step.id)) {
           yield* emit("APPROVAL_REQUESTED", {
             stepId: step.id,
