@@ -10,7 +10,7 @@ Single user (Teminife / Andy). Not a product, not multi-tenant. Design for one p
 
 ## Current state — read this honestly
 
-**Stages 0 and 1 are done. Stage 2 runs end to end except for durability — intent to stored artifact over real MCP, with policy live at all three points. Restate is not wired.**
+**Stages 0 through 4 are done. The loop runs end to end and survives a crash — intent to stored artifact over real MCP, policy live at all three points, plan execution as a Restate workflow with real suspension, and trust written back from the event log.**
 
 What exists in code: contract schemas in `specs/`, Effect Schema domain types in `src/domain/` (one home per type), a PostgreSQL schema in `migrations/` with domain constraints, a checksum-verifying migration runner, `EventLogStore` and `ArtifactStore` with in-memory *and* Postgres adapters passing the same conformance vectors, a `PolicyEngine` whose every decision records the matched rule or an explicit `unmatched`, a read-only two-ledger `TrustLedger`, a template-matched planner, a `PolicyGate` that writes every decision to the event log, an ADR-014 coverage report computed back out of that log, a tool registry, an MCP client with a real stdio server behind `design.prd@1.0`, an executor that runs a plan with policy at all three points and writes checksummed artifacts with provenance, working HTTP handlers, a Postgres `PlanStore` so plans survive restarts, trust derived from the event log with gear changes written back as events, a red-team suite reporting caught-by-rule versus caught-by-luck, gear enforcement and sampled verification in the execution path, eight capabilities with real MCP implementations across three servers, an HTTP surface declaring three endpoints, and a test suite that fails when a spec and the code disagree.
 
@@ -72,25 +72,27 @@ examples are decoded with the real schemas, every identifier in every spec is ch
 `$ref`s must resolve, and the OpenAPI document is reconciled against the `HttpApi` definition
 (ADR-011's required check). Adding a contract without adding it to these tests re-opens the door.
 
-## Next — durability, then Stage 3
+## Next — reach, then isolation
 
-The loop runs. What it does not do is survive a crash.
+The loop runs, survives a crash, and writes its own trust back. Durability landed in
+`PlanWorkflow.ts`; the trust writers landed in `TrustUpdater.ts`; the adversarial suite exists and
+reports a number. What is thin now is how much of the world it can touch, and how well it is
+contained while touching it.
 
-1. **Wire Restate.** The executor is written so this is a substitution, not a rewrite: it owns
-   planning, policy, dispatch and memory, and contains no durability machinery to unpick. Restate
-   brings retries, backoff, checkpointing and real suspension. Policy must be **re-evaluated on
-   resume**, never restored from a checkpoint — the executor already re-evaluates from scratch on
-   every invocation, so preserving that property is the main thing to protect.
-2. **Trust updates** (Stage 4): compliance from real policy evaluations, competence from approvals
-   and edit ratios. The ledger already enforces; it needs writers.
-3. **Stage 5, the adversarial suite.** This is the first honest test of whether any of it works, and
-   the loop is now complete enough to attack: prompt injection through fetched content, an
-   approval-gated action running without approval, a tool requesting undeclared scopes.
+1. **The nine descriptor-only capabilities.** `research.search` needs a real search backend; the
+   `agent.*` ones need real browser and device control. Implement them against real backends or not
+   at all — a registry entry that does not do what its contract says is worse than an absent one,
+   because the planner will target it.
+2. **The red team's one escape.** The suite reports seven attempts, six caught by rule, none caught
+   by luck — and one through: an unknown capability at the highest gear. That is a rule gap, and it
+   is the most concrete safety finding in the repo.
+3. **Tool sandboxing.** Isolation is still process-level only. The WASM component host is the
+   intended destination and has not been started.
 
 ## Traps
 
 - **Do not let the drift re-open.** It is closed and held closed by tests. A new contract that is not covered by `test/specs/` is a new second source of truth waiting to diverge.
-- **Do not write another planning document.** This project's failure mode is design-ahead-of-code. The ratio has improved but docs still outweigh source several times over. When in doubt, write code or a test, not a doc — and specifically, do not design the policy engine's schemas before writing the engine.
+- **Do not write another planning document.** This project's failure mode is design-ahead-of-code. The ratio has since inverted — source, tests and contracts outweigh prose by roughly five to one — but the pull is still there. When in doubt, write code or a test, not a doc — and specifically, do not design the policy engine's schemas before writing the engine.
 - **Do not let policy become a config file with no tests.** It now has vectors in `specs/policy/conformance/` covering effects, the fail-safe tie-break, and the unmatched case. Every new rule form needs a case; a rule shape with no vector is untested safety code.
 - **Do not measure trust by task success alone** (ADR-014). Trust that rises because the user accepted the output is trust in usefulness, not safety.
 - **Do not reach for Rust because it sounds good.** ADR-015 requires a measurement first. The device daemon will earn it; the orchestrator will not.
@@ -102,7 +104,7 @@ The loop runs. What it does not do is survive a crash.
 - `pnpm lint` — lint
 - `pnpm test` — vitest
 - `pnpm migrate` — apply the database schema (safe to re-run; fails if an applied migration was edited).
-- Storage adapters must pass the conformance vectors in `specs/storage/conformance/` (`eventlog/`, `artifact/`). No adapter exists yet, so nothing runs them — writing the runner is part of Stage 1.
-- Policy rules must pass their own vectors once those exist (currently missing — a gap to close, not a state to preserve).
+- Storage adapters must pass the conformance vectors in `specs/storage/conformance/` (`eventlog/`, `artifact/`). Both the in-memory and Postgres adapters run them; the Postgres suite skips when no database is reachable, unless `METIS_TEST_POSTGRES=1` makes that a failure.
+- Policy rules must pass their vectors in `specs/policy/conformance/`. Every new rule form needs a case.
 
 Definition of done for any change: typecheck passes, lint passes, tests pass, and any spec the change touches is updated in the same commit.

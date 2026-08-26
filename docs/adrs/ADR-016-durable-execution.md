@@ -23,7 +23,7 @@ Restate fits this project specifically:
 - **Substantially lighter to operate than Temporal** for a single-user system. Temporal is more mature and has the larger ecosystem, but its operational footprint is sized for organisations.
 - Suspension is native, which is exactly what pause/resume/park requires — a plan waiting for an S3 approval is a suspended workflow, not a polling loop.
 
-DBOS was the runner-up and remains a reasonable fallback, since it runs on Postgres and METIS is already on Postgres underneath Gel (ADR-012).
+DBOS was the runner-up and remains a reasonable fallback, since it runs on Postgres and METIS is on Postgres directly (ADR-018, superseding ADR-012).
 
 ## Design notes that matter
 

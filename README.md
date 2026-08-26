@@ -1,5 +1,8 @@
 # METIS
 
+[![Check](https://github.com/AndySakov/metis/actions/workflows/check.yml/badge.svg)](https://github.com/AndySakov/metis/actions/workflows/check.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](./LICENSE)
+
 **Modular Engine for Thought, Insight, and Synthesis** — a personal, Jarvis-grade copilot that
 takes an idea from spark → exploration → design → execution, remembers with provenance, learns a
 voice, and earns autonomy rather than assuming it.

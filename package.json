@@ -7,7 +7,7 @@
     "node": ">=22"
   },
   "license": "MIT",
-  "description": "Metis Core",
+  "description": "A personal, Jarvis-grade copilot: idea to exploration to design to execution, with provenance, policy in the execution path, and earned autonomy.",
   "repository": {
     "type": "git",
     "url": "https://github.com/AndySakov/metis"
@@ -82,8 +82,5 @@
         "**/*.ts"
       ]
     }
-  },
-  "pnpm": {
-    "patchedDependencies": {}
   }
 }
