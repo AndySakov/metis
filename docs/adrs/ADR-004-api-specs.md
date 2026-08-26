@@ -1,6 +1,6 @@
 # ADR-004: API & Event Spec Canon
 
-Status: Proposed
+Status: Accepted
 
 ## Context
 

@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schema.metis.dev/capabilities/agent.web_navigate@1.0.input.schema.json",
+  "title": "agent.web_navigate input",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "goal": { "type": "string" },
+    "inputs": { "type": "object", "additionalProperties": true },
+    "startUrl": { "type": "string", "format": "uri" },
+    "constraints": { "type": "array", "items": { "type": "string" } },
+    "allowDomains": { "type": "array", "items": { "type": "string" } },
+    "budgets": {
+      "$ref": "https://schema.metis.dev/common/Budget.schema.json"
+    },
+    "headless": { "type": "boolean", "default": true }
+  },
+  "required": ["goal", "startUrl", "allowDomains"]
+}

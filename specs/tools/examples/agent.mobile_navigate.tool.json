@@ -1,0 +1,37 @@
+{
+  "name": "agent-mobile-navigate",
+  "version": "1.0.0",
+  "capability": "agent.mobile_navigate@1.0",
+  "mcp": {
+    "server": "metis.agent",
+    "tool": "mobile_navigate",
+    "transport": "stdio"
+  },
+  "idempotent": false,
+  "isolation": "process",
+  "inputSchema": {
+    "$ref": "../../capabilities/agent.mobile_navigate@1.0.input.schema.json"
+  },
+  "outputSchema": {
+    "$ref": "../../capabilities/agent.mobile_navigate@1.0.output.schema.json"
+  },
+  "authScopes": [
+    "device.avd"
+  ],
+  "tests": [
+    {
+      "name": "launch-only",
+      "input": {
+        "goal": "Launch app and capture screenshot",
+        "appIdentifier": "com.example.app",
+        "inputs": {}
+      },
+      "expect": {
+        "type": "object",
+        "required": [
+          "status"
+        ]
+      }
+    }
+  ]
+}

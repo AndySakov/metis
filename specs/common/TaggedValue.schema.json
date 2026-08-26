@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schema.metis.dev/common/TaggedValue.schema.json",
+  "title": "TaggedValue",
+  "description": "A named value carrying tags. Tags are where trust labels live — content pulled from the open web is tagged `untrusted` at ingest, and policy reads that tag at dispatch (Limits & Guardrails §1B). A bare map of name to value could not carry that, which is why intent inputs and constraints are ordered arrays of these rather than open objects.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["name", "value"],
+  "properties": {
+    "name": { "type": "string", "minLength": 1 },
+    "value": {},
+    "tags": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "default": []
+    }
+  },
+  "examples": [
+    { "name": "topic", "value": "retrieval-augmented generation", "tags": [] },
+    {
+      "name": "source_page",
+      "value": "https://example.com/post",
+      "tags": ["untrusted", "web"]
+    }
+  ]
+}

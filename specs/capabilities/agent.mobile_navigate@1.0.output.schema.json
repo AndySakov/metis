@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schema.metis.dev/capabilities/agent.mobile_navigate@1.0.output.schema.json",
+  "title": "agent.mobile_navigate output",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "status": { "type": "string", "enum": ["success", "paused", "failed"] },
+    "artifacts": {
+      "type": "array",
+      "items": { "type": "object", "additionalProperties": true }
+    },
+    "evidence": {
+      "type": "object",
+      "properties": {
+        "screenshots": { "type": "array", "items": { "type": "string" } }
+      },
+      "additionalProperties": false
+    },
+    "summary": { "type": "string" }
+  },
+  "required": ["status"]
+}

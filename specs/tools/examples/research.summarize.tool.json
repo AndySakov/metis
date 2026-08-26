@@ -2,10 +2,13 @@
   "name": "research-summarize-basic",
   "version": "0.1.0",
   "capability": "research.summarize@0.1",
-  "implementation": {
-    "kind": "container",
-    "image": "ghcr.io/metis/tools/research-summarize:0.1.0"
+  "mcp": {
+    "server": "metis.research",
+    "tool": "summarize",
+    "transport": "stdio"
   },
+  "idempotent": true,
+  "isolation": "process",
   "inputSchema": {
     "$ref": "../../capabilities/research.summarize@0.1.input.schema.json"
   },
@@ -13,12 +16,22 @@
     "$ref": "../../capabilities/research.summarize@0.1.output.schema.json"
   },
   "authScopes": [],
-  "sandboxed": true,
   "tests": [
     {
       "name": "shape-only",
-      "input": { "chunks": [{ "text": "hello" }] },
-      "expect": { "type": "object", "required": ["markdown"] }
+      "input": {
+        "chunks": [
+          {
+            "text": "hello"
+          }
+        ]
+      },
+      "expect": {
+        "type": "object",
+        "required": [
+          "markdown"
+        ]
+      }
     }
   ]
 }

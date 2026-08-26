@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://metis/specs/capabilities/research.claim_graph@0.1.input.schema.json",
+  "title": "research.claim_graph input",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "chunks": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "text": { "type": "string" },
+          "sourceId": { "type": "string" }
+        },
+        "required": ["text"]
+      }
+    }
+  },
+  "required": ["chunks"]
+}

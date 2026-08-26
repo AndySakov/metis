@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://metis/specs/capabilities/build.scaffold@0.1.input.schema.json",
+  "title": "build.scaffold input",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "name": { "type": "string" },
+    "stack": { "type": "string" }
+  },
+  "required": ["name"]
+}

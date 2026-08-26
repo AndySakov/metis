@@ -1,6 +1,6 @@
 # ADR-003: Capability Contracts & Plugin ABI
 
-Status: Accepted
+Status: Accepted (amended by ADR-017 — MCP replaces the bespoke plugin ABI; isolation is process-level until a WASM host exists)
 
 ## Context
 

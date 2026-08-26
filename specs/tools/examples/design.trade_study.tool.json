@@ -1,0 +1,40 @@
+{
+  "name": "design-trade-study-basic",
+  "version": "1.0.0",
+  "capability": "design.trade_study@1.0",
+  "mcp": {
+    "server": "metis.design",
+    "tool": "trade_study",
+    "transport": "stdio"
+  },
+  "idempotent": true,
+  "isolation": "process",
+  "inputSchema": {
+    "$ref": "../../capabilities/design.trade_study@1.0.input.schema.json"
+  },
+  "outputSchema": {
+    "$ref": "../../capabilities/design.trade_study@1.0.output.schema.json"
+  },
+  "authScopes": [],
+  "tests": [
+    {
+      "name": "minimal",
+      "input": {
+        "criteria": [
+          "cost",
+          "latency"
+        ],
+        "options": [
+          "A",
+          "B"
+        ]
+      },
+      "expect": {
+        "type": "object",
+        "required": [
+          "markdown"
+        ]
+      }
+    }
+  ]
+}

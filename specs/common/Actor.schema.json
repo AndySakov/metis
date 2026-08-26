@@ -1,0 +1,9 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schema.metis.dev/common/Actor.schema.json",
+  "title": "Actor",
+  "description": "Who caused a thing to happen: the user, or METIS itself. The optional `:qualifier` suffix names a specific principal. METIS is single-user today (one human, one system), so the bare forms are what actually appear; the qualified form exists so the multi-user seam stays open without being built.",
+  "type": "string",
+  "pattern": "^(user|metis)(:[a-z0-9._-]+)?$",
+  "examples": ["user", "metis", "user:andysakov"]
+}

@@ -1,0 +1,70 @@
+{
+  "name": "rule ordering and tie-breaks",
+  "description": "Pins the resolution order when more than one rule matches. A deliberately small policy: every rule here matches every request, so the only thing under test is which one wins.\n\nThis vector exists because the tie-break is the part of the engine that fails silently. If `deny` stopped outranking `allow` at equal priority, every functional test would still pass and the system would fail open — which is the wrong direction for a component whose entire purpose is constraint.",
+  "policy": {
+    "version": "ordering-1",
+    "defaultEffect": "allow",
+    "rules": [
+      {
+        "id": "allow.same_priority",
+        "description": "Matches everything, priority 5, allows.",
+        "priority": 5,
+        "effect": "allow",
+        "when": {}
+      },
+      {
+        "id": "approve.same_priority",
+        "description": "Matches everything, priority 5, gates.",
+        "priority": 5,
+        "effect": "require_approval",
+        "when": {}
+      },
+      {
+        "id": "deny.same_priority",
+        "description": "Matches everything, priority 5, denies.",
+        "priority": 5,
+        "effect": "deny",
+        "when": {}
+      },
+      {
+        "id": "allow.lower_number_higher_rank",
+        "description": "Matches only artifact_write, priority 1 — outranks all of the above by number.",
+        "priority": 1,
+        "effect": "allow",
+        "when": { "at": "artifact_write" }
+      }
+    ]
+  },
+  "cases": [
+    {
+      "name": "deny outranks require_approval and allow at equal priority",
+      "request": { "at": "tool_dispatch", "actor": "metis", "autonomy": "S2" },
+      "expect": { "effect": "deny", "basis": "matched", "ruleId": "deny.same_priority" }
+    },
+    {
+      "name": "all three equal-priority rules are recorded as considered, strictest first",
+      "description": "The winner is not the only thing kept. A rule that fires constantly but never wins is a vacuous rule, and ADR-014 wants it visible.",
+      "request": { "at": "plan_validation", "actor": "metis", "autonomy": "S2" },
+      "expect": {
+        "effect": "deny",
+        "basis": "matched",
+        "ruleId": "deny.same_priority",
+        "consideredRuleIds": [
+          "deny.same_priority",
+          "approve.same_priority",
+          "allow.same_priority"
+        ]
+      }
+    },
+    {
+      "name": "a lower priority number beats a stricter effect",
+      "description": "Priority is the primary key and severity only breaks ties. An explicit high-rank allow is how an exception to a broad deny is expressed, so this must not be inverted either.",
+      "request": { "at": "artifact_write", "actor": "metis", "autonomy": "S1" },
+      "expect": {
+        "effect": "allow",
+        "basis": "matched",
+        "ruleId": "allow.lower_number_higher_rank"
+      }
+    }
+  ]
+}

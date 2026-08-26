@@ -1,0 +1,39 @@
+{
+  "name": "design-api-spec-basic",
+  "version": "1.0.0",
+  "capability": "design.api_spec@1.0",
+  "mcp": {
+    "server": "metis.design",
+    "tool": "api_spec",
+    "transport": "stdio"
+  },
+  "idempotent": true,
+  "isolation": "process",
+  "inputSchema": {
+    "$ref": "../../capabilities/design.api_spec@1.0.input.schema.json"
+  },
+  "outputSchema": {
+    "$ref": "../../capabilities/design.api_spec@1.0.output.schema.json"
+  },
+  "authScopes": [],
+  "tests": [
+    {
+      "name": "minimal",
+      "input": {
+        "title": "Widget API",
+        "endpoints": [
+          {
+            "method": "GET",
+            "path": "/health"
+          }
+        ]
+      },
+      "expect": {
+        "type": "object",
+        "required": [
+          "markdown"
+        ]
+      }
+    }
+  ]
+}

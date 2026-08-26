@@ -2,24 +2,56 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://schema.metis.dev/Intent.schema.json",
   "title": "Intent",
+  "description": "A recorded request to METIS, after the server has assigned identity and time. `IntentDraft` is what a client submits; this is what gets persisted and referenced by a Plan.",
   "type": "object",
   "additionalProperties": false,
+  "required": ["id", "ts", "actor", "goal", "autonomy"],
   "properties": {
-    "id": { "type": "string" },
-    "ts": { "type": "string", "format": "date-time" },
-    "actor": { "type": "string", "pattern": "^(user|metis)(:[a-z0-9._-]+)?$" },
-    "goal": { "type": "string", "minLength": 1 },
-    "inputs": { "type": "object", "additionalProperties": true },
-    "constraints": { "type": "array", "items": { "type": "string" } },
-    "autonomy": { "type": "string", "enum": ["S0", "S1", "S2", "S3", "S4"] }
+    "id": { "$ref": "https://schema.metis.dev/common/Identifier.schema.json" },
+    "ts": { "$ref": "https://schema.metis.dev/common/Timestamp.schema.json" },
+    "actor": { "$ref": "https://schema.metis.dev/common/Actor.schema.json" },
+    "goal": {
+      "description": "What the user wants, in one line.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 5000
+    },
+    "description": {
+      "description": "Optional elaboration. `goal` is mandatory precisely so this does not have to be.",
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 5000
+    },
+    "inputs": {
+      "type": "array",
+      "items": {
+        "$ref": "https://schema.metis.dev/common/TaggedValue.schema.json"
+      },
+      "default": []
+    },
+    "constraints": {
+      "type": "array",
+      "items": {
+        "$ref": "https://schema.metis.dev/common/TaggedValue.schema.json"
+      },
+      "default": []
+    },
+    "autonomy": {
+      "description": "Requested autonomy gear (ADR-002). Absent on a draft means S0 — advise only — because the fail-safe default is the one that cannot cause a side effect.",
+      "type": "string",
+      "enum": ["S0", "S1", "S2", "S3", "S4"]
+    }
   },
-  "required": ["id", "ts", "actor", "goal"],
   "examples": [
     {
-      "id": "intent_123",
-      "ts": "2025-01-02T15:04:05Z",
+      "id": "01890a5d-ac96-774b-bcce-b302099a8057",
+      "ts": 1735872000,
       "actor": "user:andysakov",
       "goal": "Draft a PRD for a research summarizer",
+      "inputs": [{ "name": "audience", "value": "solo developer", "tags": [] }],
+      "constraints": [
+        { "name": "max_pages", "value": 3, "tags": ["hard"] }
+      ],
       "autonomy": "S1"
     }
   ]

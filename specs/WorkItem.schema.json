@@ -4,14 +4,44 @@
   "title": "WorkItem",
   "type": "object",
   "additionalProperties": false,
-  "required": ["id", "projectId", "title", "status"],
+  "required": [
+    "id",
+    "projectId",
+    "title",
+    "status"
+  ],
   "properties": {
-    "id": { "type": "string" },
-    "projectId": { "type": "string" },
-    "title": { "type": "string" },
-    "status": { "type": "string", "enum": ["todo", "doing", "done"] },
-    "dependsOn": { "type": "array", "items": { "type": "string" } },
-    "produces": { "type": "array", "items": { "type": "string" } },
-    "owner": { "type": "string" }
+    "id": {
+      "$ref": "https://schema.metis.dev/common/Identifier.schema.json"
+    },
+    "projectId": {
+      "$ref": "https://schema.metis.dev/common/Identifier.schema.json"
+    },
+    "title": {
+      "type": "string"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "todo",
+        "doing",
+        "done"
+      ]
+    },
+    "dependsOn": {
+      "type": "array",
+      "items": {
+        "$ref": "https://schema.metis.dev/common/Identifier.schema.json"
+      }
+    },
+    "produces": {
+      "type": "array",
+      "items": {
+        "$ref": "https://schema.metis.dev/common/Identifier.schema.json"
+      }
+    },
+    "owner": {
+      "$ref": "https://schema.metis.dev/common/Actor.schema.json"
+    }
   }
 }

@@ -1,0 +1,58 @@
+{
+  "name": "eventlog ordering and range filtering",
+  "interface": "EventLogStore",
+  "description": "The log reads back in timeline order and filters by an integer epoch range (ADR-005). Events appended out of order still read back in order, and identifiers break ties within the same second — which is the property UUIDv7 exists to provide.",
+  "steps": [
+    {
+      "op": "append",
+      "event": {
+        "id": "01890a5d-c100-7000-8000-000000000003",
+        "ts": 1700000200,
+        "type": "PLAN_CREATED",
+        "actor": "metis",
+        "payload": {}
+      }
+    },
+    {
+      "op": "append",
+      "event": {
+        "id": "01890a5d-c100-7000-8000-000000000001",
+        "ts": 1700000100,
+        "type": "PLAN_CREATED",
+        "actor": "user:andysakov",
+        "payload": {}
+      }
+    },
+    {
+      "op": "append",
+      "event": {
+        "id": "01890a5d-c100-7000-8000-000000000002",
+        "ts": 1700000100,
+        "type": "APPROVAL_GRANTED",
+        "actor": "user:andysakov",
+        "payload": {}
+      }
+    },
+    {
+      "op": "read",
+      "query": {},
+      "expect": {
+        "idsInOrder": [
+          "01890a5d-c100-7000-8000-000000000001",
+          "01890a5d-c100-7000-8000-000000000002",
+          "01890a5d-c100-7000-8000-000000000003"
+        ]
+      }
+    },
+    {
+      "op": "read",
+      "query": { "fromTs": 1700000150 },
+      "expect": { "idsInOrder": ["01890a5d-c100-7000-8000-000000000003"] }
+    },
+    {
+      "op": "read",
+      "query": { "types": ["APPROVAL_GRANTED"] },
+      "expect": { "idsInOrder": ["01890a5d-c100-7000-8000-000000000002"] }
+    }
+  ]
+}

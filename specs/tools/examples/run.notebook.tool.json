@@ -1,0 +1,33 @@
+{
+  "name": "run-notebook-basic",
+  "version": "0.1.0",
+  "capability": "run.notebook@0.1",
+  "mcp": {
+    "server": "metis.run",
+    "tool": "notebook",
+    "transport": "stdio"
+  },
+  "idempotent": false,
+  "isolation": "process",
+  "inputSchema": {
+    "$ref": "../../capabilities/run.notebook@0.1.input.schema.json"
+  },
+  "outputSchema": {
+    "$ref": "../../capabilities/run.notebook@0.1.output.schema.json"
+  },
+  "authScopes": [],
+  "tests": [
+    {
+      "name": "minimal",
+      "input": {
+        "code": "print('hi')"
+      },
+      "expect": {
+        "type": "object",
+        "required": [
+          "markdown"
+        ]
+      }
+    }
+  ]
+}

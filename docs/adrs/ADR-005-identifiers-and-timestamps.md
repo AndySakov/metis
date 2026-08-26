@@ -1,6 +1,7 @@
 # ADR-005: Identifiers & Timestamps Conventions
 
-Status: Proposed
+Status: Accepted
+Extended by: ADR-019 (epoch seconds in storage too)
 
 ## Context
 

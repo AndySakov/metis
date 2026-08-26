@@ -2,10 +2,13 @@
   "name": "transform-extract-basic",
   "version": "0.1.0",
   "capability": "transform.extract@0.1",
-  "implementation": {
-    "kind": "container",
-    "image": "ghcr.io/metis/tools/transform-extract:0.1.0"
+  "mcp": {
+    "server": "metis.transform",
+    "tool": "extract",
+    "transport": "stdio"
   },
+  "idempotent": true,
+  "isolation": "process",
   "inputSchema": {
     "$ref": "../../capabilities/transform.extract@0.1.input.schema.json"
   },
@@ -13,12 +16,19 @@
     "$ref": "../../capabilities/transform.extract@0.1.output.schema.json"
   },
   "authScopes": [],
-  "sandboxed": true,
   "tests": [
     {
       "name": "simple",
-      "input": { "text": "abc 123 abc", "pattern": "abc" },
-      "expect": { "type": "object", "required": ["matches"] }
+      "input": {
+        "text": "abc 123 abc",
+        "pattern": "abc"
+      },
+      "expect": {
+        "type": "object",
+        "required": [
+          "matches"
+        ]
+      }
     }
   ]
 }

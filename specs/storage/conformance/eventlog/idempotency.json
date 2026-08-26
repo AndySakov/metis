@@ -1,26 +1,36 @@
 {
   "name": "eventlog idempotency",
+  "interface": "EventLogStore",
+  "description": "Appending the same id twice is one event, and the first write wins. ADR-007 makes the event id the idempotency key; a replayed append during durable execution (ADR-016) must not duplicate the audit record or silently rewrite its timestamp.",
   "steps": [
     {
-      "op": "put",
+      "op": "append",
       "event": {
-        "id": "evt_same",
+        "id": "01890a5d-c000-7000-8000-000000000001",
         "ts": 1700000000,
-        "type": "X",
+        "type": "TOOL_COMPLETED",
         "actor": "metis",
         "payload": {}
       }
     },
     {
-      "op": "put",
+      "op": "append",
       "event": {
-        "id": "evt_same",
+        "id": "01890a5d-c000-7000-8000-000000000001",
         "ts": 1700000001,
-        "type": "X",
+        "type": "TOOL_COMPLETED",
         "actor": "metis",
-        "payload": {}
+        "payload": { "changed": true }
       }
     },
-    { "op": "list", "expect": { "countAtLeast": 1, "uniqueIds": true } }
+    {
+      "op": "read",
+      "query": {},
+      "expect": {
+        "count": 1,
+        "uniqueIds": true,
+        "firstWriteWins": { "id": "01890a5d-c000-7000-8000-000000000001", "ts": 1700000000 }
+      }
+    }
   ]
 }

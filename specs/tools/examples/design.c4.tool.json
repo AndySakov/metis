@@ -1,0 +1,33 @@
+{
+  "name": "design-c4-basic",
+  "version": "1.0.0",
+  "capability": "design.c4@1.0",
+  "mcp": {
+    "server": "metis.design",
+    "tool": "c4",
+    "transport": "stdio"
+  },
+  "idempotent": true,
+  "isolation": "process",
+  "inputSchema": {
+    "$ref": "../../capabilities/design.c4@1.0.input.schema.json"
+  },
+  "outputSchema": {
+    "$ref": "../../capabilities/design.c4@1.0.output.schema.json"
+  },
+  "authScopes": [],
+  "tests": [
+    {
+      "name": "minimal",
+      "input": {
+        "title": "Service X"
+      },
+      "expect": {
+        "type": "object",
+        "required": [
+          "markdown"
+        ]
+      }
+    }
+  ]
+}

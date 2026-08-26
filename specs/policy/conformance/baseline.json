@@ -1,0 +1,227 @@
+{
+  "name": "baseline policy decisions",
+  "description": "ADR-008 requires every policy to have unit tests with example inputs and expected decisions. These are those tests, expressed as data so the engine and any future re-implementation are held to the same bar. Each case asserts the effect AND the basis \u2014 an allow that matched nothing is a different outcome from an allow a rule granted, and ADR-014 exists because the two were previously indistinguishable.",
+  "policy": {
+    "version": "test-1",
+    "defaultEffect": "allow",
+    "rules": [
+      {
+        "id": "deny.untrusted_to_agent",
+        "description": "Content fetched from the open web must not drive a browser or a device.",
+        "priority": 0,
+        "effect": "deny",
+        "when": {
+          "capabilities": [
+            "agent.*"
+          ],
+          "tags": [
+            "untrusted"
+          ]
+        }
+      },
+      {
+        "id": "approve.non_idempotent_at_dispatch",
+        "description": "A tool that cannot be safely replayed needs a human before it runs.",
+        "priority": 10,
+        "effect": "require_approval",
+        "when": {
+          "at": "tool_dispatch",
+          "nonIdempotent": true
+        }
+      },
+      {
+        "id": "approve.expensive",
+        "description": "Anything estimated over five dollars is gated.",
+        "priority": 20,
+        "effect": "require_approval",
+        "when": {
+          "minDollars": 5
+        }
+      },
+      {
+        "id": "allow.research_reads",
+        "description": "Read-only research capabilities are permitted outright.",
+        "priority": 30,
+        "effect": "allow",
+        "when": {
+          "capabilities": [
+            "research.*"
+          ]
+        }
+      }
+    ]
+  },
+  "cases": [
+    {
+      "name": "untrusted web content cannot reach an agent capability",
+      "request": {
+        "at": "tool_dispatch",
+        "actor": "metis",
+        "autonomy": "S2",
+        "capability": "agent.web_navigate@1.0",
+        "tags": [
+          "untrusted"
+        ]
+      },
+      "expect": {
+        "effect": "deny",
+        "basis": "matched",
+        "ruleId": "deny.untrusted_to_agent"
+      }
+    },
+    {
+      "name": "the same capability without untrusted input is not denied by that rule",
+      "request": {
+        "at": "tool_dispatch",
+        "actor": "metis",
+        "autonomy": "S2",
+        "capability": "agent.web_navigate@1.0",
+        "idempotent": true
+      },
+      "expect": {
+        "effect": "allow",
+        "basis": "unmatched"
+      }
+    },
+    {
+      "name": "a non-idempotent tool needs approval at dispatch",
+      "request": {
+        "at": "tool_dispatch",
+        "actor": "metis",
+        "autonomy": "S3",
+        "capability": "run.notebook@0.1",
+        "idempotent": false
+      },
+      "expect": {
+        "effect": "require_approval",
+        "basis": "matched",
+        "ruleId": "approve.non_idempotent_at_dispatch"
+      }
+    },
+    {
+      "name": "unstated idempotency is treated as non-idempotent",
+      "description": "ADR-016 requires an explicit declaration; the safe reading of silence is the one that cannot replay a side effect.",
+      "request": {
+        "at": "tool_dispatch",
+        "actor": "metis",
+        "autonomy": "S3",
+        "capability": "build.scaffold@0.1"
+      },
+      "expect": {
+        "effect": "require_approval",
+        "basis": "matched",
+        "ruleId": "approve.non_idempotent_at_dispatch"
+      }
+    },
+    {
+      "name": "the same non-idempotent tool is not gated at plan validation by a dispatch-scoped rule",
+      "request": {
+        "at": "plan_validation",
+        "actor": "metis",
+        "autonomy": "S3",
+        "capability": "run.notebook@0.1",
+        "idempotent": false
+      },
+      "expect": {
+        "effect": "allow",
+        "basis": "unmatched"
+      }
+    },
+    {
+      "name": "cost gate fires above the threshold",
+      "request": {
+        "at": "plan_validation",
+        "actor": "user:andysakov",
+        "autonomy": "S3",
+        "capability": "design.prd@1.0",
+        "estimatedDollars": 7.5
+      },
+      "expect": {
+        "effect": "require_approval",
+        "basis": "matched",
+        "ruleId": "approve.expensive"
+      }
+    },
+    {
+      "name": "cost gate does not fire below the threshold",
+      "request": {
+        "at": "plan_validation",
+        "actor": "user:andysakov",
+        "autonomy": "S3",
+        "capability": "design.prd@1.0",
+        "estimatedDollars": 4.99
+      },
+      "expect": {
+        "effect": "allow",
+        "basis": "unmatched"
+      }
+    },
+    {
+      "name": "an untrusted tag alone does not deny a research read",
+      "request": {
+        "at": "tool_dispatch",
+        "actor": "metis",
+        "autonomy": "S2",
+        "capability": "research.fetch@0.1",
+        "tags": [
+          "untrusted"
+        ],
+        "idempotent": true
+      },
+      "expect": {
+        "effect": "allow",
+        "basis": "matched",
+        "ruleId": "allow.research_reads"
+      },
+      "description": "The deny rule is scoped to agent.* capabilities; a research read carrying untrusted input is still allowed, by the research rule rather than by default."
+    },
+    {
+      "name": "an ungoverned action is allowed but recorded as unmatched",
+      "description": "This is the case ADR-014 is about. The effect is indistinguishable from a permitted action; the basis is not, and the unmatched fraction is built from exactly this.",
+      "request": {
+        "at": "artifact_write",
+        "actor": "metis",
+        "autonomy": "S1"
+      },
+      "expect": {
+        "effect": "allow",
+        "basis": "unmatched"
+      }
+    },
+    {
+      "name": "lower priority number wins when two rules match",
+      "description": "approve.expensive (priority 20) and allow.research_reads (priority 30) both match; the gate wins.",
+      "request": {
+        "at": "tool_dispatch",
+        "actor": "metis",
+        "autonomy": "S3",
+        "capability": "research.search@0.1",
+        "estimatedDollars": 12,
+        "idempotent": true
+      },
+      "expect": {
+        "effect": "require_approval",
+        "basis": "matched",
+        "ruleId": "approve.expensive"
+      }
+    },
+    {
+      "name": "deny wins a priority tie against allow (fail-safe)",
+      "description": "Two rules match at priority 0, one deny and one allow. A misordered or equally-ranked policy must fail closed, not open \u2014 this is the ordering guarantee the engine promises, and without a case for it the tie-break could be inverted and every other test would still pass.",
+      "request": {
+        "at": "tool_dispatch",
+        "actor": "metis",
+        "autonomy": "S2",
+        "capability": "agent.web_navigate@1.0",
+        "tags": [
+          "untrusted"
+        ]
+      },
+      "expect": {
+        "effect": "deny",
+        "basis": "matched",
+        "ruleId": "deny.untrusted_to_agent"
+      }
+    }
+  ]
+}

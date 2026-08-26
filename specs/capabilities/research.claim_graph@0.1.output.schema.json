@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://metis/specs/capabilities/research.claim_graph@0.1.output.schema.json",
+  "title": "research.claim_graph output",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "edges": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "from": { "type": "string" },
+          "rel": {
+            "type": "string",
+            "enum": ["supports", "refutes", "mentions"]
+          },
+          "to": { "type": "string" },
+          "props": { "type": "object" }
+        },
+        "required": ["from", "rel", "to"]
+      }
+    }
+  },
+  "required": ["edges"]
+}

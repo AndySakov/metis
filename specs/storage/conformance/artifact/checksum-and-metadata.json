@@ -1,0 +1,57 @@
+{
+  "name": "artifact checksum and metadata separation",
+  "interface": "ArtifactStore",
+  "description": "Payload and metadata are separate throughout (ADR-007): `head` answers without moving bytes, and `get` returns both. The store verifies that the bytes it returns hash to the checksum it recorded — ADR-001 requires every artifact to carry a checksum, which is only meaningful if something checks it.",
+  "steps": [
+    {
+      "op": "put",
+      "artifact": {
+        "id": "01890a5d-d000-7000-8000-000000000001",
+        "kind": "text",
+        "title": "PRD: Research Summarizer",
+        "uri": "s3://artifacts/prd/research-summarizer.md",
+        "checksum": "sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+        "createdAt": 1700000000,
+        "createdBy": "metis",
+        "provenance": [
+          { "rel": "produced_by", "ref": "01890a5d-ae10-7c22-9b31-2f5a6d7e8f90" }
+        ]
+      },
+      "payloadUtf8": "test"
+    },
+    {
+      "op": "head",
+      "id": "01890a5d-d000-7000-8000-000000000001",
+      "expect": {
+        "returnsMetadataOnly": true,
+        "checksum": "sha256:9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08",
+        "provenanceCount": 1
+      }
+    },
+    {
+      "op": "get",
+      "id": "01890a5d-d000-7000-8000-000000000001",
+      "expect": { "payloadUtf8": "test", "checksumVerified": true }
+    },
+    {
+      "op": "put",
+      "description": "A checksum that does not match the payload must be rejected rather than stored.",
+      "artifact": {
+        "id": "01890a5d-d000-7000-8000-000000000002",
+        "kind": "text",
+        "title": "Corrupt",
+        "uri": "s3://artifacts/corrupt.md",
+        "checksum": "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+        "createdAt": 1700000001,
+        "createdBy": "metis"
+      },
+      "payloadUtf8": "test",
+      "expect": { "error": "ArtifactStoreError" }
+    },
+    {
+      "op": "get",
+      "id": "01890a5d-d000-7000-8000-000000000002",
+      "expect": { "error": "ArtifactRetrieveError" }
+    }
+  ]
+}

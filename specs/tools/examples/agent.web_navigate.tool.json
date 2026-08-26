@@ -1,0 +1,40 @@
+{
+  "name": "agent-web-navigate",
+  "version": "1.0.0",
+  "capability": "agent.web_navigate@1.0",
+  "mcp": {
+    "server": "metis.agent",
+    "tool": "web_navigate",
+    "transport": "stdio"
+  },
+  "idempotent": false,
+  "isolation": "process",
+  "inputSchema": {
+    "$ref": "../../capabilities/agent.web_navigate@1.0.input.schema.json"
+  },
+  "outputSchema": {
+    "$ref": "../../capabilities/agent.web_navigate@1.0.output.schema.json"
+  },
+  "authScopes": [
+    "public.web"
+  ],
+  "tests": [
+    {
+      "name": "can-open-start-url",
+      "input": {
+        "goal": "Open homepage and capture title",
+        "startUrl": "https://example.com",
+        "allowDomains": [
+          "example.com"
+        ],
+        "inputs": {}
+      },
+      "expect": {
+        "type": "object",
+        "required": [
+          "status"
+        ]
+      }
+    }
+  ]
+}

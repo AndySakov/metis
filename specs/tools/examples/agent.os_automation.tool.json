@@ -1,0 +1,36 @@
+{
+  "name": "agent-os-automation",
+  "version": "1.0.0",
+  "capability": "agent.os_automation@1.0",
+  "mcp": {
+    "server": "metis.agent",
+    "tool": "os_automation",
+    "transport": "stdio"
+  },
+  "idempotent": false,
+  "isolation": "process",
+  "inputSchema": {
+    "$ref": "../../capabilities/agent.os_automation@1.0.input.schema.json"
+  },
+  "outputSchema": {
+    "$ref": "../../capabilities/agent.os_automation@1.0.output.schema.json"
+  },
+  "authScopes": [
+    "device.local"
+  ],
+  "tests": [
+    {
+      "name": "noop",
+      "input": {
+        "goal": "Open a text editor",
+        "os": "macos"
+      },
+      "expect": {
+        "type": "object",
+        "required": [
+          "status"
+        ]
+      }
+    }
+  ]
+}

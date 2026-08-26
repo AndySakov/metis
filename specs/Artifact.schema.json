@@ -2,37 +2,93 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://schema.metis.dev/Artifact.schema.json",
   "title": "Artifact",
+  "description": "The metadata record for a stored blob. This is the *only* thing named Artifact in METIS. It never carries the bytes: ADR-007 gives the store `get(id) -> {bytes, metadata}` and `head(id) -> metadata` precisely so the metadata can be listed, referenced and returned from the API without moving payloads. A thing a plan intends to produce but has not produced yet is an `ArtifactExpectation` and lives in Plan.schema.json — it cannot be an Artifact because it has no bytes to checksum.",
   "type": "object",
-  "additionalProperties": true,
+  "additionalProperties": false,
   "required": [
     "id",
     "kind",
     "title",
     "uri",
     "checksum",
-    "created_at",
-    "created_by"
+    "createdAt",
+    "createdBy"
   ],
   "properties": {
-    "id": { "type": "string" },
-    "kind": { "type": "string" },
-    "title": { "type": "string" },
-    "uri": { "type": "string" },
-    "checksum": { "type": "string" },
-    "created_at": { "type": "integer" },
-    "created_by": { "type": "string", "enum": ["user", "metis"] },
-    "metadata": {},
-    "provenance": {}
+    "id": { "$ref": "https://schema.metis.dev/common/Identifier.schema.json" },
+    "kind": {
+      "type": "string",
+      "enum": [
+        "text",
+        "image",
+        "audio",
+        "video",
+        "file",
+        "link",
+        "code",
+        "binary"
+      ]
+    },
+    "title": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "description": { "type": "string", "maxLength": 5000 },
+    "uri": {
+      "description": "Where the bytes live. Any scheme — s3://, file://, https://.",
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9+.-]*://\\S+$",
+      "maxLength": 6400
+    },
+    "checksum": {
+      "description": "Content hash of the payload. ADR-001 requires every artifact to carry one; pinning the algorithm prefix means a checksum can actually be verified rather than merely stored.",
+      "type": "string",
+      "pattern": "^sha256:[0-9a-f]{64}$"
+    },
+    "createdAt": {
+      "$ref": "https://schema.metis.dev/common/Timestamp.schema.json"
+    },
+    "createdBy": {
+      "$ref": "https://schema.metis.dev/common/Actor.schema.json"
+    },
+    "metadata": {
+      "description": "Free-form, artifact-kind-specific detail. Nothing in the core reads this.",
+      "type": "object",
+      "additionalProperties": true,
+      "default": {}
+    },
+    "provenance": {
+      "description": "Typed links back to what this came from (ADR-001). An untyped blob here would make the provenance rules unimplementable, so the shape is fixed even though the relation vocabulary stays open.",
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["rel", "ref"],
+        "properties": {
+          "rel": {
+            "description": "Known values: derives_from, produced_by, justified_by, in_project.",
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*$"
+          },
+          "ref": {
+            "description": "An Identifier of another METIS entity, or an external URI.",
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      },
+      "default": []
+    }
   },
   "examples": [
     {
-      "id": "art_prd_001",
-      "kind": "markdown",
+      "id": "01890a5d-b1c2-7d3e-8f40-51627384950a",
+      "kind": "text",
       "title": "PRD: Research Summarizer",
       "uri": "s3://artifacts/prd/research-summarizer.md",
-      "checksum": "sha256:deadbeef",
-      "created_at": 1735872000,
-      "created_by": "metis"
+      "checksum": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "createdAt": 1735872000,
+      "createdBy": "metis",
+      "provenance": [
+        { "rel": "produced_by", "ref": "01890a5d-ae10-7c22-9b31-2f5a6d7e8f90" }
+      ]
     }
   ]
 }

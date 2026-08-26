@@ -1,6 +1,6 @@
 # ADR-009: Errors & Audit Envelopes
 
-Status: Proposed
+Status: Accepted
 
 ## Context
 

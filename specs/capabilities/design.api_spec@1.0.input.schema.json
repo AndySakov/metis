@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://metis/specs/capabilities/design.api_spec@1.0.input.schema.json",
+  "title": "design.api_spec input",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "title": { "type": "string" },
+    "endpoints": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "method": { "type": "string" },
+          "path": { "type": "string" },
+          "summary": { "type": "string" }
+        },
+        "required": ["method", "path"]
+      }
+    }
+  },
+  "required": ["title"]
+}

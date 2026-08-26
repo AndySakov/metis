@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schema.metis.dev/policy/PolicyDecision.schema.json",
+  "title": "PolicyDecision",
+  "description": "The record of one policy evaluation, written to the event log as POLICY_EVALUATED.\n\n`basis` is the field ADR-014 is built on. It is required and it is a tagged union rather than a nullable rule id, because an action that passed with no rule engaged must be distinguishable from one a rule deliberately permitted. A null would read as 'no information'; `unmatched` reads as 'nothing governed this', and the unmatched fraction over a window is the honest measure of how much behaviour is actually governed.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["at", "effect", "basis", "policyVersion", "consideredRuleIds", "ts"],
+  "properties": {
+    "at": {
+      "$ref": "https://schema.metis.dev/policy/Policy.schema.json#/$defs/PolicyPoint"
+    },
+    "effect": {
+      "$ref": "https://schema.metis.dev/policy/Policy.schema.json#/$defs/PolicyEffect"
+    },
+    "basis": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["_tag", "ruleId"],
+          "properties": {
+            "_tag": { "const": "matched" },
+            "ruleId": {
+              "$ref": "https://schema.metis.dev/policy/Policy.schema.json#/$defs/PolicyRuleId"
+            }
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["_tag"],
+          "properties": { "_tag": { "const": "unmatched" } }
+        }
+      ]
+    },
+    "policyVersion": {
+      "description": "Which policy produced this. A decision made before a policy change must remain interpretable after it.",
+      "type": "string",
+      "minLength": 1
+    },
+    "consideredRuleIds": {
+      "description": "Every rule that matched, strictest first — not only the winner. A rule that fires constantly but never wins is a vacuous rule, and one that never fires at all is dead; both are tracked and both are bugs (ADR-014).",
+      "type": "array",
+      "items": {
+        "$ref": "https://schema.metis.dev/policy/Policy.schema.json#/$defs/PolicyRuleId"
+      }
+    },
+    "ts": { "$ref": "https://schema.metis.dev/common/Timestamp.schema.json" },
+    "correlationId": {
+      "$ref": "https://schema.metis.dev/common/Identifier.schema.json"
+    }
+  },
+  "examples": [
+    {
+      "at": "tool_dispatch",
+      "effect": "deny",
+      "basis": { "_tag": "matched", "ruleId": "deny.untrusted_to_agent" },
+      "policyVersion": "example-1",
+      "consideredRuleIds": ["deny.untrusted_to_agent"],
+      "ts": 1735872000
+    },
+    {
+      "at": "artifact_write",
+      "effect": "allow",
+      "basis": { "_tag": "unmatched" },
+      "policyVersion": "example-1",
+      "consideredRuleIds": [],
+      "ts": 1735872001
+    }
+  ]
+}

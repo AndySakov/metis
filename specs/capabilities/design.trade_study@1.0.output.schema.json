@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://metis/specs/capabilities/design.trade_study@1.0.output.schema.json",
+  "title": "design.trade_study output",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "markdown": { "type": "string" }
+  },
+  "required": ["markdown"]
+}

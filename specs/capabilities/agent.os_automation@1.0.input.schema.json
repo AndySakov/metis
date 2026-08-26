@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schema.metis.dev/capabilities/agent.os_automation@1.0.input.schema.json",
+  "title": "agent.os_automation input",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "goal": { "type": "string" },
+    "inputs": { "type": "object", "additionalProperties": true },
+    "constraints": { "type": "array", "items": { "type": "string" } },
+    "budgets": { "$ref": "https://schema.metis.dev/common/Budget.schema.json" },
+    "os": { "type": "string", "enum": ["macos", "windows", "linux"] }
+  },
+  "required": ["goal", "os"]
+}

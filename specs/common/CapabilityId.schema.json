@@ -1,0 +1,9 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schema.metis.dev/common/CapabilityId.schema.json",
+  "title": "CapabilityId",
+  "description": "`domain.action@MAJOR.MINOR` (ADR-003). This is the semantic layer the planner targets. It survives the transport underneath being swapped — the move to MCP (ADR-017) did not touch it. PATCH is deliberately absent: patch changes are non-contractual and must not be visible here.",
+  "type": "string",
+  "pattern": "^[a-z][a-z0-9_.-]*\\.[a-z][a-z0-9_.-]*@[0-9]+\\.[0-9]+$",
+  "examples": ["research.search@0.1", "design.prd@1.0"]
+}

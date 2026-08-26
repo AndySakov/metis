@@ -1,269 +1,259 @@
 # METIS
 
-## 1) What METIS Is
+**Modular Engine for Thought, Insight, and Synthesis** — a personal, Jarvis-grade copilot that
+takes an idea from spark → exploration → design → execution, remembers with provenance, learns a
+voice, and earns autonomy rather than assuming it.
 
-METIS (Modular Engine for Thought, Insight, and Synthesis) is a Jarvis-grade copilot that takes ideas from spark → exploration → design → execution, learns your voice and workflows, and increasingly runs on its own—with safety gates, provenance, and memory.
+Named for the Greek _mētis_: cunning counsel, craft.
 
-### Core objectives
-
-- Conversational hub (voice/text) with real-time planning and tool use.
-- Project OS for charters, tasks, ADRs, artifacts, reviews.
-- Memory fabric with provenance (graph + vectors + timeline + artifacts).
-- Learning engine that adapts tone, habits, and tool choices over time.
-- Research & design with citations, claim graphs, specs, and diagrams.
-- Execution via tools, codegen, CI hooks, notebooks, and device control.
-- Polymath breadth (travel, product builds, research, car mods, etc.).
-- Autonomy gears from “advise” to “scheduled autonomy” with approvals.
-- Composable/upgradeable platform and self-bootstrapping modules.
-- Privacy & security by default; auditability end-to-end.
+Single user. Not a product, not multi-tenant. Designed for one person operating it daily, with the
+multi-user seams left open but not built.
 
 ---
 
-## 2) Tenets (Design Principles)
+## Current state — read this first
 
-- Always-visible plan (no hidden steps; diffs and cost/time budgets).
-- Provenance everywhere (sources, claim links, artifact checksums).
+**The design runs well ahead of the implementation. This section is the honest inventory.**
+
+What exists and works:
+
+- Contract schemas in `specs/` — Intent, IntentDraft, Plan, Artifact, Event, ToolSpec, shared types,
+  17 capability contracts, 17 example tool descriptors.
+- Effect Schema domain types in `src/domain/` that decode those contracts, with branded identifiers
+  and tagged errors.
+- A PostgreSQL schema in `migrations/`, with domain constraints and a checksum-verifying migration
+  runner (`pnpm migrate`).
+- `EventLogStore` and `ArtifactStore`, each with **two adapters** — in-memory and PostgreSQL — that
+  pass the same conformance vectors.
+- A `PolicyEngine` that evaluates at three points and records **which rule matched, or explicitly
+  none**, driven by policy vectors in `specs/policy/conformance/`.
+- A `TrustLedger` with independent competence and compliance scores, explicit decay half-lives, and
+  promotion that requires both. Read-only at this stage.
+- A **planner** — template-matched and deliberately dumb — that turns an Intent into a structurally
+  valid Plan, targeting capabilities and never naming a tool implementation.
+- A **`PolicyGate`** that evaluates and writes every decision to the event log, and a **coverage
+  report** computing the unmatched fraction, dead rules and vacuous rules from that log.
+- A **tool registry** resolving a capability id to an implementation, rejecting descriptors that
+  break ADR-006's rules at construction rather than at dispatch.
+- An **MCP client and a real MCP server** (`src/tools/servers/design.ts`) — `design.prd@1.0` is
+  answered over stdio by a separate process, so the transport is genuinely exercised.
+- An **executor** that walks a plan, evaluates policy at all three points, dispatches tools, gates
+  on approval, and writes artifacts with a verified checksum and provenance.
+- **Working HTTP handlers** behind the declared endpoints, served and tested over a real socket.
+- **Trust derived from the event log** — competence and compliance computed from the same record an
+  auditor would read, with a violation demoting immediately rather than being averaged away, and
+  every gear change written back as `TRUST_PROMOTED` / `TRUST_DEMOTED` with its justification.
+- **Durable plans.** `PostgresPlanStore` persists intents and plans in the normalised shape the
+  schema describes, so a plan survives a restart with its step order and trust tags intact.
+- **A red-team suite** (`specs/redteam/`) that reports a number: how many attempts got through, and
+  of those stopped, how many were stopped **by a rule** rather than by luck.
+- **Gear enforcement in the execution path.** The executor asks the trust ledger whether a skill has
+  earned the gear the intent requested; an untrusted skill falls back to human oversight rather than
+  running unattended, and the decision is recorded as `TRUST_GATE`.
+- **Sampled verification** (ADR-014 §4) — a configurable fraction of executed actions is checked
+  against the output schema its capability declares, independent of whether any rule flagged it.
+- **Eight capabilities with real MCP implementations** across three servers: `design.prd`,
+  `design.c4`, `design.api_spec`, `design.trade_study`, `transform.extract`, `research.fetch`,
+  `research.summarize`, `research.claim_graph`. `research.fetch` does real HTTP and refuses
+  loopback, private and link-local hosts; `research.summarize` is extractive, so a citation always
+  points at text that was genuinely supplied.
+
+- **Durable execution on Restate** (ADR-016), reachable through the API. `POST /plans/{id}/execute`
+  submits the plan and reports which path ran it: `restate` is durable — retries, checkpointing,
+  real suspension on an approval gate — and `direct` runs in-process and is **not**. The mode is
+  reported rather than hidden, so a caller cannot mistake one for the other. Tested against a real
+  Restate server.
+
+**The loop runs.** `test/orchestrator/Loop.test.ts` takes an intent to a stored artifact through a
+real MCP subprocess, with the whole run correlated in the event log — and covers the paths that
+matter: an approval that genuinely stops execution until granted, a policy denial that produces no
+artifact, and an unresolvable capability that fails cleanly instead of dispatching something else.
+- An HTTP surface declaration for three endpoints, reconciled against the OpenAPI document in CI.
+- A test suite that fails when a spec and the code disagree.
+
+What does **not** exist yet, despite being described in `docs/`:
+
+- Nine of the seventeen capabilities remain descriptors: `research.search` (needs a search
+  backend), `build.scaffold`, `run.notebook`, `graph.link`, `vector.upsert`, and the four `agent.*`
+  ones, which need real browser and device control. Implementing any of them against canned
+  responses would be worse than leaving them out — the registry would claim a capability that does
+  not do what its contract says.
+- The monorepo layout, `examples/`, voice, device control, the Adaptive Agent Foundry.
+- The monorepo layout, `examples/`, voice, device control, the Adaptive Agent Foundry.
+
+---
+
+## Tenets
+
+- Always-visible plan — no hidden steps; diffs and cost/time budgets surfaced.
+- Provenance everywhere — sources, claim links, artifact checksums.
 - Gears for safety: S0 advise → S1 draft → S2 sandbox run → S3 gated run → S4 scheduled autonomy.
-- Learning-first with nightly/weekly adaptation + shadow eval + revert.
-- Local-first privacy (scoped connectors, redaction, encryption).
-- Composability for years (stable capability contracts, SemVer, hot-swap).
-- Self-bootstrapping (METIS builds/extends METIS under guardrails).
-- Interface plurality (headless core + mobile/desktop + AR/VR).
-- Long-running orchestration (durable background DAGs, pause/resume).
-- Device & environment control (local agent, secure pairing).
+- Learning-first, with shadow evaluation and one-click revert.
+- Local-first privacy — scoped connectors, redaction at ingest.
+- Composability for years — stable capability contracts, SemVer, hot-swap.
+- **Prove the constraints held, don't assert them.** Policy coverage is measured; trust splits into
+  competence and compliance. This is the part with no equivalent in existing agent tooling.
 
 ---
 
-## 3) Architecture (Stack-Neutral)
+## Architecture
 
-### Layers
+Seven layers (ADR-000). Marked by what actually exists:
 
-1. Interface: realtime voice & chat, multimodal canvas, command palette.
-2. Orchestrator: intent → plan → tool dispatch → memory writes.
-3. Memory Fabric:
-   - Event/relational store (timeline, plans, tasks, ADRs, artifact metadata)
-   - Graph store (projects, artifacts, decisions, claims, sources; provenance)
-   - Vector index (personal exemplars, project context, corpora)
-   - Artifact/object store (versioned blobs, checksums)
-4. Knowledge Engine: multi-corpus retrieval, claims/evidence, licensing flags.
-5. Tooling/Execution: container/WASM tools, notebook runner, CI hooks.
-6. Governance/Safety: capability gating, approvals, policy-as-code, audit.
-7. Observability: traces, cost/latency budgets, eval dashboards.
+| Layer                     | Contents                                                        | State        |
+| ------------------------- | --------------------------------------------------------------- | ------------ |
+| Interface                 | realtime voice & chat, canvas, command palette                   | not started  |
+| Orchestrator              | intent → plan → dispatch → memory writes                         | **built**    |
+| Memory (`mneme`)          | event log, artifact store, external retrieval                    | **built**    |
+| Knowledge Engine          | multi-corpus retrieval, claims/evidence, licensing               | not started  |
+| Tooling/Execution         | MCP tools, notebook runner, CI hooks                             | 1 real tool  |
+| Governance/Safety         | capability gating, approvals, policy-as-code, audit              | **live**     |
+| Observability             | traces, cost/latency budgets, eval dashboards                    | not started  |
 
-#### Foundational capabilities
+Load-bearing decisions:
 
-- Capability Contracts (CAP IDs) `domain.action@MAJOR.MINOR` (planner targets capabilities, not implementations).
-- Plugin ABI + Hot-Swap via portable module format (containers or WASM); health checks; canary + rollback.
-- State migrations for selected datastores; dry-run + revert.
-- Feature flags/experiments and shadow/percent rollouts.
+- **Effect** is the runtime, type system and DI layer (ADR-011).
+- **PostgreSQL**, accessed directly, no ORM (ADR-018). Gel is discontinued and removed.
+- **Restate** for durable execution — plans are workflows, not a hand-built DAG scheduler (ADR-016).
+- **MCP** is the tool transport; capability IDs stay the semantic layer above it (ADR-017).
+- **TypeScript** is the core; other languages only at contract boundaries, only with a measurement
+  and an ADR (ADR-015).
 
-#### Interface layer
-
-- Headless Core API (protocol TBD: gRPC/GraphQL/HTTP).
-- Presence & handoff across clients; UI SDK for plan view, diffs, claim graph, approvals.
-
-#### Task orchestration & personas
-
-- DAG scheduler with retries, checkpoints, pause/resume/park.
-- Persona router (Explorer/Designer/Builder/Critic/PM) with per-step overrides.
-- Notifications (push/email/Matrix) and “what changed” digests.
-
-#### Security & privacy
-
-- Zero-trust (per-tool sandboxes), least privilege, scoped connectors.
-- Key mgmt (hardware-backed optional), secrets vault, client-side encryption buckets.
-- Policy-as-code, retention TTLs, license/IP guard, signed audit logs.
-
-#### Device & environment
-
-- Local Agent (implementation TBD) on LAN; common protocols (e.g., mDNS, MQTT, IPP, SSH, WebDAV).
-- Adapters: 3D printers, printers, tablet sync, desktop control.
-- Secure pairing with per-device scopes and revocation.
+**Tool isolation is process-level only.** MCP servers are separate processes; that is weaker than
+the container-or-WASM story in ADR-003. A WASM component host is the intended destination and has
+not been started. Treat any tool as trusted-by-configuration.
 
 ---
 
-## 4) Learning & Adaptation (How METIS Personalizes)
-
-- Signals: explicit feedback (“shorter,” “more formal”), edit diffs, tool approvals, dwell/reuse, outcomes (PR merged/tests pass).
-- Memory: persona profile (tone/structure), style kit (lexicon + exemplars), working habits, decision priors, trust ledger by domain.
-- Learners: nightly style distillation → Style Kit; weekly lightweight adapters (e.g., LoRA) + bandit policy for plan/tool choice.
-- Questioning policy: ask only on high-uncertainty, high-value slots; infer when trust + familiarity high.
-- Autonomy ramp: per-skill trust drives S0→S4; decays over time; promotions gated by metrics.
-- Controls: sliders/toggles (concision, rigor); “What did you learn?” changelog; one-click revert.
-
----
-
-## 5) Self-Bootstrapping (METIS builds METIS)
-
-- Builder personas: `@metis-build` (scaffold), `@metis-refactor` (upgrade), `@metis-test` (eval).
-- Pipeline: spec → codegen → tests → sandbox run → PR → approval → rollout → ADR.
-- Guardrails: signed modules, supply-chain attestation (optional), mutation budgets, reproducible builds.
-
----
-
-## 6) Interfaces & Multi-Client
-
-- Headless Core enables: quick-capture mobile, rich desktop canvas, and AR/VR viewers.
-- Seamless session handoff and background task notifications.
-- Command palette (⌘K) to run tools with arg inference (“simulate `@nozzle v3` for 30s `@12psi`”).
-
----
-
-## 7) Background Orchestration & Persona Swaps
-
-- Multiple long-running tasks; mid-stream pause/resume/park.
-- Persona switching within a plan step or project (“switch to Critic for this step”).
-- METIS can notify when results are ready, or park deprioritized projects.
-
----
-
-## 8) Security, Privacy, IP
-
-- Local indexing where possible; connector-scoped permissions; redaction at ingest.
-- License/IP checker; copyleft contamination guard; export-control flags.
-- Dual-key approvals for high-risk actions; tamper-evident event log.
-
----
-
-## 9) Repo & Project Structure (Monorepo)
+## Repository layout
 
 ```text
-/metis
-  /apps
-    /api-orchestrator           (tech TBD)
-    /realtime-gateway           (protocol TBD)
-    /canvas-app                 (tech TBD)
-  /packages
-    /planner-core               (library)
-    /tool-registry              (schemas + adapters)
-    /memory-client              (SDK)
-    /connectors                 (docs, drive, arXiv, github, jira, etc.)
-    /evaluation                 (harness + metrics)
-  /infra
-    /k8s                        (jobs, services, secrets)
-    /db                         (migrations: stores TBD)
-  /docs
-    /adrs
-    /charters
+metis/
+  migrations/        numbered plain-SQL migrations
+  specs/             canonical contracts — code conforms to these, not the reverse
+    common/          shared types (Identifier, Timestamp, Actor, Budget, Error, ...)
+    capabilities/    per-capability input/output schemas
+    tools/examples/  example ToolSpec descriptors
+    storage/         conformance vectors
+    api/             OpenAPI 3.1
+    events/          AsyncAPI 2.6
+  src/
+    domain/          Effect Schema types — one home per type
+    ingress/         HTTP surface
+    mneme/           memory services and their adapters
+    orchestrator/    planner and executor
+    policy/          policy engine, gate, coverage, trust ledger
+    tools/           registry, MCP client, and the MCP servers themselves
+    db/              migration runner and column codecs
+    config/          configuration
+  test/specs/        the checks that keep specs and code from drifting apart
+  test/storage/      conformance vectors run against every adapter
+  test/policy/       policy and trust vectors
+  docs/adrs/         decision records
+  docs/planning/     rebuild plan, roadmap, limits
 ```
 
----
-
-## 10) Storage Interfaces (Stack-Neutral)
-
-EventLogStore (append-only timeline), GraphStore (provenance & work graph), VectorIndex (ANN retrieval), ArtifactStore (versioned blobs).
-
-In dev, ship in-memory references with the same HTTP surface to unblock the Core Loop.
-
-Full API shapes are drafted (OpenAPI/AsyncAPI); copy from your “Stack-Neutral Artifacts” doc when you wire up the dev server.
+There is no `/apps`, `/packages` or `/infra`. Earlier drafts described a monorepo; it was never
+built and the description has been removed rather than left standing.
 
 ---
 
-## 11) Contracts & Schemas (Essentials)
+## Contracts
 
-- Capability Contracts: `domain.action@MAJOR.MINOR` (SemVer; planner supports N-2 MINOR).
-- ToolSpec: name, version, capability, implementation (container/WASM TBD), input/output schemas, scopes, sandboxed, tests.
-- Intent: `{ id, ts, actor, goal, inputs?, constraints?, autonomy? }`
-- Plan: `{ id, intentId, steps[], assumptions[], risks[], expectedArtifacts[] }`
-- PlanStep: `{ id, kind: tool|ask|write|decision, description, requiresApproval?, toolCall? }`
+- **Capability IDs**: `domain.action@MAJOR.MINOR`. The planner targets capabilities, never
+  implementation names. MAJOR breaks; MINOR is additive; PATCH is invisible here.
+- **Identifiers**: UUIDv7 — time-sortable. **UUIDv4 is forbidden**, and enforced: the Effect schema
+  rejects it and the `uuid_v7` Postgres domain makes it unwritable.
+- **Timestamps**: UNIX epoch seconds, integers, at every layer including storage (ADR-005, ADR-019).
+- **Errors**: tagged errors; no thrown exceptions across service boundaries.
+- **Every tool declares whether it is idempotent** — durable execution replays, and a replayed
+  non-idempotent tool is a real-world side effect happening twice.
 
----
-
-## 12) Roadmap (Phases & Exit Criteria)
-
-- Phase 0 – Groundwork & guardrails (monorepo, CI, Tool Registry validation, ADR-000/001/002).
-- Phase 1 – Core Loop (intent → plan → execute → memory; PRD demo).
-- Phase 2 – Project OS v1 (charter/ADR/tasks + views).
-- Phase 3 – Memory + Persona v1 (context packs; preference events; Persona Pack).
-- Phase 4 – Research v1 (retrieval, citations, claim graphs, licensing flags).
-- Phase 5 – Design Studio v1 (PRD, C4, API, trade studies).
-- Phase 6 – Execution v1 (codegen, notebooks, CI; job runner TBD; secrets mgr TBD).
-- Phase 7 – Autonomy & Safety v1 (gears, approvals, license/IP checker).
-- Phase 8 – UX & Voice v1 (STT/TTS; barge-in; palette; digest; protocol TBD).
-- Phase 9 – Connectors v1 (public + private; scopes; redaction).
-- Phase 10 – Evaluation & Launch (dashboards; red-team; rollback).
-
-### Add-ons
-
-4a Self-Bootstrap Toolchain · 6a Background Orchestration & Personas · 8a Interface SDK & Multi-Client · 7a Security Hardening · 9a Device & Environment Orchestration.
+Full index: `docs/planning/metis_phase_0_artifacts.md`.
 
 ---
 
-## 13) Acceptance Tests (Golden Demos)
+## Working on it
 
-1. Idea → PRD → Scaffold: “Build a research summarizer service.” → PRD + C4 + API + service scaffolding + CI passing.
-2. Literature Map: RAG state-of-the-art → ~10 sources, claim graph, related-work with citations.
-3. Learning Adaptation: After 10 tasks, METIS shortens intros, prefers numbered steps; one-click revert.
-4. Voice Loop: Mid-plan voice change; S3 action requires approval with diff; audit logged.
-
----
-
-## 14) Risks & Mitigations
-
-- Hallucination → strict citations, claim graphs, critic pass, refuse when uncertain.
-- Privacy/leakage → local indexing, scopes, redaction, encryption; no training on sensitive buckets by default.
-- Tool drift/cost → budget caps, cost-aware planner, observability alerts.
-- Overfitting to style → cross-domain checks; cap adapter updates; easy revert.
-
----
-
-## 15) Current Artifacts You Already Have
-
-- ADRs:
-  - ADR-000 Architecture (layered design; composability; observability)
-  - ADR-001 Memory Model (graph + vectors + timeline + artifacts; provenance rules)
-  - ADR-002 Autonomy Gears & Approvals (S0–S4; trust ledger; dual-key; policy-as-code)
-  - ADR-003 Capability Contracts & Plugin ABI (CAP IDs; SemVer; portable modules; hot-swap; signing)
-- Schemas: ToolSpec, Intent, Plan (JSON Schema; 2020-12 draft).
-- Core API: OpenAPI 3.1 (stack-neutral) with `/intent`, `/plans/{id}`, `/plans/{id}/execute`, `/artifacts/{id}`, `/eventlog`, `/tools`, `/tools/validate`.
-- Events: AsyncAPI 2.6 channels (`plan/created`, `tool/started|completed`, `artifact/written`, `approval/requested|granted`, `preference/recorded`).
-- Storage interfaces: EventLogStore, GraphStore, VectorIndex, ArtifactStore (HTTP shapes + guarantees).
-- Tool Registry: conformance rules + example test vectors.
-
-### Repo paths (proposed)
-
-```text
-docs/adrs/ADR-000-architecture.md
-docs/adrs/ADR-001-memory-model.md
-docs/adrs/ADR-002-autonomy-gears.md
-docs/adrs/ADR-003-capability-contracts.md
-specs/ToolSpec.schema.json
-specs/Intent.schema.json
-specs/Plan.schema.json
+```bash
+pnpm install
+pnpm check     # typecheck
+pnpm lint      # lint
+pnpm test      # vitest
 ```
 
----
+To apply the database schema:
 
-## 16) What’s TBD (on purpose) & How We’ll Choose
+```bash
+POSTGRES_HOST=localhost POSTGRES_USER=you POSTGRES_PASSWORD=... \
+POSTGRES_DATABASE=metis pnpm migrate
+```
 
-- Datastores (graph, event/relational, vector, artifact), API protocol (gRPC/GraphQL/HTTP), module packaging (containers/WASM), job runner, secrets manager, Local Agent impl.
-- Selection gate (after Phase 3): draft options → scorecard → spike top-2 → ADR to lock choice (with migration plan).
+`pnpm migrate` is safe to re-run: applied migrations are skipped, and one whose file changed after
+it was applied fails loudly rather than silently diverging.
 
----
+**Definition of done for any change:** typecheck passes, lint passes, tests pass, and any spec the
+change touches is updated in the same commit.
 
-## 17) Immediate Next Actions
-
-- ✅ Confirm this brief.
-- Build the in-memory dev server implementing EventLogStore, GraphStore, VectorIndex, ArtifactStore + Core API endpoints.
-- Scaffold Tool Registry (validation + test harness), then register the first must-have tools:
-  - `research.search`, `research.fetch`, `research.summarize`, `design.prd`.
-
----
-
-## 18) Quick Glossary
-
-- ADR — Architecture Decision Record, one decision per doc.
-- CAP ID — Capability ID (`domain.action@MAJOR.MINOR`).
-- Persona Pack — Style kit + tool policy + questioning rules + trust ledger.
-- Field Kit — Domain bundle (templates, tools, metrics, acceptance criteria).
-- Gears — Autonomy levels S0–S4.
+`CLAUDE.md` carries the working context — locked decisions, open decisions, and the traps in this
+repo. Read it before making changes.
 
 ---
 
-## 19) Example Natural Commands
+## Learning & adaptation (designed, not built)
 
-- “`@metis` create a project Atlas and draft a PRD for a research summarizer.”
-- “Compare options for vector DBs; give a trade study with latency/cost and a recommendation.”
-- “Pause the long-running literature map; resume tonight; send me the digest at 9pm.”
-- “Adopt the tone and structure of this paragraph for future abstracts.”
-- “Print `nozzle_v3.stl` on the Voron at 0.2mm; notify me when done.”
+- Signals: explicit feedback, edit diffs, tool approvals, reuse, outcomes.
+- Memory: persona profile, style kit, working habits, decision priors, trust ledger by domain.
+- Autonomy ramp: per-skill trust drives S0→S4, decaying over time.
+- **Trust is two ledgers, not one** (ADR-014). Competence rises on doing the job well; compliance
+  rises only on safety evidence. Promotion requires both; a compliance event demotes immediately.
+  Measuring only competence would ratchet a good writer toward scheduled autonomy on the strength
+  of its prose.
+
+---
+
+## Safety posture
+
+- Policy evaluated at three points: plan validation, tool dispatch, artifact write — and re-evaluated
+  on workflow resume, never restored from a checkpoint.
+- Every policy evaluation records **which rule matched, or explicitly none**. The unmatched fraction
+  is the honest measure of how much behaviour is actually governed, and it will be uncomfortable at
+  first (ADR-014).
+- Two logs, two purposes: Restate's journal is disposable execution mechanics; the METIS event log
+  is the tamper-evident audit record. Never merge them (ADR-016).
+
+`docs/planning/Limits-and-Guardrails.md` lists what this can't do, including things that are flatly
+impossible. It is deliberately unflattering; keep it that way.
+
+---
+
+## Roadmap
+
+`docs/planning/REBUILD-PLAN.md` is authoritative. Stage 0 (fix the drift) is complete; Stage 1 is
+the four services with implementations and tests.
+
+`docs/planning/metis_v_1_roadmap.md` is the original ten-phase plan, retained for the capability
+detail in it. Where it conflicts with the rebuild plan — particularly on the monorepo, the DAG
+scheduler and container-packaged tools — the rebuild plan and the ADRs win.
+
+Success is not "how many phases are done". It is two questions:
+
+1. Can it complete a real task end to end, with provenance, without hand-holding?
+2. Can it **prove** the constraints held while doing so — from the event log, with a coverage number
+   and a red-team pass rate?
+
+---
+
+## Glossary
+
+- **ADR** — Architecture Decision Record; one decision per document.
+- **CAP ID** — Capability ID, `domain.action@MAJOR.MINOR`.
+- **Gears** — autonomy levels S0–S4.
+- **Persona Pack** — style kit + tool policy + questioning rules + trust ledger.
+- **`mneme`** — the memory layer in code (Mnemosyne). Older docs say "Memory Fabric".
+
+---
+
+## License
+
+MIT. See `LICENSE`.

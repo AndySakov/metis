@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schema.metis.dev/common/Error.schema.json",
+  "title": "Error",
+  "description": "The error envelope every API and tool failure uses (ADR-009). `correlationId` is what ties a failure to the run that produced it — the same value appears on the ERROR event written to the log, which is the only way to reconstruct what happened after the fact.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["code", "message"],
+  "properties": {
+    "code": {
+      "type": "string",
+      "enum": ["VALIDATION_FAILED", "NOT_FOUND", "CONFLICT", "UNAVAILABLE", "INTERNAL"]
+    },
+    "message": { "type": "string", "minLength": 1 },
+    "details": { "type": "object", "additionalProperties": true },
+    "correlationId": {
+      "$ref": "https://schema.metis.dev/common/Identifier.schema.json"
+    }
+  },
+  "examples": [
+    {
+      "code": "VALIDATION_FAILED",
+      "message": "autonomy must be one of S0..S4",
+      "correlationId": "01890a5d-af1f-7d10-8b21-a2b3c4d5e6f7"
+    }
+  ]
+}

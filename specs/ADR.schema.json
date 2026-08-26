@@ -4,31 +4,74 @@
   "title": "ADR",
   "type": "object",
   "additionalProperties": false,
-  "required": ["id", "projectId", "title", "status"],
+  "required": [
+    "id",
+    "projectId",
+    "title",
+    "status"
+  ],
   "properties": {
-    "id": { "type": "string" },
-    "projectId": { "type": "string" },
-    "title": { "type": "string" },
+    "id": {
+      "$ref": "https://schema.metis.dev/common/Identifier.schema.json"
+    },
+    "projectId": {
+      "$ref": "https://schema.metis.dev/common/Identifier.schema.json"
+    },
+    "title": {
+      "type": "string"
+    },
     "status": {
       "type": "string",
-      "enum": ["proposed", "accepted", "superseded"]
+      "enum": [
+        "proposed",
+        "accepted",
+        "superseded"
+      ]
     },
-    "context": { "type": "string" },
-    "decision": { "type": "string" },
+    "context": {
+      "type": "string"
+    },
+    "decision": {
+      "type": "string"
+    },
     "alternatives": {
       "type": "array",
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["option"],
+        "required": [
+          "option"
+        ],
         "properties": {
-          "option": { "type": "string" },
-          "pros": { "type": "array", "items": { "type": "string" } },
-          "cons": { "type": "array", "items": { "type": "string" } }
+          "option": {
+            "type": "string"
+          },
+          "pros": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "cons": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
         }
       }
     },
-    "consequences": { "type": "array", "items": { "type": "string" } },
-    "links": { "type": "array", "items": { "type": "string" } }
+    "consequences": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "links": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
   }
 }

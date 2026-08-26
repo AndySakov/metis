@@ -2,34 +2,66 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://schema.metis.dev/ToolSpec.schema.json",
   "title": "ToolSpec",
+  "description": "A thin descriptor binding one MCP tool to one capability, carrying the metadata METIS needs and MCP does not itself provide (ADR-017). The registry resolves a CAP ID to one or more of these; policy chooses between them. Multiple ToolSpecs may satisfy the same capability — that is what makes hot-swap real.",
   "type": "object",
   "additionalProperties": false,
+  "required": [
+    "name",
+    "version",
+    "capability",
+    "mcp",
+    "idempotent",
+    "isolation",
+    "tests"
+  ],
   "properties": {
     "name": { "type": "string", "minLength": 1 },
     "version": {
+      "description": "SemVer of this implementation, independent of the capability's MAJOR.MINOR.",
       "type": "string",
       "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-[0-9A-Za-z-.]+)?(?:\\+[0-9A-Za-z-.]+)?$"
     },
     "capability": {
-      "type": "string",
-      "description": "CAP ID domain.action@MAJOR.MINOR",
-      "pattern": "^[a-z][a-z0-9_.-]*\\.[a-z][a-z0-9_.-]*@[0-9]+\\.[0-9]+$"
+      "$ref": "https://schema.metis.dev/common/CapabilityId.schema.json"
     },
-    "implementation": {
+    "mcp": {
+      "description": "The MCP binding. Names the server logically and the tool within it; connection details (command line, URL, credentials) are deployment configuration, not contract, and deliberately do not appear here.",
       "type": "object",
       "additionalProperties": false,
+      "required": ["server", "tool"],
       "properties": {
-        "kind": { "type": "string", "enum": ["container", "wasm"] },
-        "image": { "type": "string" },
-        "entrypoint": { "type": "string" }
-      },
-      "required": ["kind"]
+        "server": {
+          "description": "Logical server id, resolved to connection details by registry configuration.",
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9._-]*$"
+        },
+        "tool": {
+          "description": "Tool name as advertised by that server over MCP.",
+          "type": "string",
+          "minLength": 1
+        },
+        "transport": { "type": "string", "enum": ["stdio", "http"] }
+      }
+    },
+    "idempotent": {
+      "description": "Whether calling this twice with the same input is indistinguishable from calling it once. Required, with no default, because durable execution replays (ADR-016) and a wrong guess here means a real-world side effect happening twice. A tool that sends, charges, or moves something declares false and must be dispatched through exactly-once handling rather than plain retry.",
+      "type": "boolean"
+    },
+    "isolation": {
+      "description": "How strongly the tool is contained. `process` is the only honest value today: MCP servers are separate processes, so the boundary is the operating system's plus whatever METIS applies at dispatch (ADR-017). This is weaker than the container-or-WASM story in ADR-003. A single-valued enum rather than the old `sandboxed: boolean` — a boolean true would assert containment that does not exist, and adding `wasm` later is an additive change gated on a real WASM host and its own ADR.",
+      "type": "string",
+      "enum": ["process"]
     },
     "inputSchema": { "$ref": "#/$defs/JsonSchema" },
     "outputSchema": { "$ref": "#/$defs/JsonSchema" },
-    "authScopes": { "type": "array", "items": { "type": "string" } },
-    "sandboxed": { "type": "boolean" },
+    "authScopes": {
+      "description": "Scopes this tool requires. Policy denies at dispatch if a scope is not granted; a tool requesting an undeclared scope is a red-team case (REBUILD-PLAN Stage 5).",
+      "type": "array",
+      "items": { "type": "string" },
+      "default": []
+    },
     "costs": {
+      "description": "Hints only. Planners must not treat these as authoritative (ADR-010).",
       "type": "object",
       "additionalProperties": false,
       "properties": {
@@ -38,13 +70,15 @@
       }
     },
     "tests": {
+      "description": "Conformance vectors. At least one is mandatory: ADR-006 requires a passing vector per capability version, and expressing it as minItems here makes the registry rule structural instead of a convention nobody checks.",
       "type": "array",
+      "minItems": 1,
       "items": {
         "type": "object",
         "additionalProperties": false,
         "required": ["name", "input"],
         "properties": {
-          "name": { "type": "string" },
+          "name": { "type": "string", "minLength": 1 },
           "input": { "type": "object" },
           "expect": {
             "anyOf": [{ "$ref": "#/$defs/JsonSchema" }, { "type": "object" }]
@@ -53,7 +87,6 @@
       }
     }
   },
-  "required": ["name", "version", "capability"],
   "$defs": {
     "JsonSchema": {
       "type": "object",
@@ -63,13 +96,16 @@
   },
   "examples": [
     {
-      "name": "research.search",
+      "name": "research-search-basic",
       "version": "0.1.0",
       "capability": "research.search@0.1",
-      "implementation": {
-        "kind": "container",
-        "image": "ghcr.io/metis/tools/research-search:0.1.0"
+      "mcp": {
+        "server": "metis.research",
+        "tool": "search",
+        "transport": "stdio"
       },
+      "idempotent": true,
+      "isolation": "process",
       "inputSchema": {
         "type": "object",
         "properties": { "query": { "type": "string" } },
@@ -80,7 +116,13 @@
         "properties": { "results": { "type": "array" } }
       },
       "authScopes": ["public.web"],
-      "sandboxed": true
+      "tests": [
+        {
+          "name": "minimal",
+          "input": { "query": "retrieval-augmented generation", "limit": 1 },
+          "expect": { "type": "object", "required": ["results"] }
+        }
+      ]
     }
   ]
 }

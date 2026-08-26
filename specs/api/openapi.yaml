@@ -1,19 +1,53 @@
 openapi: 3.1.0
 info:
-  title: METIS Core API (stack-neutral)
-  version: 0.1.0
+  title: METIS Core API
+  version: 0.2.0
+  description: >
+    The headless Core API. This file is canonical (ADR-004): code conforms to it, not the reverse.
+
+    Every operation carries `x-status`. `implemented` means the endpoint exists in
+    `src/ingress/IntentApi.ts` today and is reconciled against this file by
+    `test/specs/ApiReconciliation.test.ts` — ADR-011 requires that one validate the other rather
+    than the two being maintained in parallel. `planned` means the contract is agreed but the
+    endpoint is not built yet; it is marked rather than omitted so this file states what is true.
 servers:
   - url: http://localhost:8080
+components:
+  parameters:
+    Identifier:
+      name: id
+      in: path
+      required: true
+      schema:
+        $ref: ../common/Identifier.schema.json
+  responses:
+    NotFound:
+      description: No such entity
+      content:
+        application/json:
+          schema:
+            $ref: ../common/Error.schema.json
+    ValidationFailed:
+      description: The request did not satisfy its schema
+      content:
+        application/json:
+          schema:
+            $ref: ../common/Error.schema.json
 paths:
   /intent:
     post:
+      operationId: createPlan
+      x-status: implemented
       summary: Submit an intent; returns a planned execution
+      description: >
+        Takes an IntentDraft, not an Intent. The server assigns `id` and `ts`, so requiring them
+        from the client would be asking for fields it has no authority to set (ADR-005).
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: ../Intent.schema.json
+              $ref: ../IntentDraft.schema.json
       responses:
         "201":
           description: Plan created
@@ -21,14 +55,15 @@ paths:
             application/json:
               schema:
                 $ref: ../Plan.schema.json
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
   /plans/{id}:
     get:
+      operationId: getPlan
+      x-status: implemented
       summary: Get a plan by id
       parameters:
-        - name: id
-          in: path
-          required: true
-          schema: { type: string }
+        - $ref: "#/components/parameters/Identifier"
       responses:
         "200":
           description: OK
@@ -36,14 +71,38 @@ paths:
             application/json:
               schema:
                 $ref: ../Plan.schema.json
+        "404":
+          $ref: "#/components/responses/NotFound"
+  /artifacts/{id}:
+    get:
+      operationId: getArtifact
+      x-status: implemented
+      summary: Get artifact metadata
+      description: >
+        Metadata only — never the bytes. ADR-007 separates `head` from `get` precisely so artifacts
+        can be listed and referenced without moving payloads.
+      parameters:
+        - $ref: "#/components/parameters/Identifier"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: ../Artifact.schema.json
+        "404":
+          $ref: "#/components/responses/NotFound"
   /plans/{id}/execute:
     post:
-      summary: Execute a plan (or step range) in the runner
+      operationId: executePlan
+      x-status: implemented
+      summary: Execute a plan as a durable workflow
+      description: >
+        Execution is a Restate workflow (ADR-016), so this returns immediately with an execution id
+        and the run continues durably. A step requiring approval suspends the workflow rather than
+        polling. Policy is re-evaluated on resume and never restored from a checkpoint.
       parameters:
-        - name: id
-          in: path
-          required: true
-          schema: { type: string }
+        - $ref: "#/components/parameters/Identifier"
       requestBody:
         required: false
         content:
@@ -52,58 +111,48 @@ paths:
               type: object
               additionalProperties: false
               properties:
-                steps: { type: array, items: { type: string } }
-                dryRun: { type: boolean, default: false }
+                approvedSteps:
+                  description: >
+                    Steps the user has already approved. A gated step not named here parks the run
+                    (on the durable path) or ends it awaiting approval (on the direct path).
+                  type: array
+                  items:
+                    $ref: ../common/Identifier.schema.json
       responses:
         "202":
-          description: Accepted; execution started
+          description: Accepted
           content:
             application/json:
               schema:
                 type: object
+                additionalProperties: false
+                required: [executionId, mode, status]
                 properties:
                   executionId: { type: string }
+                  mode:
+                    description: >
+                      Which path ran it. `restate` is durable — retries, checkpointing and real
+                      suspension. `direct` runs in-process and is **not** durable: killing the
+                      process loses the run. This is reported rather than hidden so a caller
+                      cannot mistake one for the other.
+                    type: string
+                    enum: [restate, direct]
                   status:
-                    {
-                      type: string,
-                      enum: [accepted, running, completed, failed],
-                    }
-                  startedAt: { type: integer }
-                  stepResults:
-                    type: array
-                    items:
-                      type: object
-                      properties:
-                        stepId: { type: string }
-                        status:
-                          {
-                            type: string,
-                            enum: [pending, running, completed, failed],
-                          }
-                        output: {}
-  /artifacts/{id}:
-    get:
-      summary: Get artifact metadata
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema: { type: string }
-      responses:
-        "200":
-          description: OK
-          content:
-            application/json:
-              schema:
-                $ref: ../Artifact.schema.json
+                    type: string
+                    enum:
+                      [accepted, completed, awaiting_approval, denied, failed]
+        "404":
+          $ref: "#/components/responses/NotFound"
   /eventlog/{id}:
     put:
+      operationId: appendEvent
+      x-status: planned
       summary: Append (idempotent) event to log
+      description: >
+        Idempotent by id. Replaying an append returns the event already stored rather than
+        duplicating it or rewriting its timestamp.
       parameters:
-        - name: id
-          in: path
-          required: true
-          schema: { type: string }
+        - $ref: "#/components/parameters/Identifier"
       requestBody:
         required: true
         content:
@@ -111,24 +160,35 @@ paths:
             schema:
               $ref: ../Event.schema.json
       responses:
-        "201": { description: Created }
-        "200": { description: OK }
+        "201": { description: Appended }
+        "200": { description: Already present; existing event returned }
+        "422":
+          $ref: "#/components/responses/ValidationFailed"
   /eventlog:
     get:
+      operationId: readEventLog
+      x-status: planned
       summary: Query events by time and type
       parameters:
         - name: fromTs
           in: query
-          schema: { type: integer }
+          schema:
+            $ref: ../common/Timestamp.schema.json
         - name: toTs
           in: query
-          schema: { type: integer }
+          schema:
+            $ref: ../common/Timestamp.schema.json
         - name: types
           in: query
           schema: { type: array, items: { type: string } }
+        - name: actor
+          in: query
+          schema:
+            $ref: ../common/Actor.schema.json
         - name: project
           in: query
-          schema: { type: string }
+          schema:
+            $ref: ../common/Identifier.schema.json
       responses:
         "200":
           description: OK
@@ -139,7 +199,9 @@ paths:
                 items: { $ref: ../Event.schema.json }
   /tools:
     get:
-      summary: List registered capabilities
+      operationId: listTools
+      x-status: planned
+      summary: List registered tool implementations
       responses:
         "200":
           description: OK
@@ -150,7 +212,12 @@ paths:
                 items: { $ref: ../ToolSpec.schema.json }
   /tools/validate:
     post:
-      summary: Validate a ToolSpec against its schemas and tests
+      operationId: validateTool
+      x-status: planned
+      summary: Validate a ToolSpec against its schemas and conformance vectors
+      description: >
+        ADR-006's registry rules: schema validation, declared scopes, and at least one passing
+        conformance vector per capability version.
       requestBody:
         required: true
         content:
@@ -164,6 +231,8 @@ paths:
             application/json:
               schema:
                 type: object
+                additionalProperties: false
+                required: [valid, errors]
                 properties:
                   valid: { type: boolean }
                   errors: { type: array, items: { type: string } }

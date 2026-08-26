@@ -1,6 +1,6 @@
 # ADR-001: Memory Model
 
-Status: Accepted
+Status: Accepted (partially superseded by ADR-013 — the three-store decision only; the provenance rules still hold)
 
 ## Context
 

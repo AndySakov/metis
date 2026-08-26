@@ -1,0 +1,9 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schema.metis.dev/common/Timestamp.schema.json",
+  "title": "Timestamp",
+  "description": "UNIX epoch seconds as an integer (ADR-005). This is the representation at every layer including storage — see ADR-019 for why storage does not use timestamptz. Clients may propose a timestamp; the server is authoritative for the persisted value.",
+  "type": "integer",
+  "minimum": 0,
+  "examples": [1735872000]
+}

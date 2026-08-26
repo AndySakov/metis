@@ -1,6 +1,6 @@
 # ADR-010: Budgets & Costing
 
-Status: Proposed
+Status: Accepted
 
 ## Context
 

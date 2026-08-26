@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schema.metis.dev/capabilities/agent.os_automation@1.0.output.schema.json",
+  "title": "agent.os_automation output",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "status": { "type": "string", "enum": ["success", "paused", "failed"] },
+    "artifacts": {
+      "type": "array",
+      "items": { "type": "object", "additionalProperties": true }
+    },
+    "evidence": { "type": "object", "additionalProperties": true },
+    "summary": { "type": "string" }
+  },
+  "required": ["status"]
+}

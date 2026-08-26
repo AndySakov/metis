@@ -1,0 +1,38 @@
+{
+  "name": "research-claim-graph-basic",
+  "version": "0.1.0",
+  "capability": "research.claim_graph@0.1",
+  "mcp": {
+    "server": "metis.research",
+    "tool": "claim_graph",
+    "transport": "stdio"
+  },
+  "idempotent": true,
+  "isolation": "process",
+  "inputSchema": {
+    "$ref": "../../capabilities/research.claim_graph@0.1.input.schema.json"
+  },
+  "outputSchema": {
+    "$ref": "../../capabilities/research.claim_graph@0.1.output.schema.json"
+  },
+  "authScopes": [],
+  "tests": [
+    {
+      "name": "minimal",
+      "input": {
+        "chunks": [
+          {
+            "text": "A claims B",
+            "sourceId": "doc:1"
+          }
+        ]
+      },
+      "expect": {
+        "type": "object",
+        "required": [
+          "edges"
+        ]
+      }
+    }
+  ]
+}

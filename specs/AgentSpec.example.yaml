@@ -1,0 +1,14 @@
+# Minimal AgentSpec example (web)
+kind: web
+goal: "Capture headline from example.com homepage"
+inputs: {}
+environment:
+  url: "https://example.com"
+constraints: []
+success:
+  require: ["headline.exists"]
+  outputs: ["headline"]
+safety:
+  max_steps: 20
+  max_runtime_s: 60
+  allow_domains: ["example.com"]

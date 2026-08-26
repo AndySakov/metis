@@ -2,21 +2,47 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://schema.metis.dev/Plan.schema.json",
   "title": "Plan",
+  "description": "The always-visible plan (tenet 1). It references its Intent by id rather than embedding it — embedding would duplicate state that has its own row, its own identity and its own lifetime.",
   "type": "object",
   "additionalProperties": false,
+  "required": ["id", "intentId", "createdAt", "steps"],
   "properties": {
-    "id": { "type": "string" },
-    "intentId": { "type": "string" },
+    "id": { "$ref": "https://schema.metis.dev/common/Identifier.schema.json" },
+    "intentId": {
+      "$ref": "https://schema.metis.dev/common/Identifier.schema.json"
+    },
+    "createdAt": {
+      "$ref": "https://schema.metis.dev/common/Timestamp.schema.json"
+    },
     "steps": {
       "type": "array",
       "items": { "$ref": "#/$defs/PlanStep" },
       "minItems": 1
     },
-    "assumptions": { "type": "array", "items": { "type": "string" } },
-    "risks": { "type": "array", "items": { "type": "string" } },
-    "expectedArtifacts": { "type": "array", "items": { "type": "string" } }
+    "assumptions": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/Assumption" },
+      "default": []
+    },
+    "risks": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/Risk" },
+      "default": []
+    },
+    "expectedArtifacts": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/ArtifactExpectation" },
+      "default": []
+    },
+    "artifacts": {
+      "description": "Identifiers of artifacts this plan actually produced. References, never embedded records — an Artifact is metadata for a blob and has its own endpoint.",
+      "type": "array",
+      "items": {
+        "$ref": "https://schema.metis.dev/common/Identifier.schema.json"
+      },
+      "default": []
+    }
   },
-  "required": ["id", "intentId", "steps"],
   "$defs": {
     "ToolCall": {
       "type": "object",
@@ -24,11 +50,18 @@
       "required": ["capability", "input"],
       "properties": {
         "capability": {
-          "type": "string",
-          "pattern": "^[a-z][a-z0-9_.-]*\\.[a-z][a-z0-9_.-]*@[0-9]+\\.[0-9]+$"
+          "$ref": "https://schema.metis.dev/common/CapabilityId.schema.json"
         },
-        "tool": { "type": "string" },
-        "input": { "type": "object", "additionalProperties": true },
+        "tool": {
+          "description": "The concrete implementation chosen to satisfy the capability. Set by the registry at dispatch, never written by the planner — ADR-017 requires the planner to target capabilities and never name an implementation. Present on an executed plan, absent on a freshly generated one.",
+          "type": "string",
+          "minLength": 1
+        },
+        "input": {
+          "description": "Validated at dispatch against the input schema the capability declares in specs/capabilities/.",
+          "type": "object",
+          "additionalProperties": true
+        },
         "budget": {
           "$ref": "https://schema.metis.dev/common/Budget.schema.json"
         }
@@ -37,37 +70,106 @@
     "PlanStep": {
       "type": "object",
       "additionalProperties": false,
+      "required": ["id", "kind", "description"],
       "properties": {
-        "id": { "type": "string" },
+        "id": {
+          "$ref": "https://schema.metis.dev/common/Identifier.schema.json"
+        },
         "kind": {
           "type": "string",
           "enum": ["tool", "ask", "write", "decision"]
         },
-        "description": { "type": "string" },
-        "requiresApproval": { "type": "boolean" },
+        "description": { "type": "string", "minLength": 1, "maxLength": 5000 },
+        "requiresApproval": { "type": "boolean", "default": false },
         "toolCall": { "$ref": "#/$defs/ToolCall" }
-      },
-      "required": ["id", "kind", "description"]
+      }
+    },
+    "Assumption": {
+      "description": "Something the plan takes as true without checking. Carries an identifier so a decision or artifact can point at it — a bare string could not be referenced, and ADR-001's provenance rules require that it can be.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "description"],
+      "properties": {
+        "id": {
+          "$ref": "https://schema.metis.dev/common/Identifier.schema.json"
+        },
+        "description": { "type": "string", "minLength": 1, "maxLength": 5000 },
+        "tags": { "type": "array", "items": { "type": "string" }, "default": [] }
+      }
+    },
+    "Risk": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "description"],
+      "properties": {
+        "id": {
+          "$ref": "https://schema.metis.dev/common/Identifier.schema.json"
+        },
+        "description": { "type": "string", "minLength": 1, "maxLength": 5000 },
+        "tags": { "type": "array", "items": { "type": "string" }, "default": [] }
+      }
+    },
+    "ArtifactExpectation": {
+      "description": "An artifact the plan intends to produce. Deliberately not an Artifact: it has no uri and no checksum because it does not exist yet, and forcing the two shapes together is what produced the duplicate Artifact definition this schema replaces.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "kind", "description"],
+      "properties": {
+        "id": {
+          "$ref": "https://schema.metis.dev/common/Identifier.schema.json"
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "text",
+            "image",
+            "audio",
+            "video",
+            "file",
+            "link",
+            "code",
+            "binary"
+          ]
+        },
+        "description": { "type": "string", "minLength": 1, "maxLength": 5000 },
+        "tags": { "type": "array", "items": { "type": "string" }, "default": [] }
+      }
     }
   },
   "examples": [
     {
-      "id": "plan_abc",
-      "intentId": "intent_123",
+      "id": "01890a5d-ae10-7c22-9b31-2f5a6d7e8f90",
+      "intentId": "01890a5d-ac96-774b-bcce-b302099a8057",
+      "createdAt": 1735872001,
       "steps": [
         {
-          "id": "step_1",
+          "id": "01890a5d-ae11-7a01-8c02-3d4e5f607182",
           "kind": "tool",
           "description": "Search for related literature",
           "requiresApproval": false,
           "toolCall": {
             "capability": "research.search@0.1",
-            "tool": "research.search",
             "input": { "query": "RAG state of the art" },
             "budget": { "seconds": 10 }
           }
         }
-      ]
+      ],
+      "assumptions": [
+        {
+          "id": "01890a5d-ae12-7b03-9d04-5e6f708192a3",
+          "description": "Public web sources are acceptable for this survey",
+          "tags": []
+        }
+      ],
+      "expectedArtifacts": [
+        {
+          "id": "01890a5d-ae13-7c05-8e06-7f8091a2b3c4",
+          "kind": "text",
+          "description": "PRD markdown",
+          "tags": []
+        }
+      ],
+      "artifacts": []
     }
   ]
 }

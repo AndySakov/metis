@@ -2,10 +2,13 @@
   "name": "design-prd-basic",
   "version": "1.0.0",
   "capability": "design.prd@1.0",
-  "implementation": {
-    "kind": "container",
-    "image": "ghcr.io/metis/tools/design-prd:1.0.0"
+  "mcp": {
+    "server": "metis.design",
+    "tool": "prd",
+    "transport": "stdio"
   },
+  "idempotent": true,
+  "isolation": "process",
   "inputSchema": {
     "$ref": "../../capabilities/design.prd@1.0.input.schema.json"
   },
@@ -13,12 +16,18 @@
     "$ref": "../../capabilities/design.prd@1.0.output.schema.json"
   },
   "authScopes": [],
-  "sandboxed": true,
   "tests": [
     {
       "name": "minimal",
-      "input": { "title": "Hello" },
-      "expect": { "type": "object", "required": ["markdown"] }
+      "input": {
+        "title": "Hello"
+      },
+      "expect": {
+        "type": "object",
+        "required": [
+          "markdown"
+        ]
+      }
     }
   ]
 }

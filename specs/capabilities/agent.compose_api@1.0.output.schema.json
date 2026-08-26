@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schema.metis.dev/capabilities/agent.compose_api@1.0.output.schema.json",
+  "title": "agent.compose_api output",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "status": { "type": "string", "enum": ["success", "paused", "failed"] },
+    "artifacts": {
+      "type": "array",
+      "items": { "type": "object", "additionalProperties": true }
+    },
+    "summary": { "type": "string" }
+  },
+  "required": ["status"]
+}

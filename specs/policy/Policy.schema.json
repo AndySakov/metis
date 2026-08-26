@@ -2,49 +2,92 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://schema.metis.dev/policy/Policy.schema.json",
   "title": "Policy",
+  "description": "An ordered set of rules evaluated at three points in the execution path (ADR-008). Earlier drafts of this file described approval thresholds, scope allow/deny lists and retention buckets as three unrelated sections; those are all expressible as rules, and having one rule form means one evaluation path, one decision record, and one coverage measurement rather than three.",
   "type": "object",
   "additionalProperties": false,
+  "required": ["version", "rules"],
   "properties": {
-    "version": { "type": "string" },
-    "approvals": {
+    "version": { "type": "string", "minLength": 1 },
+    "defaultEffect": {
+      "description": "Applied when no rule matches. `allow` today — but the evaluation is still recorded as unmatched, which is the number ADR-014 wants reported. Flipping this to `deny` closes the world and should only happen once coverage justifies it.",
+      "$ref": "#/$defs/PolicyEffect",
+      "default": "allow"
+    },
+    "rules": { "type": "array", "items": { "$ref": "#/$defs/PolicyRule" } }
+  },
+  "$defs": {
+    "PolicyEffect": {
+      "type": "string",
+      "enum": ["allow", "deny", "require_approval"]
+    },
+    "PolicyPoint": {
+      "description": "Enforcement belongs at the seams, not in one chokepoint — each seam knows something the others do not.",
+      "type": "string",
+      "enum": ["plan_validation", "tool_dispatch", "artifact_write"]
+    },
+    "PolicyRuleId": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_.-]*$"
+    },
+    "PolicyCondition": {
+      "description": "Every condition is optional. A rule with none matches everything — legal, and exactly what the vacuous-rule report exists to surface.",
       "type": "object",
       "additionalProperties": false,
       "properties": {
-        "thresholds": {
-          "type": "object",
-          "additionalProperties": false,
-          "properties": {
-            "cost_usd": { "type": "number" },
-            "time_s": { "type": "number" }
-          }
-        },
-        "requiredForGears": {
+        "at": { "$ref": "#/$defs/PolicyPoint" },
+        "autonomy": {
           "type": "array",
-          "items": { "type": "string", "enum": ["S3", "S4"] }
+          "items": { "type": "string", "enum": ["S0", "S1", "S2", "S3", "S4"] }
+        },
+        "capabilities": {
+          "description": "Capability id, or a prefix glob ending in `*`. Deliberately not full regex: a policy language that can express anything is one nobody can audit.",
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "scopes": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+        "tags": {
+          "description": "Tags carried by the inputs. This is how `untrusted` content reaches policy.",
+          "type": "array",
+          "items": { "type": "string", "minLength": 1 }
+        },
+        "minDollars": { "type": "number", "minimum": 0 },
+        "minSeconds": { "type": "number", "minimum": 0 },
+        "nonIdempotent": {
+          "description": "Fires when the tool is not declared idempotent. Absent information counts as non-idempotent: ADR-016 requires an explicit declaration, and the safe reading of silence is the one that cannot replay a side effect.",
+          "type": "boolean"
         }
       }
     },
-    "scopes": {
+    "PolicyRule": {
       "type": "object",
       "additionalProperties": false,
+      "required": ["id", "description", "priority", "effect", "when"],
       "properties": {
-        "allow": { "type": "array", "items": { "type": "string" } },
-        "deny": { "type": "array", "items": { "type": "string" } }
-      }
-    },
-    "retention": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "additionalProperties": false,
-        "required": ["bucket", "ttl_days"],
-        "properties": {
-          "bucket": { "type": "string" },
-          "ttl_days": { "type": "integer", "minimum": 0 },
-          "redact": { "type": "boolean" }
-        }
+        "id": { "$ref": "#/$defs/PolicyRuleId" },
+        "description": { "type": "string", "minLength": 1, "maxLength": 5000 },
+        "priority": {
+          "description": "Lower numbers win. Ties break by severity — deny over require_approval over allow — so a misordered policy fails closed.",
+          "type": "integer",
+          "minimum": 0
+        },
+        "effect": { "$ref": "#/$defs/PolicyEffect" },
+        "when": { "$ref": "#/$defs/PolicyCondition" }
       }
     }
   },
-  "required": ["version"]
+  "examples": [
+    {
+      "version": "example-1",
+      "defaultEffect": "allow",
+      "rules": [
+        {
+          "id": "deny.untrusted_to_agent",
+          "description": "Content fetched from the open web must not drive a browser or a device.",
+          "priority": 0,
+          "effect": "deny",
+          "when": { "capabilities": ["agent.*"], "tags": ["untrusted"] }
+        }
+      ]
+    }
+  ]
 }

@@ -2,24 +2,40 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://schema.metis.dev/Event.schema.json",
   "title": "Event",
+  "description": "One entry in the METIS event log — the tamper-evident semantic record the safety story rests on. This is not Restate's execution journal and must never be merged with it (ADR-016): that journal is disposable execution mechanics, this is the audit trail.",
   "type": "object",
   "additionalProperties": false,
   "required": ["id", "ts", "type", "actor", "payload"],
   "properties": {
-    "id": { "type": "string" },
-    "ts": { "type": "integer" },
-    "type": { "type": "string" },
-    "actor": { "type": "string", "enum": ["user", "metis"] },
-    "project": { "type": "string" },
+    "id": {
+      "description": "Also the idempotency key — appending the same id twice is one event (ADR-007).",
+      "$ref": "https://schema.metis.dev/common/Identifier.schema.json"
+    },
+    "ts": { "$ref": "https://schema.metis.dev/common/Timestamp.schema.json" },
+    "type": {
+      "description": "SCREAMING_SNAKE. Left open rather than enumerated because new event types arrive with every subsystem, but the shape is pinned so the log stays greppable.",
+      "type": "string",
+      "pattern": "^[A-Z][A-Z0-9_]*$",
+      "examples": ["PLAN_CREATED", "TOOL_COMPLETED", "POLICY_EVALUATED", "ERROR"]
+    },
+    "actor": { "$ref": "https://schema.metis.dev/common/Actor.schema.json" },
+    "project": {
+      "$ref": "https://schema.metis.dev/common/Identifier.schema.json"
+    },
+    "correlationId": {
+      "description": "Ties every event produced by one request or run together. ADR-009 requires errors to carry the same correlationId as the work that failed; without a field for it that requirement could not be met.",
+      "$ref": "https://schema.metis.dev/common/Identifier.schema.json"
+    },
     "payload": {}
   },
   "examples": [
     {
-      "id": "evt_001",
+      "id": "01890a5d-af20-7e11-9a22-b3c4d5e6f708",
       "ts": 1733872000,
       "type": "PLAN_CREATED",
       "actor": "metis",
-      "payload": { "planId": "plan_abc" }
+      "correlationId": "01890a5d-af1f-7d10-8b21-a2b3c4d5e6f7",
+      "payload": { "planId": "01890a5d-ae10-7c22-9b31-2f5a6d7e8f90" }
     }
   ]
 }

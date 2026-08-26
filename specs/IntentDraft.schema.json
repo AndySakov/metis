@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schema.metis.dev/IntentDraft.schema.json",
+  "title": "IntentDraft",
+  "description": "What a client POSTs to /intent. It carries no `id` and no `ts` because the server assigns both — ADR-005 makes the server authoritative for persisted time, and a client-chosen identifier could not be trusted to be a time-sortable UUIDv7. The server turns a draft into an `Intent`.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["actor", "goal"],
+  "properties": {
+    "actor": { "$ref": "https://schema.metis.dev/common/Actor.schema.json" },
+    "goal": { "type": "string", "minLength": 1, "maxLength": 5000 },
+    "description": { "type": "string", "minLength": 1, "maxLength": 5000 },
+    "inputs": {
+      "type": "array",
+      "items": {
+        "$ref": "https://schema.metis.dev/common/TaggedValue.schema.json"
+      },
+      "default": []
+    },
+    "constraints": {
+      "type": "array",
+      "items": {
+        "$ref": "https://schema.metis.dev/common/TaggedValue.schema.json"
+      },
+      "default": []
+    },
+    "autonomy": {
+      "description": "Omit to get S0 — advise only.",
+      "type": "string",
+      "enum": ["S0", "S1", "S2", "S3", "S4"],
+      "default": "S0"
+    }
+  },
+  "examples": [
+    {
+      "actor": "user:andysakov",
+      "goal": "Draft a PRD for a research summarizer",
+      "autonomy": "S1"
+    }
+  ]
+}

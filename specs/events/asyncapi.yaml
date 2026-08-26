@@ -1,47 +1,83 @@
-asyncapi: '2.6.0'
+asyncapi: "2.6.0"
 info:
-  title: METIS Events (stack-neutral)
-  version: 0.1.0
+  title: METIS Events
+  version: 0.2.0
+  description: >
+    Channels on the METIS event log. Every message payload is an `Event` (ADR-004), whose `type`
+    field carries the SCREAMING_SNAKE name shown on each channel.
+
+    This log is METIS's own audit record and is deliberately separate from Restate's execution
+    journal (ADR-016). The journal is disposable execution mechanics; this is the tamper-evident
+    record the safety story depends on.
 channels:
   plan/created:
     subscribe:
       message:
         name: PlanCreated
+        description: "Event.type = PLAN_CREATED"
         payload:
           $ref: ../Event.schema.json
   tool/started:
     subscribe:
       message:
         name: ToolStarted
+        description: "Event.type = TOOL_STARTED"
         payload:
           $ref: ../Event.schema.json
   tool/completed:
     subscribe:
       message:
         name: ToolCompleted
+        description: "Event.type = TOOL_COMPLETED. Payload carries durationMs and cost."
         payload:
           $ref: ../Event.schema.json
   artifact/written:
     subscribe:
       message:
         name: ArtifactWritten
+        description: "Event.type = ARTIFACT_WRITTEN"
         payload:
           $ref: ../Event.schema.json
   approval/requested:
     subscribe:
       message:
         name: ApprovalRequested
+        description: "Event.type = APPROVAL_REQUESTED"
         payload:
           $ref: ../Event.schema.json
   approval/granted:
     subscribe:
       message:
         name: ApprovalGranted
+        description: "Event.type = APPROVAL_GRANTED"
         payload:
           $ref: ../Event.schema.json
   preference/recorded:
     subscribe:
       message:
         name: PreferenceRecorded
+        description: "Event.type = PREFERENCE_RECORDED"
+        payload:
+          $ref: ../Event.schema.json
+  policy/evaluated:
+    subscribe:
+      message:
+        name: PolicyEvaluated
+        description: >
+          Event.type = POLICY_EVALUATED. ADR-014 requires every policy evaluation to be written to
+          the log carrying the matched rule identity, or an explicit `unmatched` marker. The
+          unmatched fraction over a window is the honest measure of how much behaviour is actually
+          governed, and it cannot be computed unless every evaluation — including the ones no rule
+          had an opinion about — is recorded here.
+        payload:
+          $ref: ../Event.schema.json
+  trust/changed:
+    subscribe:
+      message:
+        name: TrustChanged
+        description: >
+          Event.type = TRUST_PROMOTED or TRUST_DEMOTED. ADR-014 requires any promotion or demotion
+          to be an event with its justification attached, naming which ledger moved — competence or
+          compliance.
         payload:
           $ref: ../Event.schema.json

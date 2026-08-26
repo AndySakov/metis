@@ -1,0 +1,33 @@
+{
+  "name": "build-scaffold-basic",
+  "version": "0.1.0",
+  "capability": "build.scaffold@0.1",
+  "mcp": {
+    "server": "metis.build",
+    "tool": "scaffold",
+    "transport": "stdio"
+  },
+  "idempotent": false,
+  "isolation": "process",
+  "inputSchema": {
+    "$ref": "../../capabilities/build.scaffold@0.1.input.schema.json"
+  },
+  "outputSchema": {
+    "$ref": "../../capabilities/build.scaffold@0.1.output.schema.json"
+  },
+  "authScopes": [],
+  "tests": [
+    {
+      "name": "minimal",
+      "input": {
+        "name": "demo-service"
+      },
+      "expect": {
+        "type": "object",
+        "required": [
+          "markdown"
+        ]
+      }
+    }
+  ]
+}

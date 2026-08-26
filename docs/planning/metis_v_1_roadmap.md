@@ -1,5 +1,12 @@
 # METIS — v1 Roadmap
 
+> **Status: historical.** This is the original ten-phase plan, retained for the capability detail
+> in it. It is **not** the current plan — `docs/planning/REBUILD-PLAN.md` is, and where the two
+> disagree the rebuild plan and the ADRs win. Specifically superseded here: the monorepo layout
+> (never built, see §2), the hand-built DAG scheduler (ADR-016 adopts Restate), container/WASM tool
+> packaging (ADR-017 adopts MCP), the TBD datastore (ADR-018 selects PostgreSQL), and the
+> three-tier memory model (ADR-013 reduces it to two plus external retrieval).
+
 **Goal**: A Jarvis-grade copilot that takes ideas from spark → exploration → design → execution, learns your style, and reduces handholding over time.
 
 ## Name & identity
@@ -34,10 +41,11 @@
 1. **Interface**: Realtime voice + chat + multimodal canvas + command palette.
 2. **Orchestrator**: intent parser → planner → tool dispatcher → memory writes.
 3. **Memory Fabric**: Graph store (TBD), Event/relational store (TBD), Vector index (TBD), Artifact/object store (TBD), timeline/event log.
-4. **Knowledge Engine**: retrieval pipelines (public + private connectors), claim/evidence extraction.
+4. **Knowledge Engine**: retrieval pipelines (public + private connectors), web-memory feeds (incremental ingest + hybrid search), claim/evidence extraction.
 5. **Tooling/Execution**: containerized tools, notebook runner, CI hooks.
-6. **Governance/Safety**: capability gating, approvals, audit, license/IP checks.
-7. **Observability**: traces, cost/latency budgets, dashboards.
+6. **Adaptive Agent Foundry**: gap detection → on-the-fly agent synthesis (web/mobile/OS/API) → guarded execution → graduation to reusable Tool.
+7. **Governance/Safety**: capability gating, approvals, audit, license/IP checks.
+8. **Observability**: traces, cost/latency budgets, dashboards.
 
 ### 1A) Foundational capabilities (codified)
 
@@ -87,7 +95,11 @@
 
 ---
 
-## 2) Repo & Project Structure (monorepo)
+## 2) Repo & Project Structure (monorepo — NOT BUILT)
+
+The layout below was never created. The actual layout is flat and is documented in `README.md`.
+It is kept here as the shape to grow into if and when a split is justified, not as a description
+of the repository.
 
 ```text
 /metis
@@ -107,6 +119,11 @@
   /docs
     /adrs
     /charters
+    /capabilities
+      - Web-Memory.md
+      - Adaptive-Agent-Foundry.md
+    /templates
+      - Agent-Tool-Graduation-PR.md
 ```
 
 ---
@@ -193,7 +210,7 @@ export type PreferenceEvent = {
 };
 
 export type PersonaPack = {
-  version: string; createdAt: number;
+  version: string; created_at: number;
   styleKit: StyleKit; toolPolicy: any; questioning: any; trust: Record<string, number>;
 };
 
@@ -231,7 +248,7 @@ export type StyleKit = {
 
 #### Exit Criteria — Phase 0
 
-- Run `npm test` → all green. Load example tools; reject invalid specs. Create/read ADRs via API.
+- Run `pnpm test` → all green. Load example tools; reject invalid specs. Create/read ADRs via API.
 
 ---
 
@@ -304,6 +321,29 @@ export type StyleKit = {
 
 ---
 
+### Phase 4a — Self-Bootstrap Toolchain
+
+**Objectives**: Use METIS to build METIS modules. **Deliverables**: `@metis-build` personas; codegen/test/sandbox/PR pipeline; signed module format; rollout playbook.  
+
+**Exit Criteria**: From a spec, METIS opens a PR adding a new tool; tests green; approval prompts; module hot-swapped.
+
+---
+
+### Phase 4b — Web Memory v1
+
+**Objectives**: Continuous, policy-aware ingestion from targeted public feeds (HN, arXiv/OpenAlex, Telegram channels, RSS/blogs), normalization + chunking with context, hybrid retrieval (BM25 ∪ vector), provenance writes.
+
+**Deliverables**:
+
+- Connectors (seed): HN API/RSS, arXiv/OpenAlex, Telegram (scoped), generic RSS/Atom.
+- Ingest pipeline: fetch → normalize (readability + site rules) → chunk (sentence/para + headings) → embed → dedup → index.
+- Services/APIs: `/web-memory/search`, `/web-memory/answer`, `/web-memory/feed`.
+- Governance: robots/noindex honor, license tags, takedown path.
+
+**Exit Criteria**: Index ≥10 sources/feeds with daily refresh; search returns citations with provenance; weekly digest of “what’s new” is generated; storage costs and per-source rate limits enforced.
+
+---
+
 ### Phase 5 — Design Studio v1
 
 #### Objectives — Phase 5
@@ -338,6 +378,31 @@ export type StyleKit = {
 
 ---
 
+### Phase 6a — Background Orchestration & Personas
+
+**Objectives**: Durable DAGs, pause/resume/park, persona swapping mid-run.  
+
+**Deliverables**: DAG scheduler service; checkpoint store; persona router; notification gateway.  
+
+**Exit Criteria**: Start a long run, pause, switch persona, resume; audit shows checkpoints and diffs.
+
+---
+
+### Phase 6b — Adaptive Agent Foundry
+
+**Objectives**: Synthesize task-specific agents when a capability gap is detected; run with safety gates; graduate successful runs into Tools with CAP IDs.
+
+**Deliverables**:
+
+- AgentSpec DSL (goal, inputs, environment, success, safety/budgets).
+- Runners: web (DOM+AX+visual), mobile (AVD/Sim+driver), OS automation; API composer.
+- Recorder/Parametrizer; PR generator to propose new Tool with schemas and tests.
+- Approvals UI for S3 actions with screenshots, diffs, and cost/time estimates.
+
+**Exit Criteria**: From a natural request lacking an existing tool, system builds a micro-agent, completes the task up to approval gates, and opens a PR proposing a new tool (e.g., `travel.flight_book@1.0`) with tests; tool can hot-swap in on approval.
+
+---
+
 ### Phase 7 — Autonomy & Safety v1
 
 #### Objectives — Phase 7
@@ -351,6 +416,16 @@ export type StyleKit = {
 #### Exit Criteria — Phase 7
 
 - Attempt S3 action → requires approval with diff & cost estimate; audit trail stored.
+
+---
+
+### Phase 7a — Security Hardening
+
+**Objectives**: Sandboxes, policy-as-code, encryption at rest/in use, audit trails.  
+
+**Deliverables**: Vault integration; per-tool sandboxes; data retention policies; license/IP checker v1.1.  
+
+**Exit Criteria**: Pen-test checklist passes; red-team scenarios logged and blocked.
 
 ---
 
@@ -371,6 +446,16 @@ export type StyleKit = {
 
 ---
 
+### Phase 8a — Interface SDK & Multi-Client
+
+**Objectives**: Headless API + Mobile quick-capture + desktop canvas + AR/VR adapter stubs.  
+
+**Deliverables**: API façade (protocol TBD); client SDKs; presence/handoff; mobile prototype.  
+
+**Exit Criteria**: Capture on phone → plan/refine on desktop → AR viewer shows diagrams.
+
+---
+
 ### Phase 9 — Connectors v1
 
 #### Objectives — Phase 9
@@ -384,6 +469,16 @@ export type StyleKit = {
 #### Exit Criteria — Phase 9
 
 - Connect two private sources; retrieve & cite; respect scope & redaction.
+
+---
+
+### Phase 9a — Device & Environment Orchestration
+
+**Objectives**: Local Agent + device adapters + secure pairing.  
+
+**Deliverables**: Rust daemon; OctoPrint/IPP/SSH adapters; pairing UI; device registry.  
+
+**Exit Criteria**: "Print part X on Voron at 0.2mm" runs via OctoPrint; "Send doc to iPad" syncs; "Open design on desktop" executes securely.
 
 ---
 
@@ -404,25 +499,14 @@ export type StyleKit = {
 
 ---
 
-### Phase 4a — Self-Bootstrap Toolchain
+### Appendix — Limits & Guardrails
 
-**Objectives**: Use METIS to build METIS modules. **Deliverables**: `@metis-build` personas; codegen/test/sandbox/PR pipeline; signed module format; rollout playbook. **Exit Criteria**: From a spec, METIS opens a PR adding a new tool; tests green; approval prompts; module hot-swapped.
+See `docs/planning/Limits-and-Guardrails.md` for a full treatment of:
 
-### Phase 6a — Background Orchestration & Personas
-
-**Objectives**: Durable DAGs, pause/resume/park, persona swapping mid-run. **Deliverables**: DAG scheduler service; checkpoint store; persona router; notification gateway. **Exit Criteria**: Start a long run, pause, switch persona, resume; audit shows checkpoints and diffs.
-
-### Phase 8a — Interface SDK & Multi-Client
-
-**Objectives**: Headless API + Mobile quick-capture + desktop canvas + AR/VR adapter stubs. **Deliverables**: API façade (protocol TBD); client SDKs; presence/handoff; mobile prototype. **Exit Criteria**: Capture on phone → plan/refine on desktop → AR viewer shows diagrams.
-
-### Phase 7a — Security Hardening
-
-**Objectives**: Sandboxes, policy-as-code, encryption at rest/in use, audit trails. **Deliverables**: Vault integration; per-tool sandboxes; data retention policies; license/IP checker v1.1. **Exit Criteria**: Pen-test checklist passes; red-team scenarios logged and blocked.
-
-### Phase 9a — Device & Environment Orchestration
-
-**Objectives**: Local Agent + device adapters + secure pairing. **Deliverables**: Rust daemon; OctoPrint/IPP/SSH adapters; pairing UI; device registry. **Exit Criteria**: "Print part X on Voron at 0.2mm" runs via OctoPrint; "Send doc to iPad" syncs; "Open design on desktop" executes securely.
+- Security risks (avoidable vs. managed), technological limits, physical/operational constraints
+- Out-of-scope by design vs. unrealistic/impossible items
+- Often-missed edges (takedowns, PII in embeddings, license contamination, drift)
+- Guardrails checklist and acceptance criteria (prompt injection blocked in untrusted mode; dual-key for payments; takedown cascades; secrets hygiene; cost caps)
 
 ## 5) Detailed Backlog (initial)
 
@@ -438,6 +522,7 @@ export type StyleKit = {
 8. **build.scaffold**: service name + stack → repo skeleton + tests.
 9. **build.codegen**: spec → code + tests (guardrails + coverage target).
 10. **run.notebook**: notebook code → executed notebook artifact.
+11. **research.claim_graph**: sources → claims–evidence graph with provenance and confidence.
 
 ### B. Learning & Persona
 

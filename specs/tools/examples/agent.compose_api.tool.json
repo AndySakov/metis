@@ -1,0 +1,39 @@
+{
+  "name": "agent-compose-api",
+  "version": "1.0.0",
+  "capability": "agent.compose_api@1.0",
+  "mcp": {
+    "server": "metis.agent",
+    "tool": "compose_api",
+    "transport": "stdio"
+  },
+  "idempotent": false,
+  "isolation": "process",
+  "inputSchema": {
+    "$ref": "../../capabilities/agent.compose_api@1.0.input.schema.json"
+  },
+  "outputSchema": {
+    "$ref": "../../capabilities/agent.compose_api@1.0.output.schema.json"
+  },
+  "authScopes": [
+    "public.web"
+  ],
+  "tests": [
+    {
+      "name": "compose-two-apis",
+      "input": {
+        "goal": "Search and fetch",
+        "apis": [
+          {},
+          {}
+        ]
+      },
+      "expect": {
+        "type": "object",
+        "required": [
+          "status"
+        ]
+      }
+    }
+  ]
+}

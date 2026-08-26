@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schema.metis.dev/capabilities/agent.compose_api@1.0.input.schema.json",
+  "title": "agent.compose_api input",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "goal": { "type": "string" },
+    "inputs": { "type": "object", "additionalProperties": true },
+    "apis": {
+      "type": "array",
+      "items": { "type": "object", "additionalProperties": true },
+      "description": "API descriptors or OpenAPI refs"
+    },
+    "constraints": { "type": "array", "items": { "type": "string" } },
+    "budgets": { "$ref": "https://schema.metis.dev/common/Budget.schema.json" }
+  },
+  "required": ["goal", "apis"]
+}

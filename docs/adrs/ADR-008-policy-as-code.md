@@ -1,6 +1,7 @@
 # ADR-008: Policy-as-Code for Autonomy & Safety
 
-Status: Proposed
+Status: Accepted
+Amended by: ADR-014 (coverage and two-ledger trust)
 
 ## Context
 

@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://metis/specs/capabilities/run.notebook@0.1.output.schema.json",
+  "title": "run.notebook output",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "markdown": { "type": "string" }
+  },
+  "required": ["markdown"]
+}

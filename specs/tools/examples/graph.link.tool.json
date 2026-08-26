@@ -2,10 +2,13 @@
   "name": "graph-link-basic",
   "version": "0.1.0",
   "capability": "graph.link@0.1",
-  "implementation": {
-    "kind": "container",
-    "image": "ghcr.io/metis/tools/graph-link:0.1.0"
+  "mcp": {
+    "server": "metis.memory",
+    "tool": "link",
+    "transport": "stdio"
   },
+  "idempotent": true,
+  "isolation": "process",
   "inputSchema": {
     "$ref": "../../capabilities/graph.link@0.1.input.schema.json"
   },
@@ -13,12 +16,20 @@
     "$ref": "../../capabilities/graph.link@0.1.output.schema.json"
   },
   "authScopes": [],
-  "sandboxed": true,
   "tests": [
     {
       "name": "simple",
-      "input": { "from": "doc:1", "rel": "mentions", "to": "entity:abc" },
-      "expect": { "type": "object", "required": ["ok"] }
+      "input": {
+        "from": "doc:1",
+        "rel": "mentions",
+        "to": "entity:abc"
+      },
+      "expect": {
+        "type": "object",
+        "required": [
+          "ok"
+        ]
+      }
     }
   ]
 }

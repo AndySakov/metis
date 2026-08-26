@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schema.metis.dev/capabilities/agent.mobile_navigate@1.0.input.schema.json",
+  "title": "agent.mobile_navigate input",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "goal": { "type": "string" },
+    "inputs": { "type": "object", "additionalProperties": true },
+    "appIdentifier": {
+      "type": "string",
+      "description": "Bundle ID or package name"
+    },
+    "constraints": { "type": "array", "items": { "type": "string" } },
+    "budgets": { "$ref": "https://schema.metis.dev/common/Budget.schema.json" },
+    "device": {
+      "type": "string",
+      "description": "emulator profile (e.g., Pixel_7, iPhone_14)"
+    }
+  },
+  "required": ["goal", "appIdentifier"]
+}
