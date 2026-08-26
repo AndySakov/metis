@@ -3,11 +3,14 @@
   "version": "0.0.1",
   "type": "module",
   "packageManager": "pnpm@10.14.0",
+  "engines": {
+    "node": ">=22"
+  },
   "license": "MIT",
   "description": "Metis Core",
   "repository": {
     "type": "git",
-    "url": "https://github.com/metis/core"
+    "url": "https://github.com/AndySakov/metis"
   },
   "publishConfig": {
     "access": "restricted",
