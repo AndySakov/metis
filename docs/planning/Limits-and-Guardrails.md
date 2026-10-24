@@ -148,6 +148,10 @@ Stated plainly rather than implied away. These are open, not managed.
   timestamps, so a signal from months ago counts as much as one from today. The decay half-lives in
   the trust policy apply only to a record carried forward, which the live ledger never does. A
   skill that earned S2 and then went unused keeps it until new evidence moves it.
+- **Memory writes are gated, not labelled.** Untrusted input to a tool declaring `memory.write`
+  needs approval, but nothing stores the `untrusted` tag with the record, so an approved write is
+  read back later as ordinary memory. The memory server is not built yet; when it lands, the tag
+  has to be persisted and put back on the content when it is retrieved.
 - **Durability depends on which execution mode was used.** `restate` is durable; `direct` is not,
   and killing the process loses the run. The API reports the mode on every submission, so the
   distinction is visible — but any claim that "plans survive restarts" is only true of the durable
