@@ -40,11 +40,31 @@ const api = createServer((req, res) => {
   })
 })
 
+/** Wikipedia and arXiv, as far as `research.search` can tell: one hit each. */
+const indexes = createServer((req, res) => {
+  if ((req.url ?? "").startsWith("/w/api.php")) {
+    res.writeHead(200, { "content-type": "application/json" })
+    res.end(JSON.stringify({ query: { search: [{ title: "Note-taking", snippet: "Notes, kept" }] } }))
+    return
+  }
+  res.writeHead(200, { "content-type": "application/atom+xml" })
+  res.end(
+    "<feed><entry><id>http://arxiv.org/abs/2401.00001v1</id><published>2024-01-01T00:00:00Z</published>" +
+      "<title>Offline-first sync</title><summary>CRDTs for notes.</summary></entry></feed>"
+  )
+})
+const savedEnv = { ...process.env }
+
 let runtime: ManagedRuntime.ManagedRuntime<EventLogStore, unknown>
 const workspace = mkdtempSync(join(tmpdir(), "metis-app-workspace-"))
 
 beforeAll(async () => {
   await new Promise<void>((done) => api.listen(0, "127.0.0.1", done))
+  await new Promise<void>((done) => indexes.listen(0, "127.0.0.1", done))
+  const indexesAt = `http://127.0.0.1:${(indexes.address() as AddressInfo).port}`
+  // Read by `serversFor`, so the search server asks the stand-in, never the real indexes.
+  process.env.METIS_WIKIPEDIA_API = `${indexesAt}/w/api.php`
+  process.env.METIS_ARXIV_API = `${indexesAt}/api/query`
   const config: App.AppConfig = {
     port: PORT,
     anthropicApiKey: Option.some(Redacted.make("test-key")),
@@ -63,6 +83,8 @@ beforeAll(async () => {
 afterAll(async () => {
   await runtime?.dispose()
   await new Promise<void>((done) => api.close(() => done()))
+  await new Promise<void>((done) => indexes.close(() => done()))
+  process.env = savedEnv
   rmSync(workspace, { recursive: true, force: true })
 }, 20_000)
 
@@ -74,7 +96,7 @@ const post = (path: string, body: unknown) =>
   })
 
 describe("pnpm start", () => {
-  it("plans only what can run, and says what it left out", async () => {
+  it("plans every step of a PRD now that search is real, and skips none", async () => {
     const response = await post("/intent", {
       actor: "user:andysakov",
       goal: "Draft a PRD for offline-first notes",
@@ -83,8 +105,8 @@ describe("pnpm start", () => {
     expect(response.status).toBe(201)
     const plan = await response.json()
 
-    expect(plan.steps.map((s: any) => s.toolCall?.capability)).toEqual(["design.prd@1.0"])
-    expect(plan.risks.map((r: any) => r.description).join("\n")).toContain("research.search@0.1")
+    expect(plan.steps.map((s: any) => s.toolCall?.capability)).toEqual(["research.search@0.1", "design.prd@1.0"])
+    expect(plan.risks.map((r: any) => r.description).join("\n")).not.toContain("Skipped")
   }, 30_000)
 
   it("chains a fetch into a summary, binding what is fetched", async () => {
@@ -105,13 +127,19 @@ describe("pnpm start", () => {
     expect(stored.steps[1].toolCall.bindings).toEqual(plan.steps[1].toolCall.bindings)
   }, 30_000)
 
-  it("asks rather than plans when nothing the goal needs is registered", async () => {
+  it("researches through the open indexes, and says which ones", async () => {
     const plan = await (await post("/intent", {
       actor: "user:andysakov",
-      goal: "Research the state of the art in RAG",
+      goal: "Research offline-first sync for notes apps",
       autonomy: "S2"
     })).json()
-    expect(plan.steps.map((s: any) => s.kind)).toEqual(["ask"])
+    expect(plan.steps.map((s: any) => s.toolCall?.capability)).toEqual(["research.search@0.1"])
+
+    const done = await (await post(`/plans/${plan.id}/execute`, { approvedSteps: [plan.steps[0].id] })).json()
+    expect(done.status).toBe("completed")
+    const sources = await (await fetch(`http://127.0.0.1:${PORT}/artifacts/${done.steps[0].artifactId}/content`)).text()
+    expect(sources).toContain("Searched Wikipedia and arXiv only")
+    expect(sources).toContain("[Offline-first sync](https://arxiv.org/abs/2401.00001v1)")
   }, 30_000)
 
   it("waits for approval on a skill with no history, then runs it through Claude", async () => {
@@ -120,18 +148,18 @@ describe("pnpm start", () => {
       goal: "Draft a PRD for offline-first notes",
       autonomy: "S2"
     })).json()
-    const stepId = plan.steps[0].id
-
     // A skill with no history is at S0 on the ledger, so even an S2 run stops for a human.
     const first = await (await post(`/plans/${plan.id}/execute`, {})).json()
     expect(first).toMatchObject({ mode: "direct", status: "awaiting_approval" })
 
     requests.length = 0
-    const approved = await (await post(`/plans/${plan.id}/execute`, { approvedSteps: [stepId] })).json()
+    const approved = await (await post(`/plans/${plan.id}/execute`, {
+      approvedSteps: plan.steps.map((s: any) => s.id)
+    })).json()
     expect(approved).toMatchObject({ mode: "direct", status: "completed" })
 
     // The document comes back over HTTP, byte for byte what the model wrote.
-    const artifactId = approved.steps[0].artifactId
+    const artifactId = approved.steps[1].artifactId
     const content = await fetch(`http://127.0.0.1:${PORT}/artifacts/${artifactId}/content`)
     expect(content.status).toBe(200)
     expect(await content.text()).toBe("# Offline-first notes\n\nA PRD.")

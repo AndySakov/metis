@@ -202,7 +202,16 @@ export const serversFor = (config: AppConfig): ServerMap => ({
     ? { "metis.build": { ...node("build.ts"), env: { METIS_WORKSPACE: resolve(config.workspace.value) } } }
     : {}),
   "metis.design": node("design.ts"),
-  "metis.research": node("research.ts"),
+  "metis.research": {
+    ...node("research.ts"),
+    // Where `research.search` sends its queries, when something other than Wikipedia and arXiv
+    // themselves should answer: a proxy, or a stand-in under test.
+    env: Object.fromEntries(
+      ["METIS_WIKIPEDIA_API", "METIS_ARXIV_API"].flatMap((name) =>
+        process.env[name] === undefined ? [] : [[name, process.env[name]!]]
+      )
+    )
+  },
   "metis.transform": node("transform.ts")
 })
 

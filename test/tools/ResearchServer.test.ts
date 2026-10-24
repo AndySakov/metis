@@ -1,7 +1,9 @@
 import { readFileSync } from "node:fs"
+import { createServer } from "node:http"
+import type { AddressInfo } from "node:net"
 import { resolve } from "node:path"
 
-import { describe, expect, it } from "@effect/vitest"
+import { afterAll, beforeAll, describe, expect, it } from "@effect/vitest"
 import { Effect, Schema } from "effect"
 
 import { ToolSpec } from "../../src/domain/ToolSpec.js"
@@ -200,5 +202,123 @@ describe("research.claim_graph asserts only what it can justify", () => {
     const outcome = await call(spec, { chunks: [{ text: "Short. Also short. Tiny.", sourceId: "s1" }] })
     const edges = (outcome.right.output as { edges?: Array<unknown> }).edges ?? []
     expect(edges).toEqual([])
+  }, 30_000)
+})
+
+describe("research.search queries Wikipedia and arXiv, and says it searched only those", () => {
+  const seen: Array<URL> = []
+  let failWikipedia = false
+  const stand = createServer((req, res) => {
+    const url = new URL(req.url ?? "/", "http://local")
+    seen.push(url)
+    if (url.pathname === "/w/api.php") {
+      if (failWikipedia) {
+        res.writeHead(503).end()
+        return
+      }
+      res.writeHead(200, { "content-type": "application/json" })
+      res.end(JSON.stringify({
+        query: {
+          search: [
+            {
+              title: "Retrieval-augmented generation",
+              snippet: "<span class=\"searchmatch\">RAG</span> grounds &amp; cites"
+            },
+            { title: "Large language model", snippet: "A model trained on text" }
+          ]
+        }
+      }))
+      return
+    }
+    res.writeHead(200, { "content-type": "application/atom+xml" })
+    res.end(`<?xml version="1.0"?><feed>
+      <entry><id>http://arxiv.org/abs/2005.11401v4</id><published>2020-05-22T17:32:47Z</published>
+        <title>Retrieval-Augmented Generation for
+          Knowledge-Intensive NLP Tasks</title><summary>Large pre-trained language models store knowledge.</summary></entry>
+      <entry><id>http://arxiv.org/abs/2312.10997v5</id><published>2023-12-18T07:47:33Z</published>
+        <title>RAG for LLMs: A Survey</title><summary>A survey &amp; review.</summary></entry>
+    </feed>`)
+  })
+  let base = ""
+  beforeAll(async () => {
+    await new Promise<void>((done) => stand.listen(0, "127.0.0.1", done))
+    base = `http://127.0.0.1:${(stand.address() as AddressInfo).port}`
+  })
+  afterAll(() => new Promise<void>((done) => stand.close(() => done())))
+
+  const search = (input: Record<string, unknown>) =>
+    Effect.runPromise(
+      Effect.scoped(
+        Effect.gen(function*() {
+          const runner = yield* ToolRunner
+          return yield* Effect.either(runner.run(specFor("research.search.tool.json", "search"), input))
+        })
+      ).pipe(
+        Effect.provide(McpToolRunner.layer({
+          "metis.research": {
+            ...servers["metis.research"]!,
+            env: { METIS_WIKIPEDIA_API: `${base}/w/api.php`, METIS_ARXIV_API: `${base}/api/query` }
+          }
+        }))
+      ) as Effect.Effect<any>
+    )
+
+  it("interleaves both indexes by rank, as the contract shapes them", async () => {
+    seen.length = 0
+    const outcome = await search({ query: "retrieval augmented generation", limit: 4 })
+    expect(outcome._tag).toBe("Right")
+    const { markdown, results } = outcome.right.output
+    expect(results.map((r: any) => r.url)).toEqual([
+      "https://en.wikipedia.org/wiki/Retrieval-augmented_generation",
+      "https://arxiv.org/abs/2005.11401v4",
+      "https://en.wikipedia.org/wiki/Large_language_model",
+      "https://arxiv.org/abs/2312.10997v5"
+    ])
+    expect(results[0]).toMatchObject({ snippet: "RAG grounds & cites", license: "CC BY-SA 4.0", score: 1 })
+    expect(results[1]).toMatchObject({
+      title: "Retrieval-Augmented Generation for Knowledge-Intensive NLP Tasks",
+      date: "2020-05-22",
+      score: 1
+    })
+    expect(results[3].score).toBe(0.5)
+    expect(markdown).toContain("Searched Wikipedia and arXiv only")
+    expect(markdown).toContain("[RAG for LLMs: A Survey](https://arxiv.org/abs/2312.10997v5)")
+
+    // The query reaches arXiv as plain terms, so its syntax cannot be injected.
+    const arxiv = seen.find((u) => u.pathname === "/api/query")!
+    expect(arxiv.searchParams.get("search_query")).toBe("all:retrieval AND all:augmented AND all:generation")
+  }, 30_000)
+
+  it("leaves Wikipedia out of a date range, since its articles have no publication date", async () => {
+    seen.length = 0
+    const outcome = await search({ query: "rag", filters: { from: "2023-01-01" } })
+    expect(outcome.right.output.results.map((r: any) => r.date)).toEqual(["2023-12-18"])
+    expect(outcome.right.output.markdown).toContain("Wikipedia left out")
+    expect(seen.some((u) => u.pathname === "/w/api.php")).toBe(false)
+    expect(seen.find((u) => u.pathname === "/api/query")!.searchParams.get("search_query")).toContain(
+      "submittedDate:[202301010000 TO 299912312359]"
+    )
+  }, 30_000)
+
+  it("searches only the domains asked for", async () => {
+    seen.length = 0
+    const outcome = await search({ query: "rag", filters: { domains: ["arxiv.org"] } })
+    expect(outcome.right.output.results.every((r: any) => r.url.startsWith("https://arxiv.org/"))).toBe(true)
+    expect(seen.every((u) => u.pathname === "/api/query")).toBe(true)
+  }, 30_000)
+
+  it("reports an index that failed, and fails only when every index it needed did", async () => {
+    failWikipedia = true
+    try {
+      const partial = await search({ query: "rag" })
+      expect(partial._tag).toBe("Right")
+      expect(partial.right.output.results.every((r: any) => r.url.startsWith("https://arxiv.org/"))).toBe(true)
+      expect(partial.right.output.markdown).toContain("Wikipedia could not be searched")
+
+      const total = await search({ query: "rag", filters: { domains: ["en.wikipedia.org"] } })
+      expect(total._tag).toBe("Left")
+    } finally {
+      failWikipedia = false
+    }
   }, 30_000)
 })

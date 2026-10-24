@@ -63,11 +63,13 @@ What exists and works:
   running unattended, and the decision is recorded as `TRUST_GATE`.
 - **Sampled verification** (ADR-014 §4) — a configurable fraction of executed actions is checked
   against the output schema its capability declares, independent of whether any rule flagged it.
-- **Nine capabilities with real MCP implementations** across four servers: `design.prd`,
-  `design.c4`, `design.api_spec`, `design.trade_study`, `transform.extract`, `research.fetch`,
-  `research.summarize`, `research.claim_graph`, `build.scaffold`. `research.fetch` does real HTTP
-  and refuses loopback, private and link-local hosts; `research.summarize` is extractive, so a
-  citation always points at text that was genuinely supplied.
+- **Ten capabilities with real MCP implementations** across four servers: `design.prd`,
+  `design.c4`, `design.api_spec`, `design.trade_study`, `transform.extract`, `research.search`,
+  `research.fetch`, `research.summarize`, `research.claim_graph`, `build.scaffold`.
+  `research.search` queries Wikipedia and arXiv, which need no key, and says it searched only
+  those: it is not a web-wide search. `research.fetch` does real HTTP and refuses loopback, private
+  and link-local hosts; `research.summarize` is extractive, so a citation always points at text
+  that was genuinely supplied.
 - **A project scaffolder that writes to disk.** `build.scaffold` (`src/tools/servers/build.ts`)
   creates a `node-ts` or `python` project under `METIS_WORKSPACE` and nowhere else: the name must
   be one safe path segment, and it never writes over an existing directory. It is declared
@@ -105,8 +107,7 @@ artifact, and an unresolvable capability that fails cleanly instead of dispatchi
 
 What does **not** exist yet, despite being described in `docs/`:
 
-- Eight of the seventeen capabilities remain descriptors: `research.search` (needs a search
-  backend), `run.notebook`, `graph.link`, `vector.upsert`, and the four `agent.*` ones, which need real browser and device control. Implementing any of them against canned
+- Seven of the seventeen capabilities remain descriptors: `run.notebook`, `graph.link`, `vector.upsert`, and the four `agent.*` ones, which need real browser and device control. Implementing any of them against canned
   responses would be worse than leaving them out — the registry would claim a capability that does
   not do what its contract says.
 - The monorepo layout, `examples/`, voice, device control, the Adaptive Agent Foundry.

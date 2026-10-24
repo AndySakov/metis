@@ -1,4 +1,6 @@
+import { createServer } from "node:http"
 import { createRequire } from "node:module"
+import type { AddressInfo } from "node:net"
 
 import { afterAll, beforeAll, describe, expect, it } from "@effect/vitest"
 import { ManagedRuntime, Option } from "effect"
@@ -20,7 +22,20 @@ const base = `http://127.0.0.1:${PORT}`
 
 let runtime: ManagedRuntime.ManagedRuntime<unknown, unknown> | undefined
 
+/** Stands in for Wikipedia and arXiv, so a PRD's search step never leaves the machine. */
+const indexes = createServer((req, res) => {
+  res.writeHead(200, {
+    "content-type": (req.url ?? "").startsWith("/w/") ? "application/json" : "application/atom+xml"
+  })
+  res.end((req.url ?? "").startsWith("/w/") ? JSON.stringify({ query: { search: [] } }) : "<feed></feed>")
+})
+const savedEnv = { ...process.env }
+
 beforeAll(async () => {
+  await new Promise<void>((done) => indexes.listen(0, "127.0.0.1", done))
+  const indexesAt = `http://127.0.0.1:${(indexes.address() as AddressInfo).port}`
+  process.env.METIS_WIKIPEDIA_API = `${indexesAt}/w/api.php`
+  process.env.METIS_ARXIV_API = `${indexesAt}/api/query`
   const config: App.AppConfig = {
     port: PORT,
     anthropicApiKey: Option.none(),
@@ -36,6 +51,8 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await runtime?.dispose()
+  await new Promise<void>((done) => indexes.close(() => done()))
+  process.env = savedEnv
 }, 20_000)
 
 const post = (path: string, body: unknown) =>
@@ -137,8 +154,11 @@ interface Browser {
 /** Runs the plan on the page, approving if it asks: a skill that has earned its gear does not. */
 const runOnPage = async (page: Page) => {
   await page.click("#run")
-  await page.waitForSelector("#steps .badge.s-awaiting_approval, #steps .badge.s-completed")
-  if ((await page.$$eval("#steps .badge.s-awaiting_approval", (n) => n.length)) > 0) {
+  // Each approval re-runs the plan, which may stop at the next step: approve until nothing waits.
+  for (let round = 0; round < 5; round++) {
+    await page.waitForSelector("#run:not([disabled])")
+    await page.waitForSelector("#steps .badge.s-awaiting_approval, #steps .badge.s-completed")
+    if ((await page.$$eval("#steps .badge.s-awaiting_approval", (n) => n.length)) === 0) break
     await page.click("#steps button.primary")
   }
   await page.waitForSelector("#output .doc")
