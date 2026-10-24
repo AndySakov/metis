@@ -39,7 +39,7 @@ channels:
     subscribe:
       message:
         name: ToolCompleted
-        description: "Event.type = TOOL_COMPLETED. Payload carries durationMs and cost."
+        description: "Event.type = TOOL_COMPLETED. Payload carries durationMs and cost, and samples: how many completions the tool's server asked the model for, when it asked for any."
         payload:
           $ref: ../Event.schema.json
   artifact/written:

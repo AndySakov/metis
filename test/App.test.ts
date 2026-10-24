@@ -306,6 +306,24 @@ describe("pnpm start", () => {
     }
   })
 
+  it("lets only the packs that ask for it use the model, the configured CLI ahead of the API", () => {
+    const base: App.AppConfig = {
+      port: PORT,
+      anthropicApiKey: Option.some(Redacted.make("k")),
+      anthropicBaseUrl: Option.none(),
+      postgres: false,
+      restate: Option.none(),
+      workspace: Option.none(),
+      modelCli: Option.none(),
+      packs: []
+    }
+    const packs = [{ sampling: ["plain.tools"] }, { sampling: [] }] as unknown as Parameters<typeof App.samplingFor>[1]
+    expect(App.samplingFor(base, packs)).toEqual({ granted: new Set(["plain.tools"]), via: "metis.model", perCall: 8 })
+    const cli = { ...base, modelCli: Option.some({ cli: "claude", model: Option.none(), env: [] }) }
+    expect(App.samplingFor(cli, packs).via).toBe("metis.model-cli")
+    expect(App.samplingFor({ ...base, anthropicApiKey: Option.none() }, packs).via).toBeUndefined()
+  })
+
   it("will not start on a model CLI it cannot use", () => {
     expect(App.modelCliOf({ cli: "chatgpt", model: Option.none(), env: [] })).toHaveProperty("error")
     expect(App.modelCliOf({ cli: "ollama", model: Option.none(), env: [] })).toMatchObject({

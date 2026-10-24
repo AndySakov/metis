@@ -1,0 +1,82 @@
+{
+  "description": "The facts a plain-English rewrite must keep, and the check it is held to.",
+  "facts": [
+    {
+      "name": "numbers with their punctuation, dates and times as written",
+      "text": "Ksh 1,250,000 due 2026-10-24 at 15:30, or 10.5% after 3/4 of the term",
+      "expect": [
+        "1,250,000",
+        "2026-10-24",
+        "15:30",
+        "10.5",
+        "3/4"
+      ]
+    },
+    {
+      "name": "links and emails whole, and the digits inside them not counted twice",
+      "text": "See https://example.com/v2/docs. Mail ops2@example.com",
+      "expect": [
+        "https://example.com/v2/docs",
+        "ops2@example.com"
+      ]
+    },
+    {
+      "name": "a fact repeated is one fact",
+      "text": "30 days, then 30 more",
+      "expect": [
+        "30"
+      ]
+    },
+    {
+      "name": "no facts in prose",
+      "text": "Please read this carefully.",
+      "expect": []
+    }
+  ],
+  "checks": [
+    {
+      "name": "a rewrite that keeps every fact and is shorter passes",
+      "original": "Pursuant to the agreement dated 2026-10-24, the balance of Ksh 1,250,000 is payable within 30 days.",
+      "rewrite": "Pay Ksh 1,250,000 within 30 days (agreement of 2026-10-24).",
+      "expect": {
+        "passed": true,
+        "missing": [],
+        "longer": false
+      }
+    },
+    {
+      "name": "a rounded amount is a missing fact",
+      "original": "The balance is Ksh 1,250,000.",
+      "rewrite": "You owe about Ksh 1.25m.",
+      "expect": {
+        "passed": false,
+        "missing": [
+          "1,250,000"
+        ],
+        "longer": false
+      }
+    },
+    {
+      "name": "a reformatted date is a missing fact",
+      "original": "Due on 2026-10-24.",
+      "rewrite": "Due 24 October 2026.",
+      "expect": {
+        "passed": false,
+        "missing": [
+          "2026-10-24"
+        ],
+        "longer": true
+      }
+    },
+    {
+      "name": "a longer rewrite fails even with every fact",
+      "original": "Pay 30 now.",
+      "rewrite": "You need to pay 30 right now, please.",
+      "expect": {
+        "passed": false,
+        "missing": [],
+        "longer": true
+      }
+    }
+  ]
+}

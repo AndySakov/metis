@@ -36,7 +36,9 @@ export class PackServer extends Schema.Class<PackServer>("PackServer")({
   command: Schema.NonEmptyString,
   args: Schema.optionalWith(Schema.Array(Schema.String), { default: () => [] }),
   env: Schema.optionalWith(Schema.Array(EnvName), { default: () => [] }),
-  paths: Schema.optionalWith(Schema.Array(EnvName), { default: () => [] })
+  paths: Schema.optionalWith(Schema.Array(EnvName), { default: () => [] }),
+  /** Whether the server may ask for completions over MCP sampling, answered by the configured model. */
+  model: Schema.optionalWith(Schema.Boolean, { default: () => false })
 }) {}
 
 export class PackStep extends Schema.Class<PackStep>("PackStep")({

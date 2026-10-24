@@ -368,6 +368,9 @@ export * as Planner from "./orchestrator/Planner.js"
  *   would otherwise silently replace the first.
  * - **Its environment is what it names.** A server gets the variables its manifest lists, from
  *   METIS's environment, and no others, the same rule core's servers follow.
+ * - **Model use is declared twice.** A server asks for completions only if its manifest says
+ *   `"model": true`, and every tool on such a server declares the `model.sample` scope, so policy
+ *   and the event log see model use on every call rather than discovering it inside one.
  *
  * What a pack cannot do from here is run code in the orchestrator. Its templates are data, compiled
  * by the planner; its code runs in the processes it declares, as any MCP server does.
@@ -491,6 +494,12 @@ export * as Descriptors from "./tools/Descriptors.js"
  *
  * Clients are cached per server and closed with the scope, so a plan calling three tools on one
  * server spawns one process rather than three.
+ *
+ * It also answers MCP sampling: a server asking its client for a completion. Only servers granted
+ * it may ask (a pack's manifest says `"model": true`); the answer comes from the configured model
+ * server's `complete` tool, so the asking server never holds a credential or a CLI; and one tool
+ * call may ask only so many times, so a looping server cannot spend the user's model without limit.
+ * How many it asked for is reported with the result, and so reaches the event log.
  */
 export * as McpToolRunner from "./tools/McpToolRunner.js"
 
@@ -586,6 +595,10 @@ export * as design from "./tools/servers/design.js"
  * `claude -p` on a Claude Code login, `codex exec`, `ollama run`, or a command of your own. The
  * prompt is the same; the CLI runs in an empty temporary directory, so it finds no project to
  * read, and whatever it prints is the document. Run that way it is registered as `metis.model-cli`.
+ *
+ * `complete` is not a capability. It is how a pack's server reaches the model: the pack asks METIS
+ * for a completion over MCP sampling, and METIS answers through this tool (`McpToolRunner.ts`), so
+ * a pack uses whatever model is configured without ever holding its credentials or its CLI.
  */
 export * as model from "./tools/servers/model.js"
 

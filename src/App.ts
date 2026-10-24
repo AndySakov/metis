@@ -298,6 +298,23 @@ const plannerFromRegistry = (templates: ReadonlyArray<Planner.Template>) =>
     })
   )
 
+/** How many completions one tool call of a pack's may ask the model for. */
+const SAMPLES_PER_CALL = 8
+
+/**
+ * Model access for packs: the servers whose manifest grants it, answered by the configured model
+ * server, the CLI ahead of the API as for `design.*`. With neither configured a request is refused.
+ */
+export const samplingFor = (config: AppConfig, packs: ReadonlyArray<LoadedPack>): McpToolRunner.Sampling => ({
+  granted: new Set(packs.flatMap((pack) => pack.sampling)),
+  via: Option.isSome(config.modelCli)
+    ? "metis.model-cli"
+    : Option.isSome(config.anthropicApiKey)
+    ? "metis.model"
+    : undefined,
+  perCall: SAMPLES_PER_CALL
+})
+
 /** Everything behind the API, without the HTTP listener. */
 export const services = (config: AppConfig) =>
   Layer.unwrapEffect(Effect.map(Effect.orDie(Packs.loadAll(config.packs)), (packs) => servicesWith(config, packs)))
@@ -317,7 +334,7 @@ const servicesWith = (config: AppConfig, packs: ReadonlyArray<LoadedPack>) => {
         )
       })
     ),
-    McpToolRunner.layer(servers)
+    McpToolRunner.layer(servers, samplingFor(config, packs))
   )
   const base = Layer.mergeAll(
     stores(config),
@@ -382,8 +399,15 @@ const announce = (config: AppConfig) =>
           onSome: (dir) => `build.scaffold writes under ${resolve(dir)}`
         })
       )
+      const sampling = samplingFor(config, packs)
       for (const pack of packs) {
         yield* Effect.log(`pack ${pack.manifest.name} ${pack.manifest.version} from ${pack.dir}`)
+        if (pack.sampling.length === 0) continue
+        yield* sampling.via === undefined
+          ? Effect.logWarning(
+            `pack ${pack.manifest.name} asks for the model, and none is configured: its tools will fail until METIS_MODEL_CLI or ANTHROPIC_API_KEY is set`
+          )
+          : Effect.log(`pack ${pack.manifest.name} may ask the model, through ${sampling.via}`)
       }
       yield* Effect.log(`capabilities: ${[...new Set(specs.map((spec) => spec.capability))].sort().join(", ")}`)
     })

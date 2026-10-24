@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://packs.metis.dev/plain/text.plain@0.1.input.schema.json",
+  "title": "text.plain@0.1 input",
+  "description": "Text to rewrite in plain English.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "text"
+  ],
+  "properties": {
+    "text": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "examples": [
+    {
+      "text": "Pursuant to the agreement dated 2026-10-24, the outstanding balance of Ksh 1,250,000 is payable within 30 days."
+    }
+  ]
+}
