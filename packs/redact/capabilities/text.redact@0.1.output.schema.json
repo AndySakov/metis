@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://packs.metis.dev/redact/text.redact@0.1.output.schema.json",
+  "title": "text.redact@0.1 output",
+  "description": "The text with each detail found replaced by `[kind]`, and how many of each kind were replaced. Names and addresses are not found: only the kinds listed.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "text",
+    "found",
+    "markdown"
+  ],
+  "properties": {
+    "text": {
+      "type": "string"
+    },
+    "found": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "email",
+        "card",
+        "phone",
+        "ip"
+      ],
+      "properties": {
+        "email": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "card": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "phone": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "ip": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "markdown": {
+      "type": "string"
+    }
+  },
+  "examples": [
+    {
+      "text": "Call Amina on [phone] or [email]",
+      "found": {
+        "email": 1,
+        "card": 0,
+        "phone": 1,
+        "ip": 0
+      },
+      "markdown": "## Redacted\n"
+    }
+  ]
+}

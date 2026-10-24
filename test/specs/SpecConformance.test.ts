@@ -7,6 +7,7 @@ import { Schema } from "effect"
 import { Artifact } from "../../src/domain/Artifact.js"
 import { Event } from "../../src/domain/Event.js"
 import { Intent, IntentDraft } from "../../src/domain/Intent.js"
+import { Pack } from "../../src/domain/Pack.js"
 import { Plan } from "../../src/domain/Plan.js"
 import { Policy, PolicyDecision } from "../../src/domain/Policy.js"
 import { UnitProfile } from "../../src/domain/Stays.js"
@@ -23,6 +24,11 @@ import { Isolation, isolationRank, ToolSpec } from "../../src/domain/ToolSpec.js
  */
 
 const SPECS = resolve(__dirname, "../../specs")
+/** Packs in the repository are contracts too: every check below covers them as well as `specs/`. */
+const PACKS = resolve(__dirname, "../../packs")
+const packDirs = readdirSync(PACKS, { withFileTypes: true })
+  .filter((entry) => entry.isDirectory())
+  .map((entry) => join(PACKS, entry.name))
 
 const readJson = (path: string): Record<string, unknown> =>
   JSON.parse(readFileSync(path, "utf8")) as Record<string, unknown>
@@ -34,6 +40,9 @@ const allSpecFiles = (dir: string): Array<string> =>
     if (entry.isDirectory()) return allSpecFiles(full)
     return entry.name.endsWith(".json") ? [full] : []
   })
+
+/** Every contract file: `specs/` and each pack's JSON. */
+const allContractFiles = (): Array<string> => [...allSpecFiles(SPECS), ...allSpecFiles(PACKS)]
 
 const examplesOf = (path: string): Array<unknown> => {
   const spec = readJson(path)
@@ -49,6 +58,7 @@ describe("spec examples decode with the schemas the code actually uses", () => {
     { file: "Event.schema.json", schema: Event },
     { file: "policy/Policy.schema.json", schema: Policy },
     { file: "policy/PolicyDecision.schema.json", schema: PolicyDecision },
+    { file: "packs/Pack.schema.json", schema: Pack },
     { file: "stays/UnitProfile.schema.json", schema: UnitProfile }
   ] as const
 
@@ -65,22 +75,28 @@ describe("spec examples decode with the schemas the code actually uses", () => {
 
 describe("every ToolSpec example conforms (ADR-006, ADR-017)", () => {
   const dir = join(SPECS, "tools/examples")
-  const files = readdirSync(dir).filter((f) => f.endsWith(".json")).sort()
+  const files = [
+    ...readdirSync(dir).filter((f) => f.endsWith(".json")).sort().map((f) => join(dir, f)),
+    ...packDirs.flatMap((pack) => {
+      const tools = join(pack, "tools")
+      return existsSync(tools) ? readdirSync(tools).filter((f) => f.endsWith(".json")).map((f) => join(tools, f)) : []
+    })
+  ]
 
   it("there are tool examples to check", () => {
     expect(files.length).toBeGreaterThan(0)
   })
 
   for (const file of files) {
-    it(file, () => {
-      const spec = readJson(join(dir, file))
+    it(file.slice(resolve(SPECS, "..").length + 1), () => {
+      const spec = readJson(file)
       expect(() => Schema.decodeUnknownSync(ToolSpec)(spec)).not.toThrow()
     })
   }
 
   it("no example still declares container/WASM packaging (ADR-017 removed it)", () => {
     for (const file of files) {
-      const spec = readJson(join(dir, file))
+      const spec = readJson(file)
       expect(spec.implementation, `${file} still has an implementation block`).toBeUndefined()
       expect(spec.sandboxed, `${file} still claims sandboxed`).toBeUndefined()
     }
@@ -90,7 +106,7 @@ describe("every ToolSpec example conforms (ADR-006, ADR-017)", () => {
     // `container` and `wasm` are vocabulary until a runtime provides them. A descriptor claiming
     // one before then asserts containment that does not exist.
     for (const file of files) {
-      const spec = Schema.decodeUnknownSync(ToolSpec)(readJson(join(dir, file)))
+      const spec = Schema.decodeUnknownSync(ToolSpec)(readJson(file))
       expect(isolationRank(spec.isolation), `${file} claims ${spec.isolation}`).toBeLessThanOrEqual(
         isolationRank("process")
       )
@@ -99,7 +115,7 @@ describe("every ToolSpec example conforms (ADR-006, ADR-017)", () => {
 
   it("every example declares idempotency explicitly (ADR-016)", () => {
     for (const file of files) {
-      const spec = readJson(join(dir, file))
+      const spec = readJson(file)
       expect(typeof spec.idempotent, `${file} must declare idempotent`).toBe("boolean")
     }
   })
@@ -153,7 +169,7 @@ describe("identifier convention is enforced, not just documented", () => {
     }
 
     const offenders: Array<string> = []
-    for (const file of allSpecFiles(SPECS)) {
+    for (const file of allContractFiles()) {
       walk(readJson(file), file.slice(SPECS.length + 1), offenders)
     }
     expect(offenders).toEqual([])
@@ -178,7 +194,7 @@ describe("the identifier convention applies to every spec, not just the ones wit
   it("no spec declares an identity field as a bare string", () => {
     const offenders: Array<string> = []
 
-    for (const file of allSpecFiles(SPECS)) {
+    for (const file of allContractFiles()) {
       // The shared `common/` primitives define the vocabulary; they are not entities themselves.
       if (file.includes(`${join("specs", "common")}`) || file.includes("/common/")) continue
       // Capability I/O and tool descriptors carry their own domain fields, not METIS entity ids.
@@ -239,7 +255,7 @@ describe("$ref integrity (ADR-004: fail on broken refs)", () => {
   it("every $ref resolves to a file that exists", () => {
     const broken: Array<string> = []
 
-    for (const file of allSpecFiles(SPECS)) {
+    for (const file of allContractFiles()) {
       const refs: Array<string> = []
       collectRefs(readJson(file), refs)
 
@@ -275,7 +291,7 @@ describe("$ref integrity (ADR-004: fail on broken refs)", () => {
   it("every local #/$defs pointer names a definition that exists", () => {
     const broken: Array<string> = []
 
-    for (const file of allSpecFiles(SPECS)) {
+    for (const file of allContractFiles()) {
       const spec = readJson(file)
       const refs: Array<string> = []
       collectRefs(spec, refs)
@@ -302,4 +318,22 @@ describe("there is exactly one Artifact", () => {
     expect(Object.keys(defs)).not.toContain("Artifact")
     expect(Object.keys(defs)).toContain("ArtifactExpectation")
   })
+})
+
+describe("every pack in the repository is a pack METIS will load", () => {
+  it("there are packs to check", () => {
+    expect(packDirs.length).toBeGreaterThan(0)
+  })
+
+  for (const dir of packDirs) {
+    it(dir.slice(PACKS.length + 1), () => {
+      const pack = Schema.decodeUnknownSync(Pack)(readJson(join(dir, "pack.json")))
+      for (const tool of pack.tools) expect(existsSync(join(dir, tool)), tool).toBe(true)
+      // A pack binds only the servers it runs.
+      for (const tool of pack.tools) {
+        const spec = Schema.decodeUnknownSync(ToolSpec)(readJson(join(dir, tool)))
+        expect(Object.keys(pack.servers), tool).toContain(spec.mcp.server)
+      }
+    })
+  }
 })

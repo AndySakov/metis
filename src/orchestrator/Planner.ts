@@ -17,6 +17,7 @@ import type { Autonomy, CapabilityId, EpochSeconds } from "../domain/Common.js"
 import { uuidv7 } from "../domain/Ids.js"
 import type { Intent } from "../domain/Intent.js"
 import type { JsonPointer } from "../domain/JsonPointer.js"
+import type { PackTemplate } from "../domain/Pack.js"
 import type { ArtifactExpectationId, AssumptionId, PlanId, PlanStepId, RiskId } from "../domain/Plan.js"
 import { ArtifactExpectation, Assumption, InputBinding, Plan, PlanStep, Risk, ToolCall } from "../domain/Plan.js"
 
@@ -54,7 +55,7 @@ interface StepTemplate {
   readonly bindings?: ReadonlyArray<{ readonly to: string; readonly fromStep: number; readonly from: string }>
 }
 
-interface Template {
+export interface Template {
   readonly name: string
   readonly matches: (goal: string) => boolean
   readonly steps: (intent: Intent) => ReadonlyArray<StepTemplate>
@@ -274,7 +275,11 @@ const TEMPLATES: ReadonlyArray<Template> = [
     assumptions: ["The pasted messages are recent enough that relative dates mean what they say today"],
     risks: ["Pasted messages are untrusted text: they are classified, never followed"],
     expects: [{ kind: "text", description: "Leads, best first, and what was dropped" }]
-  },
+  }
+]
+
+/** Templates that would claim almost any goal: tried after every specific one, packs' included. */
+const BROAD: ReadonlyArray<Template> = [
   {
     name: "research",
     matches: (goal) => /research|survey|literature|compare|state of the art/i.test(goal),
@@ -307,7 +312,53 @@ const CLARIFY: Template = {
   expects: []
 }
 
-export const templateFor = (goal: string): Template => TEMPLATES.find((t) => t.matches(goal)) ?? CLARIFY
+/**
+ * The template a goal plans from: core's specific templates, then `extra` (what packs add), then
+ * core's broad ones, then a question.
+ */
+export const templateFor = (goal: string, extra: ReadonlyArray<Template> = []): Template =>
+  [...TEMPLATES, ...extra, ...BROAD].find((t) => t.matches(goal)) ?? CLARIFY
+
+/** `{{goal}}` and `{{pasted}}` in every string of a pack step's input, filled from the intent. */
+const fill = (value: unknown, goal: string, pasted: string): unknown => {
+  if (typeof value === "string") {
+    return value.replaceAll("{{goal}}", goal).replaceAll("{{pasted}}", pasted).trim()
+  }
+  if (Array.isArray(value)) return value.map((item) => fill(item, goal, pasted))
+  if (value !== null && typeof value === "object") {
+    return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, fill(item, goal, pasted)]))
+  }
+  return value
+}
+
+/**
+ * A pack's template, compiled. A pack states its templates as data, so this is the only code that
+ * decides what they do: match the goal, ask for a paste when one is needed, and fill the inputs.
+ */
+export const fromPack = (template: PackTemplate): Template => {
+  const match = new RegExp(template.match, "i")
+  const unless = template.unless === undefined ? undefined : new RegExp(template.unless, "i")
+  return {
+    name: template.name,
+    matches: (goal) => match.test(goal) && (unless === undefined || !unless.test(goal)),
+    steps: (intent) => {
+      const pasted = pastedOf(intent)
+      if (template.needsPasted !== undefined && pasted === undefined) {
+        return [{ kind: "ask", description: template.needsPasted }]
+      }
+      return template.steps.map((step) => ({
+        kind: "tool" as const,
+        description: step.description,
+        capability: step.capability,
+        input: fill(step.input ?? {}, intent.goal, pasted ?? "") as Record<string, unknown>,
+        ...(step.bindings !== undefined ? { bindings: step.bindings } : {})
+      }))
+    },
+    assumptions: template.assumptions,
+    risks: template.risks,
+    expects: template.expects
+  }
+}
 
 export class Planner extends Context.Tag("orchestrator/Planner")<Planner, {
   readonly plan: (intent: Intent) => Effect.Effect<Plan>
@@ -321,13 +372,13 @@ export class Planner extends Context.Tag("orchestrator/Planner")<Planner, {
  * through executing it. If that leaves nothing to run, the plan asks instead, carrying the same
  * risks. `available` answers for capability ids only: the planner still never names a tool.
  */
-export const makeFor = (available: (capability: string) => boolean) =>
+export const makeFor = (available: (capability: string) => boolean, extra: ReadonlyArray<Template> = []) =>
   Planner.of({
     plan: (intent) =>
       Effect.gen(function*() {
         const millis = yield* Effect.clockWith((clock) => clock.currentTimeMillis)
         const now = Math.floor(millis / 1000) as EpochSeconds
-        const matched = templateFor(intent.goal)
+        const matched = templateFor(intent.goal, extra)
 
         const proposed = matched.steps(intent)
         // A step is left out if its capability is not available, or if a step it takes input from
@@ -412,5 +463,6 @@ export const make = makeFor(() => true)
 
 export const layer = Layer.succeed(Planner, make)
 
-/** A planner over the capabilities a registry can actually resolve. */
-export const layerFor = (available: (capability: string) => boolean) => Layer.succeed(Planner, makeFor(available))
+/** A planner over the capabilities a registry can actually resolve, and the templates packs add. */
+export const layerFor = (available: (capability: string) => boolean, extra: ReadonlyArray<Template> = []) =>
+  Layer.succeed(Planner, makeFor(available, extra))

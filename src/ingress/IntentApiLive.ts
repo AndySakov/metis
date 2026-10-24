@@ -25,6 +25,7 @@ import { EventLogStore, EventQuery } from "../mneme/EventLogStore.js"
 import { PlanStore } from "../mneme/PlanStore.js"
 import { PlanExecution } from "../orchestrator/PlanExecution.js"
 import { Planner } from "../orchestrator/Planner.js"
+import { Packs } from "../packs/Packs.js"
 import { TrustLedger } from "../policy/TrustLedger.js"
 import { skillOf, skillsIn } from "../policy/TrustUpdater.js"
 import { ToolRegistry } from "../tools/ToolRegistry.js"
@@ -34,6 +35,7 @@ import {
   ExecutionRecord,
   ExecutionRejected,
   IntentApi,
+  PackSummary,
   PlanNotFound
 } from "./IntentApi.js"
 
@@ -182,9 +184,20 @@ export const InspectApiLive = HttpApiBuilder.group(IntentApi, "inspect", (handle
     const log = yield* EventLogStore
     const registry = yield* ToolRegistry
     const ledger = yield* TrustLedger
+    const packs = yield* Packs
 
     return handlers
       .handle("listTools", () => registry.all)
+      .handle("listPacks", () =>
+        Effect.succeed(packs.map((pack) =>
+          new PackSummary({
+            name: pack.manifest.name,
+            version: pack.manifest.version,
+            description: pack.manifest.description,
+            capabilities: [...new Set(pack.tools.map((tool) => tool.capability))].sort(),
+            examples: pack.manifest.examples
+          })
+        )))
       .handle("readEventLog", ({ urlParams }) =>
         Effect.gen(function*() {
           const { actor, fromTs, planId, toTs, types } = urlParams

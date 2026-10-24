@@ -1,0 +1,48 @@
+{
+  "name": "redact",
+  "version": "0.1.0",
+  "description": "Strips personal details from pasted text before it goes anywhere else.",
+  "servers": {
+    "redact.tools": {
+      "command": "node",
+      "args": [
+        "--experimental-strip-types",
+        "${pack}/src/server.ts"
+      ]
+    }
+  },
+  "tools": [
+    "tools/text.redact.tool.json"
+  ],
+  "templates": [
+    {
+      "name": "redact",
+      "match": "\\b(redact|scrub|anonymi[sz]e)\\b",
+      "needsPasted": "Paste the text to redact",
+      "steps": [
+        {
+          "description": "Redact emails, card numbers, phone numbers and IP addresses",
+          "capability": "text.redact@0.1",
+          "input": {
+            "text": "{{pasted}}"
+          }
+        }
+      ],
+      "risks": [
+        "Only the kinds of detail listed are found: names and addresses are not"
+      ],
+      "expects": [
+        {
+          "kind": "text",
+          "description": "The text with personal details replaced"
+        }
+      ]
+    }
+  ],
+  "examples": [
+    {
+      "goal": "Redact the personal details in this",
+      "pasted": "Call Amina on +254 712 345 678 or amina@example.com"
+    }
+  ]
+}

@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://packs.metis.dev/redact/text.redact@0.1.input.schema.json",
+  "title": "text.redact@0.1 input",
+  "description": "Text to redact, and optionally which kinds of detail to look for (all of them by default).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "text"
+  ],
+  "properties": {
+    "text": {
+      "type": "string"
+    },
+    "kinds": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/$defs/Kind"
+      }
+    }
+  },
+  "$defs": {
+    "Kind": {
+      "type": "string",
+      "enum": [
+        "email",
+        "card",
+        "phone",
+        "ip"
+      ]
+    }
+  },
+  "examples": [
+    {
+      "text": "Call Amina on +254 712 345 678 or amina@example.com"
+    },
+    {
+      "text": "Card 4111 1111 1111 1111",
+      "kinds": [
+        "card"
+      ]
+    }
+  ]
+}

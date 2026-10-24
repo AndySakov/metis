@@ -312,6 +312,36 @@ paths:
               schema:
                 type: array
                 items: { $ref: ../ToolSpec.schema.json }
+  /packs:
+    get:
+      operationId: listPacks
+      x-status: implemented
+      summary: The packs METIS was started with
+      description: >
+        Each pack loaded from METIS_PACKS (specs/packs/Pack.schema.json): the capabilities its
+        descriptors bind, and the goals it offers the console as examples. Empty when no pack is
+        loaded.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  additionalProperties: false
+                  required: [name, version, description, capabilities, examples]
+                  properties:
+                    name: { $ref: ../packs/Pack.schema.json#/$defs/PackName }
+                    version: { type: string, minLength: 1 }
+                    description: { type: string, minLength: 1 }
+                    capabilities:
+                      type: array
+                      items: { $ref: ../common/CapabilityId.schema.json }
+                    examples:
+                      type: array
+                      items: { $ref: ../packs/Pack.schema.json#/$defs/Example }
   /trust:
     get:
       operationId: listTrust

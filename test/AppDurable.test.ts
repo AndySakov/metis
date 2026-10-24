@@ -88,7 +88,8 @@ describe.skipIf(!available)("pnpm start on Restate", () => {
         endpointPort: ENDPOINT
       }),
       workspace: Option.none(),
-      modelCli: Option.none()
+      modelCli: Option.none(),
+      packs: []
     }
     // Building the layer registers the workflow, retrying until the Restate server is up.
     runtime = ManagedRuntime.make(App.layer(config) as never)
