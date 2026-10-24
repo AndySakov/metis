@@ -1,0 +1,223 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schema.metis.dev/capabilities/stays.reply@0.1.output.schema.json",
+  "title": "stays.reply@0.1 output",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "unit",
+    "lead",
+    "markdown"
+  ],
+  "properties": {
+    "unit": {
+      "type": "string"
+    },
+    "lead": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "text",
+        "verdict",
+        "reason",
+        "direction",
+        "unit",
+        "areaTier",
+        "datesStated"
+      ],
+      "properties": {
+        "text": {
+          "type": "string"
+        },
+        "sender": {
+          "type": "string"
+        },
+        "group": {
+          "type": "string"
+        },
+        "at": {
+          "type": "string"
+        },
+        "verdict": {
+          "type": "string",
+          "enum": [
+            "lead",
+            "noise"
+          ]
+        },
+        "reason": {
+          "type": "string"
+        },
+        "direction": {
+          "type": "string",
+          "enum": [
+            "seeking",
+            "offering",
+            "unclear"
+          ]
+        },
+        "unit": {
+          "type": "string",
+          "enum": [
+            "match",
+            "weak",
+            "larger",
+            "unstated"
+          ]
+        },
+        "area": {
+          "type": "string"
+        },
+        "areaTier": {
+          "type": "string",
+          "enum": [
+            "accept",
+            "borderline",
+            "reject",
+            "unstated"
+          ]
+        },
+        "checkIn": {
+          "type": "string",
+          "format": "date"
+        },
+        "checkOut": {
+          "type": "string",
+          "format": "date"
+        },
+        "datesStated": {
+          "type": "boolean"
+        },
+        "confidence": {
+          "description": "Leads only.",
+          "type": "string",
+          "enum": [
+            "high",
+            "medium",
+            "low"
+          ]
+        },
+        "availability": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "verdict",
+            "detail"
+          ],
+          "properties": {
+            "verdict": {
+              "description": "OPEN: an unsold slot carried for projection, fill it. FREE: nothing booked. CONTESTED: overlaps a hot lead that has not converted. BOOKED: clashes with a confirmed booking. NO DATA: past the sheet's last month.",
+              "type": "string",
+              "enum": [
+                "OPEN",
+                "FREE",
+                "CONTESTED",
+                "BOOKED",
+                "NO DATA"
+              ]
+            },
+            "detail": {
+              "type": "string"
+            },
+            "nextWindow": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "checkIn",
+                "checkOut"
+              ],
+              "properties": {
+                "checkIn": {
+                  "type": "string",
+                  "format": "date"
+                },
+                "checkOut": {
+                  "type": "string",
+                  "format": "date"
+                }
+              }
+            }
+          },
+          "description": "Whether the unit can take the lead's dates, when a booking sheet is configured; one night when only an arrival was given."
+        },
+        "reply": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": [
+            "text",
+            "language",
+            "placeholders",
+            "unverified"
+          ],
+          "description": "A first reply for the owner to send: the listing and price first, one question last, in the lead's language. Only facts the unit profile records; a draft, never sent by METIS.",
+          "properties": {
+            "text": {
+              "type": "string"
+            },
+            "language": {
+              "type": "string",
+              "enum": [
+                "en",
+                "sw"
+              ]
+            },
+            "placeholders": {
+              "description": "Facts the profile lacks, left in the text as [placeholders] to fill before sending.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "unverified": {
+              "description": "What the draft assumes and nothing checked, to confirm before sending.",
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "draft": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "text",
+        "language",
+        "placeholders",
+        "unverified"
+      ],
+      "description": "A first reply for the owner to send: the listing and price first, one question last, in the lead's language. Only facts the unit profile records; a draft, never sent by METIS.",
+      "properties": {
+        "text": {
+          "type": "string"
+        },
+        "language": {
+          "type": "string",
+          "enum": [
+            "en",
+            "sw"
+          ]
+        },
+        "placeholders": {
+          "description": "Facts the profile lacks, left in the text as [placeholders] to fill before sending.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "unverified": {
+          "description": "What the draft assumes and nothing checked, to confirm before sending.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "markdown": {
+      "type": "string"
+    }
+  }
+}

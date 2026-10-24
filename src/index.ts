@@ -472,6 +472,22 @@ export * as Verification from "./policy/Verification.js"
 export * as Availability from "./stays/Availability.js"
 
 /**
+ * A first reply to a booking lead, drafted for the owner to send.
+ *
+ * Three lessons decide its shape. In August, most chased leads died on an unanswered message from
+ * the host, usually a qualifying question sent as the opener ("What's the budget?"); the people
+ * posting are fielding several hosts at once, and whoever sends the place and the price first
+ * wins. So the draft opens with the listing and the price for the nights asked, and keeps one
+ * question for the end, one that moves toward a booking. And a wrong price or a promised amenity
+ * costs a review, so the draft states only what the unit's profile records: a missing fact is a
+ * visible `[placeholder]`, listed for the owner to fill, never a guess.
+ *
+ * It answers in the lead's language, English or Swahili, and is a draft only: nothing here sends.
+ * Free of Node APIs, like the rest of `src/stays/`.
+ */
+export * as Reply from "./stays/Reply.js"
+
+/**
  * Reading a unit's booking sheet from Google Sheets, as a service account.
  *
  * Read-only by construction: the token asked for carries only the `spreadsheets.readonly` scope, so

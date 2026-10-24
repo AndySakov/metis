@@ -218,6 +218,25 @@ const TEMPLATES: ReadonlyArray<Template> = [
     expects: [{ kind: "text", description: "The files created" }]
   },
   {
+    // Before the lead sweep, so "reply to this lead" drafts a reply rather than triaging.
+    name: "reply_lead",
+    matches: (goal) => /\b(reply|respond|answer)\b/i.test(goal) && !/\b(prd|c4|api spec)\b/i.test(goal),
+    steps: (intent) => {
+      const pasted = pastedOf(intent)
+      return pasted === undefined
+        ? [{ kind: "ask", description: "Paste the enquiry to reply to" }]
+        : [{
+          kind: "tool",
+          description: "Draft a first reply: the listing and price first, one question last",
+          capability: "stays.reply@0.1",
+          input: { message: pasted }
+        }]
+    },
+    assumptions: ["The unit profile's listing facts are current"],
+    risks: ["A draft only: check the placeholders and dates, then send it yourself"],
+    expects: [{ kind: "text", description: "A reply ready to paste" }]
+  },
+  {
     // After the document templates, so "a PRD for a free notes app" is still a PRD.
     name: "availability",
     matches: (goal) => /\b(free|available|availability|vacant|booked)\b/i.test(goal) && !/\bleads?\b/i.test(goal),

@@ -27,7 +27,9 @@ import { z } from "zod"
 import { UnitProfile } from "../../domain/Stays.ts"
 import type { Calendar, SheetSnapshot } from "../../stays/Availability.ts"
 import { answer, calendarFrom } from "../../stays/Availability.ts"
+import { draft } from "../../stays/Reply.ts"
 import { fetchSheet } from "../../stays/Sheets.ts"
+import type { Triaged } from "../../stays/Triage.ts"
 import { dates, parseChat, report, todayIn, triage, withAvailability } from "../../stays/Triage.ts"
 
 const EXAMPLE = fileURLToPath(new URL("../../../specs/stays/units/example-westlands-1br.json", import.meta.url))
@@ -63,6 +65,9 @@ const reply = <A extends Record<string, unknown>>(result: A) => ({
   structuredContent: result
 })
 
+/** Every lead gets a first reply drafted; noise gets none. Drafts only: nothing here sends. */
+const withReply = (t: Triaged): Triaged => t.verdict === "lead" ? { ...t, reply: draft(t, profile) } : t
+
 const server = new McpServer({ name: "metis.stays", version: "0.1.0" })
 
 server.registerTool(
@@ -82,9 +87,48 @@ server.registerTool(
     // Read only when there is a dated lead to check: most sweeps find none.
     const dated = triaged.some((t) => t.verdict === "lead" && t.checkIn !== undefined)
     const source = dated ? await calendar(at) : undefined
-    const results = source !== undefined && "calendar" in source ? withAvailability(triaged, source.calendar) : triaged
+    const checked = source !== undefined && "calendar" in source ? withAvailability(triaged, source.calendar) : triaged
+    const results = checked.map(withReply)
     const notes = source !== undefined && "unavailable" in source ? [source.unavailable] : []
     return reply({ unit: profile.name, results, markdown: report(results, profile, notes) })
+  }
+)
+
+server.registerTool(
+  "reply",
+  {
+    title: "Draft a reply",
+    description: `Draft a first reply to one booking enquiry for ${profile.name}, from its listing. A draft only.`,
+    inputSchema: {
+      message: z.string().min(1),
+      sender: z.string().optional(),
+      now: z.string().datetime({ offset: true }).optional()
+    }
+  },
+  async ({ message, now, sender }) => {
+    const at = now === undefined ? new Date() : new Date(now)
+    const lead = triage({ text: message, ...(sender !== undefined ? { sender } : {}) }, profile, at)
+    if (lead.verdict === "noise") {
+      const markdown = `## No reply drafted\n\nThis reads as ${lead.reason}, so there is no enquiry to answer.\n`
+      return reply({ unit: profile.name, lead, markdown })
+    }
+    const source = lead.checkIn !== undefined ? await calendar(at) : undefined
+    const checked = source !== undefined && "calendar" in source ? withAvailability([lead], source.calendar)[0]! : lead
+    const drafted = withReply(checked)
+    const markdown = [
+      `## Reply for ${profile.name}`,
+      "",
+      "```text",
+      drafted.reply!.text,
+      "```",
+      ...(drafted.reply!.placeholders.length > 0
+        ? ["", `Fill before sending: ${drafted.reply!.placeholders.join(", ")}.`]
+        : []),
+      ...drafted.reply!.unverified.map((check) => `Confirm: ${check}.`),
+      ...(source !== undefined && "unavailable" in source ? ["", `> ${source.unavailable}`] : []),
+      ""
+    ].join("\n")
+    return reply({ unit: profile.name, lead: drafted, draft: drafted.reply!, markdown })
   }
 )
 

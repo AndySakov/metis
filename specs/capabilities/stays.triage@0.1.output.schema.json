@@ -137,6 +137,43 @@
               }
             },
             "description": "Whether the unit can take the lead's dates, when a booking sheet is configured; one night when only an arrival was given."
+          },
+          "reply": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "text",
+              "language",
+              "placeholders",
+              "unverified"
+            ],
+            "description": "A first reply for the owner to send: the listing and price first, one question last, in the lead's language. Only facts the unit profile records; a draft, never sent by METIS.",
+            "properties": {
+              "text": {
+                "type": "string"
+              },
+              "language": {
+                "type": "string",
+                "enum": [
+                  "en",
+                  "sw"
+                ]
+              },
+              "placeholders": {
+                "description": "Facts the profile lacks, left in the text as [placeholders] to fill before sending.",
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "unverified": {
+                "description": "What the draft assumes and nothing checked, to confirm before sending.",
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            }
           }
         }
       }

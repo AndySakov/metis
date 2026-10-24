@@ -27,5 +27,16 @@ export class UnitProfile extends Schema.Class<UnitProfile>("UnitProfile")({
   areas: Schema.Struct({ accept: Names, borderline: Names, reject: Names }),
   availability: Schema.optional(
     Schema.Struct({ spreadsheetId: Schema.String.pipe(Schema.pattern(/^[A-Za-z0-9_-]+$/)) })
-  )
+  ),
+  /** What a reply may state. Anything missing is a placeholder in the draft, never a guess. */
+  listing: Schema.optional(Schema.Struct({
+    headline: Schema.optional(Schema.NonEmptyTrimmedString.pipe(Schema.maxLength(120))),
+    headlineSw: Schema.optional(Schema.NonEmptyTrimmedString.pipe(Schema.maxLength(120))),
+    currency: Schema.optional(Schema.NonEmptyTrimmedString.pipe(Schema.maxLength(8))),
+    nightlyRate: Schema.optional(Schema.Int.pipe(Schema.positive())),
+    highlights: Schema.optional(
+      Schema.Array(Schema.NonEmptyTrimmedString.pipe(Schema.maxLength(80))).pipe(Schema.maxItems(5))
+    ),
+    photos: Schema.optional(Schema.String.pipe(Schema.pattern(/^https:\/\//)))
+  }))
 }) {}

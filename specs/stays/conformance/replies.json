@@ -1,0 +1,198 @@
+{
+  "description": "First replies to booking leads. Each opens with the listing and the price for the nights asked, states only what the profile records (a missing fact is a visible placeholder), answers in the lead's language, and ends on one question that moves toward a booking. A case without its own listing uses `listing`.",
+  "profile": "../units/example-westlands-1br.json",
+  "listing": {
+    "headline": "a 1-bedroom in Westlands",
+    "headlineSw": "1-bedroom Westlands",
+    "currency": "Ksh",
+    "highlights": [
+      "fibre Wi-Fi",
+      "backup power"
+    ],
+    "nightlyRate": 9000,
+    "photos": "https://example.com/westlands-1br"
+  },
+  "cases": [
+    {
+      "name": "free dates: the listing and the price for those nights, then one question",
+      "lead": {
+        "text": "Anyone with a 1br in Westlands from the 15th, 3 nights?",
+        "sender": "Kevin Otieno",
+        "checkIn": "2026-11-15",
+        "checkOut": "2026-11-18",
+        "availability": {
+          "verdict": "FREE",
+          "detail": ""
+        }
+      },
+      "expect": {
+        "text": "Hi Kevin! I have a 1-bedroom in Westlands, free Sun 15 Nov to Wed 18 Nov.\nIt has fibre Wi-Fi and backup power.\nKsh 9,000 a night, Ksh 27,000 for the 3 nights.\nPhotos: https://example.com/westlands-1br\nShall I hold them for you?",
+        "language": "en",
+        "placeholders": [],
+        "unverified": []
+      }
+    },
+    {
+      "name": "a Swahili lead gets a Swahili reply",
+      "lead": {
+        "text": "Naomba 1 bedroom Westlands tarehe 15 mpaka 18",
+        "sender": "Wanjiru",
+        "checkIn": "2026-11-15",
+        "checkOut": "2026-11-18",
+        "availability": {
+          "verdict": "OPEN",
+          "detail": ""
+        }
+      },
+      "expect": {
+        "text": "Habari Wanjiru! Nina 1-bedroom Westlands, inapatikana tarehe 15 Nov hadi 18 Nov.\nIna fibre Wi-Fi na backup power.\nBei: Ksh 9,000 kwa usiku, usiku 3 ni Ksh 27,000.\nPicha: https://example.com/westlands-1br\nNikushikilie tarehe hizo?",
+        "language": "sw",
+        "placeholders": [],
+        "unverified": []
+      }
+    },
+    {
+      "name": "taken dates offer the next free window, for an agent's client",
+      "lead": {
+        "text": "Client needs a 1br in Kilimani 21st to 23rd",
+        "sender": "Agent Mary",
+        "checkIn": "2026-08-21",
+        "checkOut": "2026-08-23",
+        "availability": {
+          "verdict": "BOOKED",
+          "detail": "",
+          "nextWindow": {
+            "checkIn": "2026-08-25",
+            "checkOut": "2026-08-27"
+          }
+        }
+      },
+      "expect": {
+        "text": "Hi! I have a 1-bedroom in Westlands for your client. Fri 21 Aug to Sun 23 Aug are taken, but it's free Tue 25 Aug to Thu 27 Aug.\nIt has fibre Wi-Fi and backup power.\nKsh 9,000 a night, Ksh 18,000 for the 2 nights.\nPhotos: https://example.com/westlands-1br\nShall I hold those dates for you?",
+        "language": "en",
+        "placeholders": [],
+        "unverified": []
+      }
+    },
+    {
+      "name": "taken dates in Swahili: the next window, a capital at the sentence start",
+      "lead": {
+        "text": "Natafuta 1br Westlands tarehe 21 mpaka 23",
+        "sender": "Achieng",
+        "checkIn": "2026-08-21",
+        "checkOut": "2026-08-23",
+        "availability": {
+          "verdict": "BOOKED",
+          "detail": "",
+          "nextWindow": {
+            "checkIn": "2026-08-25",
+            "checkOut": "2026-08-27"
+          }
+        }
+      },
+      "expect": {
+        "text": "Habari Achieng! Nina 1-bedroom Westlands. Tarehe 21 Ago hadi 23 Ago imeshachukuliwa, lakini inapatikana tarehe 25 Ago hadi 27 Ago.\nIna fibre Wi-Fi na backup power.\nBei: Ksh 9,000 kwa usiku, usiku 2 ni Ksh 18,000.\nPicha: https://example.com/westlands-1br\nNikushikilie tarehe hizo?",
+        "language": "sw",
+        "placeholders": [],
+        "unverified": []
+      }
+    },
+    {
+      "name": "taken with nothing near: ask whether the dates move",
+      "lead": {
+        "text": "Need a 1br westlands 21st to 23rd",
+        "sender": "Ann",
+        "checkIn": "2026-08-21",
+        "checkOut": "2026-08-23",
+        "availability": {
+          "verdict": "BOOKED",
+          "detail": ""
+        }
+      },
+      "expect": {
+        "text": "Hi Ann! I have a 1-bedroom in Westlands, but Fri 21 Aug to Sun 23 Aug are taken.\nIt has fibre Wi-Fi and backup power.\nKsh 9,000 a night.\nPhotos: https://example.com/westlands-1br\nAre your dates flexible?",
+        "language": "en",
+        "placeholders": [],
+        "unverified": []
+      }
+    },
+    {
+      "name": "contested dates say so, and ask for a decision today",
+      "lead": {
+        "text": "Need a 1 bedroom this weekend",
+        "sender": "brian",
+        "checkIn": "2026-08-14",
+        "checkOut": "2026-08-16",
+        "availability": {
+          "verdict": "CONTESTED",
+          "detail": ""
+        }
+      },
+      "expect": {
+        "text": "Hi! I have a 1-bedroom in Westlands, available Fri 14 Aug to Sun 16 Aug. Someone else has asked about those dates too, so I can hold them if you confirm today.\nIt has fibre Wi-Fi and backup power.\nKsh 9,000 a night, Ksh 18,000 for the 2 nights.\nPhotos: https://example.com/westlands-1br\nShall I hold them for you?",
+        "language": "en",
+        "placeholders": [],
+        "unverified": []
+      }
+    },
+    {
+      "name": "only an arrival: one night, priced as one",
+      "lead": {
+        "text": "Nahitaji keja ya one bedroom usiku wa leo",
+        "sender": "+254 712 345 678",
+        "checkIn": "2026-08-10",
+        "availability": {
+          "verdict": "FREE",
+          "detail": ""
+        }
+      },
+      "expect": {
+        "text": "Habari! Nina 1-bedroom Westlands, inapatikana tarehe 10 Ago hadi 11 Ago.\nIna fibre Wi-Fi na backup power.\nBei: Ksh 9,000 kwa usiku.\nPicha: https://example.com/westlands-1br\nNikushikilie tarehe hizo?",
+        "language": "sw",
+        "placeholders": [],
+        "unverified": []
+      }
+    },
+    {
+      "name": "availability not checked: dates offered, not promised",
+      "lead": {
+        "text": "Anyone with a 1br in Westlands from the 15th, 3 nights?",
+        "sender": "Kevin",
+        "checkIn": "2026-11-15",
+        "checkOut": "2026-11-18"
+      },
+      "expect": {
+        "text": "Hi Kevin! I have a 1-bedroom in Westlands for Sun 15 Nov to Wed 18 Nov.\nIt has fibre Wi-Fi and backup power.\nKsh 9,000 a night, Ksh 27,000 for the 3 nights.\nPhotos: https://example.com/westlands-1br\nShall I hold them for you?",
+        "language": "en",
+        "placeholders": [],
+        "unverified": [
+          "availability was not checked: confirm Sun 15 Nov to Wed 18 Nov is free before sending"
+        ]
+      }
+    },
+    {
+      "name": "no dates, facts missing: the listing still goes first, gaps are placeholders",
+      "lead": {
+        "text": "Anyone with a 1br in Westlands?"
+      },
+      "listing": {
+        "headline": "a 1-bedroom in Westlands",
+        "headlineSw": "1-bedroom Westlands",
+        "currency": "Ksh",
+        "highlights": [
+          "fibre Wi-Fi",
+          "backup power"
+        ]
+      },
+      "expect": {
+        "text": "Hi! I have a 1-bedroom in Westlands.\nIt has fibre Wi-Fi and backup power.\n[nightly rate] a night.\nPhotos: [photos link]\nWhich dates are you looking at?",
+        "language": "en",
+        "placeholders": [
+          "[nightly rate]",
+          "[photos link]"
+        ],
+        "unverified": []
+      }
+    }
+  ]
+}

@@ -20,6 +20,7 @@
 
 import type { Answer, Calendar } from "./Availability.ts"
 import { answer } from "./Availability.ts"
+import type { Draft } from "./Reply.ts"
 
 export interface UnitProfile {
   readonly id: string
@@ -28,6 +29,15 @@ export interface UnitProfile {
   readonly bedrooms: number
   /** Where the unit's bookings live, when availability is to be checked. */
   readonly availability?: { readonly spreadsheetId: string } | undefined
+  /** The facts a reply may state (`Reply.ts`). */
+  readonly listing?: {
+    readonly headline?: string | undefined
+    readonly headlineSw?: string | undefined
+    readonly currency?: string | undefined
+    readonly nightlyRate?: number | undefined
+    readonly highlights?: ReadonlyArray<string> | undefined
+    readonly photos?: string | undefined
+  } | undefined
   readonly areas: {
     readonly accept: ReadonlyArray<string>
     readonly borderline: ReadonlyArray<string>
@@ -62,6 +72,8 @@ export interface Triaged extends Message {
   readonly confidence?: Confidence
   /** Whether the unit can take the dates asked for; leads with dates, when a sheet is configured. */
   readonly availability?: Answer
+  /** A first reply to send, drafted from the profile's listing (`Reply.ts`). Leads only. */
+  readonly reply?: Draft
 }
 
 // ---- Language ----------------------------------------------------------------------------------
@@ -499,6 +511,12 @@ export const report = (
       `${lead.reason}. ${availabilityLine(lead)}`,
       ""
     )
+    if (lead.reply !== undefined) {
+      lines.push("Draft reply (yours to send):", "", "```text", lead.reply.text, "```")
+      if (lead.reply.placeholders.length > 0) lines.push(`Fill before sending: ${lead.reply.placeholders.join(", ")}.`)
+      for (const check of lead.reply.unverified) lines.push(`Confirm: ${check}.`)
+      lines.push("")
+    }
   })
   if (leads.length > 0) {
     lines.push("Reply with the listing (photos and price) first, not a question: the first host to send them wins.", "")
