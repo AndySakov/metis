@@ -56,6 +56,15 @@ const intent = Schema.decodeUnknownSync(Intent)({
   constraints: [{ name: "max_pages", value: 3, tags: ["hard"] }]
 })
 
+const intentWith = (goal: string) =>
+  Schema.decodeUnknownSync(Intent)({
+    id: "01890a5d-ac96-774b-bcce-b302099a8058",
+    ts: 1735872000,
+    actor: "user:andysakov",
+    goal,
+    autonomy: "S2"
+  })
+
 const available = await canConnect()
 
 if (!available && !REQUIRED) {
@@ -125,6 +134,31 @@ if (!available && !REQUIRED) {
       expect(readBack.plan!.assumptions.length).toBe(plan.assumptions.length)
       expect(readBack.plan!.risks.length).toBe(plan.risks.length)
       expect(readBack.plan!.expectedArtifacts.length).toBe(plan.expectedArtifacts.length)
+    }, 30_000)
+
+    it("keeps the bindings that chain one step's output into the next", async () => {
+      const chained = intentWith("Summarize https://example.com/notes")
+      const plan = await Effect.runPromise(
+        Effect.gen(function*() {
+          const planner = yield* Planner.Planner
+          return yield* planner.plan(chained)
+        }).pipe(Effect.provide(Planner.layer))
+      )
+      await Effect.runPromise(
+        Effect.flatMap(PlanStore, (store) => Effect.orDie(store.put(chained, plan))).pipe(
+          Effect.provide(stack)
+        ) as Effect.Effect<void>
+      )
+      const readBack = await Effect.runPromise(
+        Effect.flatMap(PlanStore, (store) => Effect.orDie(store.getPlan(plan.id))).pipe(
+          Effect.provide(stack)
+        ) as Effect.Effect<Plan | undefined>
+      )
+
+      // Lost bindings would run the summary on an input missing the page it was planned to get.
+      expect(readBack!.steps.map((s) => s.toolCall?.bindings)).toEqual(plan.steps.map((s) => s.toolCall?.bindings))
+      expect(readBack!.steps[1]!.toolCall!.bindings).toHaveLength(1)
+      expect(readBack!.steps[0]!.toolCall!.bindings).toBeUndefined()
     }, 30_000)
 
     it("preserves the trust tags policy reads", async () => {

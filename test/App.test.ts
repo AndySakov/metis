@@ -86,6 +86,24 @@ describe("pnpm start", () => {
     expect(plan.risks.map((r: any) => r.description).join("\n")).toContain("research.search@0.1")
   }, 30_000)
 
+  it("chains a fetch into a summary, binding what is fetched", async () => {
+    const plan = await (await post("/intent", {
+      actor: "user:andysakov",
+      goal: "Summarize https://example.com/notes",
+      autonomy: "S2"
+    })).json()
+    expect(plan.steps.map((s: any) => s.toolCall.capability)).toEqual(["research.fetch@0.1", "research.summarize@0.1"])
+    expect(plan.steps[1].toolCall.bindings).toEqual([{
+      to: "/chunks/0/text",
+      fromStep: plan.steps[0].id,
+      from: "/text"
+    }])
+
+    // Served back as written, bindings included.
+    const stored = await (await fetch(`http://127.0.0.1:${PORT}/plans/${plan.id}`)).json()
+    expect(stored.steps[1].toolCall.bindings).toEqual(plan.steps[1].toolCall.bindings)
+  }, 30_000)
+
   it("asks rather than plans when nothing the goal needs is registered", async () => {
     const plan = await (await post("/intent", {
       actor: "user:andysakov",

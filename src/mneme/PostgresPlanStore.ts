@@ -18,7 +18,7 @@ import { Actor, ArtifactKind, Autonomy, CapabilityId, LongText, TaggedValue } fr
 import type { IntentId } from "../domain/Intent.js"
 import { Intent } from "../domain/Intent.js"
 import type { PlanId } from "../domain/Plan.js"
-import { ArtifactExpectation, Assumption, Plan, PlanStep, Risk, ToolCall } from "../domain/Plan.js"
+import { ArtifactExpectation, Assumption, InputBinding, Plan, PlanStep, Risk, ToolCall } from "../domain/Plan.js"
 import { PlanStore, PlanStoreError } from "./PlanStore.js"
 
 const IntentRow = Schema.Struct({
@@ -51,6 +51,7 @@ const StepRow = Schema.Struct({
   tool_capability: Schema.NullOr(CapabilityId),
   tool_name: Schema.NullOr(Schema.NonEmptyTrimmedString),
   tool_input: Schema.NullOr(Schema.Record({ key: Schema.String, value: Schema.Unknown })),
+  tool_bindings: Schema.NullOr(Schema.Array(InputBinding)),
   tool_budget: Schema.NullOr(Schema.Unknown)
 })
 
@@ -123,10 +124,12 @@ export const make = Effect.gen(function*() {
           `
 
           for (const [ordinal, step] of plan.steps.entries()) {
+            const bound = step.toolCall?.bindings ?? []
+            const bindings = bound.length === 0 ? null : JSON.stringify(bound)
             yield* sql`
               INSERT INTO plan_step (
                 id, plan_id, ordinal, kind, description, requires_approval,
-                tool_capability, tool_name, tool_input, tool_budget
+                tool_capability, tool_name, tool_input, tool_bindings, tool_budget
               )
               VALUES (
                 ${step.id}, ${plan.id}, ${ordinal}, ${step.kind}::plan_step_kind,
@@ -134,6 +137,7 @@ export const make = Effect.gen(function*() {
                 ${step.toolCall?.capability ?? null},
                 ${step.toolCall?.tool ?? null},
                 ${step.toolCall === undefined ? null : JSON.stringify(step.toolCall.input)}::jsonb,
+                ${bindings}::jsonb,
                 ${step.toolCall?.budget === undefined ? null : JSON.stringify(step.toolCall.budget)}::jsonb
               )
               ON CONFLICT (id) DO NOTHING
@@ -185,7 +189,8 @@ export const make = Effect.gen(function*() {
         // identifier order would only work by accident.
         const steps = yield* decode(StepRow)(
           yield* sql`
-            SELECT id, kind, description, requires_approval, tool_capability, tool_name, tool_input, tool_budget
+            SELECT id, kind, description, requires_approval, tool_capability, tool_name, tool_input, tool_bindings,
+                   tool_budget
             FROM plan_step WHERE plan_id = ${id} ORDER BY ordinal ASC
           `
         )
@@ -220,6 +225,7 @@ export const make = Effect.gen(function*() {
                   toolCall: new ToolCall({
                     capability: step.tool_capability,
                     input: step.tool_input ?? {},
+                    ...(step.tool_bindings !== null ? { bindings: step.tool_bindings } : {}),
                     ...(step.tool_name !== null ? { tool: step.tool_name } : {})
                   })
                 }

@@ -62,8 +62,36 @@
           "type": "object",
           "additionalProperties": true
         },
+        "bindings": {
+          "description": "Input values filled from earlier steps' outputs when the call is dispatched. Each must read from an earlier tool step and write to a place its input leaves open; a bound value carries its source's trust labels to policy.",
+          "type": "array",
+          "items": { "$ref": "#/$defs/InputBinding" }
+        },
         "budget": {
           "$ref": "https://schema.metis.dev/common/Budget.schema.json"
+        }
+      }
+    },
+    "InputBinding": {
+      "description": "One input value taken from an earlier step's output, resolved at dispatch.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["to", "fromStep", "from"],
+      "properties": {
+        "to": {
+          "description": "JSON Pointer (RFC 6901) into this call's input. Its parent must exist in the input; it must not.",
+          "type": "string",
+          "minLength": 1,
+          "pattern": "^(?:/(?:[^~/]|~[01])*)*$"
+        },
+        "fromStep": {
+          "description": "The id of an earlier tool step in the same plan.",
+          "$ref": "https://schema.metis.dev/common/Identifier.schema.json"
+        },
+        "from": {
+          "description": "JSON Pointer (RFC 6901) into that step's output; the empty string is the whole output.",
+          "type": "string",
+          "pattern": "^(?:/(?:[^~/]|~[01])*)*$"
         }
       }
     },
@@ -149,8 +177,12 @@
           "requiresApproval": false,
           "toolCall": {
             "capability": "research.search@0.1",
-            "input": { "query": "RAG state of the art" },
-            "budget": { "seconds": 10 }
+            "input": {
+              "query": "RAG state of the art"
+            },
+            "budget": {
+              "seconds": 10
+            }
           }
         }
       ],
@@ -170,6 +202,48 @@
         }
       ],
       "artifacts": []
+    },
+    {
+      "id": "01890a5d-ae20-7c22-9b31-2f5a6d7e8f91",
+      "intentId": "01890a5d-ac96-774b-bcce-b302099a8057",
+      "createdAt": 1735872001,
+      "steps": [
+        {
+          "id": "01890a5d-ae21-7a01-8c02-3d4e5f607183",
+          "kind": "tool",
+          "description": "Fetch the page",
+          "requiresApproval": false,
+          "toolCall": {
+            "capability": "research.fetch@0.1",
+            "input": {
+              "url": "https://example.com/post"
+            }
+          }
+        },
+        {
+          "id": "01890a5d-ae22-7a01-8c02-3d4e5f607184",
+          "kind": "tool",
+          "description": "Summarize what was fetched",
+          "requiresApproval": false,
+          "toolCall": {
+            "capability": "research.summarize@0.1",
+            "input": {
+              "chunks": [
+                {
+                  "source": "https://example.com/post"
+                }
+              ]
+            },
+            "bindings": [
+              {
+                "to": "/chunks/0/text",
+                "fromStep": "01890a5d-ae21-7a01-8c02-3d4e5f607183",
+                "from": "/text"
+              }
+            ]
+          }
+        }
+      ]
     }
   ]
 }

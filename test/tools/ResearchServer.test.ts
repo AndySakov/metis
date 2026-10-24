@@ -88,8 +88,14 @@ describe("research.summarize is extractive, so citations cannot be fabricated", 
 
   it("quotes only sentences that appear in the input", async () => {
     const chunks = [
-      { text: "Alpha beta gamma delta epsilon. Zeta eta theta iota kappa.", source: "https://example.com/a" },
-      { text: "Alpha beta gamma lambda mu. Nu xi omicron pi rho.", source: "https://example.com/b" }
+      {
+        text: "Alpha beta gamma delta epsilon zeta eta theta. Zeta eta theta iota kappa lambda mu nu.",
+        source: "https://example.com/a"
+      },
+      {
+        text: "Alpha beta gamma lambda mu nu xi omicron. Nu xi omicron pi rho sigma tau upsilon.",
+        source: "https://example.com/b"
+      }
     ]
     const outcome = await call(spec, { chunks })
     expect(outcome._tag).toBe("Right")
@@ -97,7 +103,9 @@ describe("research.summarize is extractive, so citations cannot be fabricated", 
     const markdown = String((outcome.right.output as { markdown?: string }).markdown ?? "")
     const corpus = chunks.map((c) => c.text).join(" ")
 
-    for (const line of markdown.split("\n").filter((l) => l.startsWith("- "))) {
+    const quoted = markdown.split("\n").filter((l) => l.startsWith("- "))
+    expect(quoted.length).toBeGreaterThan(0)
+    for (const line of quoted) {
       const sentence = line.slice(2).trim()
       // The property a generated summary cannot offer: the text is quoted, not invented, so a
       // citation always points at something that was genuinely said.
@@ -117,6 +125,41 @@ describe("research.summarize is extractive, so citations cannot be fabricated", 
     const citations = (outcome.right.output as { citations?: Array<{ url: string }> }).citations ?? []
     const urls = citations.map((c) => c.url).sort()
     expect(urls).toEqual(["https://example.com/a", "https://example.com/b"])
+  }, 30_000)
+})
+
+describe("research.summarize reads like a summary", () => {
+  const spec = specFor("research.summarize.tool.json", "summarize")
+  const bullets = async (text: string) => {
+    const outcome = await call(spec, { chunks: [{ text }] })
+    expect(outcome._tag).toBe("Right")
+    return String((outcome.right.output as { markdown: string }).markdown)
+      .split("\n")
+      .filter((l) => l.startsWith("- "))
+      .map((l) => l.slice(2))
+  }
+
+  it("quotes whole sentences, not the fragments a web page is full of", async () => {
+    const quoted = await bullets(
+      "Home. Menu. Contents [hide]. Metis was the goddess of wisdom and counsel in Greek mythology.\n" +
+        "Edit\nThe Greek word metis meant a quality that combined wisdom and cunning together."
+    )
+    expect(quoted).toEqual([
+      "Metis was the goddess of wisdom and counsel in Greek mythology.",
+      "The Greek word metis meant a quality that combined wisdom and cunning together."
+    ])
+  }, 30_000)
+
+  it("keeps the source's order and says each sentence once", async () => {
+    const opening = "Offline-first notes apps keep every note on the device before they sync anywhere."
+    const later = "Sync conflicts in offline-first notes apps are resolved per note, not per device."
+    const quoted = await bullets(`${opening} ${later} ${opening}`)
+    expect(quoted).toEqual([opening, later])
+  }, 30_000)
+
+  it("says so rather than quoting junk when nothing is a sentence", async () => {
+    const outcome = await call(spec, { chunks: [{ text: "Home | About | Contact" }] })
+    expect(String((outcome.right.output as { markdown: string }).markdown)).toContain("nothing to quote")
   }, 30_000)
 })
 

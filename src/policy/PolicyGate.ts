@@ -59,7 +59,10 @@ export const make = Effect.gen(function*() {
             consideredRuleIds: decision.consideredRuleIds,
             requestedBy: request.actor,
             autonomy: request.autonomy,
-            capability: request.capability ?? null
+            capability: request.capability ?? null,
+            // The labels the decision saw, so an audit can tell a clean allow from one made on
+            // content read from the web.
+            tags: request.tags
           },
           ...(correlationId !== undefined ? { correlationId } : {})
         })

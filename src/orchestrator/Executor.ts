@@ -26,6 +26,7 @@ import type { CorrelationId, EventId, EventType } from "../domain/Event.js"
 import { Event } from "../domain/Event.js"
 import { uuidv7 } from "../domain/Ids.js"
 import type { Intent } from "../domain/Intent.js"
+import * as Pointer from "../domain/JsonPointer.js"
 import type { Plan, PlanStep, PlanStepId } from "../domain/Plan.js"
 import { PolicyRequest } from "../domain/Policy.js"
 import { ArtifactStore } from "../mneme/ArtifactStore.js"
@@ -70,6 +71,14 @@ export interface ExecuteOptions {
 const METIS = "metis" as Actor
 
 /** Which output field of a capability is the artifact body, if any. */
+/**
+ * The labels on anything a tool declaring `public.web` returns: it read the open web, so what it
+ * hands back is untrusted wherever it goes next (`Common.ts`, `TaggedValue`).
+ */
+const WEB_CONTENT = ["untrusted", "web"] as const
+
+const union = (...lists: ReadonlyArray<ReadonlyArray<string>>): ReadonlyArray<string> => [...new Set(lists.flat())]
+
 const artifactBody = (output: unknown): string | undefined => {
   if (output === null || typeof output !== "object") return undefined
   const record = output as Record<string, unknown>
@@ -153,6 +162,10 @@ export const execute = (
       })
 
     const results: Array<StepResult> = []
+    const intentTags = intent.inputs.flatMap((input) => input.tags)
+    // What each completed step returned, with the labels it carries. In memory only: on resume the
+    // executor walks the plan again and refills it (ADR-016).
+    const produced = new Map<string, { readonly output: unknown; readonly tags: ReadonlyArray<string> }>()
 
     // ---- Point 1: plan validation -------------------------------------------------------------
     const planDecision = yield* gate.check(
@@ -160,7 +173,7 @@ export const execute = (
         at: "plan_validation",
         actor: intent.actor,
         autonomy: intent.autonomy,
-        tags: intent.inputs.flatMap((input) => input.tags)
+        tags: intentTags
       }),
       correlationId
     )
@@ -230,6 +243,25 @@ export const execute = (
           return { stepId: step.id, status: "completed" as const }
         }
 
+        // ---- Bindings --------------------------------------------------------------------
+        // Values from earlier steps are filled in now, and their labels come with them: a page
+        // fetched two steps ago is as untrusted here as it was there. The plan was checked for
+        // bindings it could never resolve; what is left is an output missing what was expected.
+        let input: Record<string, unknown> = step.toolCall.input
+        let boundTags: ReadonlyArray<string> = []
+        for (const binding of step.toolCall.bindings ?? []) {
+          const source = produced.get(binding.fromStep)
+          const value = source === undefined ? undefined : Pointer.get(source.output, binding.from)
+          if (source === undefined || value === undefined) {
+            const reason = `binding ${binding.to}: step ${binding.fromStep} produced nothing at "${binding.from}"`
+            yield* emit("STEP_FAILED", { stepId: step.id, reason })
+            return { stepId: step.id, status: "failed" as const, detail: reason }
+          }
+          input = Pointer.set(input, binding.to, value)
+          boundTags = union(boundTags, source.tags)
+        }
+        const tags = union(intentTags, boundTags)
+
         const specs = yield* Effect.either(registry.select(step.toolCall.capability))
         if (specs._tag === "Left") {
           // Asked anyway, so the dispatch is a recorded decision rather than an invisible lookup
@@ -241,7 +273,7 @@ export const execute = (
               actor: intent.actor,
               autonomy: intent.autonomy,
               capability: step.toolCall.capability,
-              tags: intent.inputs.flatMap((input) => input.tags),
+              tags,
               registered: false
             }),
             correlationId
@@ -264,7 +296,7 @@ export const execute = (
             autonomy: intent.autonomy,
             capability: step.toolCall.capability,
             scopes: spec.authScopes,
-            tags: intent.inputs.flatMap((input) => input.tags),
+            tags,
             idempotent: spec.idempotent,
             registered: true,
             isolation: spec.isolation
@@ -298,7 +330,7 @@ export const execute = (
         // A repeated identical call escalates to a human rather than being denied: the useful
         // failure mode is "stop and ask", because a loop is usually a bug in what asked for the
         // work, not an attack. Denying would also make the step unrecoverable by approval.
-        const key = callKey(step.toolCall.capability, step.toolCall.input)
+        const key = callKey(step.toolCall.capability, input)
         const repeats = (dispatches.get(key) ?? 0) + 1
         dispatches.set(key, repeats)
         const loopTripped = repeats >= DOOM_LOOP_THRESHOLD
@@ -321,7 +353,9 @@ export const execute = (
           yield* emit("APPROVAL_REQUESTED", {
             stepId: step.id,
             capability: step.toolCall.capability,
-            basis: decision.basis
+            basis: decision.basis,
+            // Whoever approves should see that the input carries content from elsewhere.
+            ...(tags.length > 0 ? { tags } : {})
           })
           return { stepId: step.id, status: "awaiting_approval" as const }
         }
@@ -336,7 +370,7 @@ export const execute = (
           tool: spec.name
         })
 
-        const ran = yield* Effect.either(runner.run(spec, step.toolCall.input))
+        const ran = yield* Effect.either(runner.run(spec, input))
         if (ran._tag === "Left") {
           // The tool itself failed, so the failure counts against its skill. A registry miss or a
           // storage failure is not the skill's doing, and those STEP_FAILED events name none.
@@ -354,6 +388,8 @@ export const execute = (
           tool: spec.name,
           durationMs: ran.right.durationMs
         })
+        const outputTags = spec.authScopes.includes("public.web") ? union(tags, WEB_CONTENT) : tags
+        produced.set(step.id, { output: ran.right.output, tags: outputTags })
 
         // ---- Sampled verification (ADR-014 §4) ---------------------------------------------
         // Runs regardless of whether any rule flagged this action; that independence is the whole
@@ -379,7 +415,7 @@ export const execute = (
             actor: intent.actor,
             autonomy: intent.autonomy,
             capability: step.toolCall.capability,
-            tags: intent.inputs.flatMap((input) => input.tags),
+            tags: outputTags,
             registered: true,
             isolation: spec.isolation
           }),
