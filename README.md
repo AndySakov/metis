@@ -229,10 +229,14 @@ curl -s localhost:8787/artifacts/<artifact id>/content    # the document itself
 
 A skill with no history is at S0, so every tool step asks for approval at first. Trust is derived
 live from the event log, and a gear needs both a score and enough evidence behind it in each
-ledger: an approved, completed run adds about two signals to each, so a skill runs unattended at
+ledger. An approved, completed run adds about two signals to each, so a skill runs unattended at
 S2 after three such runs. S4 needs forty signals in each ledger, so at least twenty runs, and more
-once runs stop needing approval, since an unattended run adds no approval signal. Each promotion or demotion is written to the
-log as `TRUST_PROMOTED` or `TRUST_DEMOTED`, with its justification.
+once runs stop needing approval, since an unattended run adds no approval signal.
+
+Evidence fades: a signal counts half after one half-life (30 days for competence, 14 for
+compliance), so a skill that stops running loses its gear, and recent behaviour outweighs old. Each
+promotion or demotion is written to the log as `TRUST_PROMOTED` or `TRUST_DEMOTED`, with its
+justification.
 
 **Definition of done for any change:** typecheck passes, lint passes, tests pass, and any spec the
 change touches is updated in the same commit.

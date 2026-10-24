@@ -113,39 +113,62 @@ export interface DerivedTrust {
  * which is the only safe default for a system whose autonomy is supposed to be earned rather than
  * assumed.
  */
+const DAY = 86_400
+
+/**
+ * What one signal is worth at `now`: `0.5` per half-life of age, counted in whole days.
+ *
+ * Whole days, because weighting by the second would make two signals a moment old worth a fraction
+ * under two, and a threshold of two unreachable on the day it is earned. A timestamp ahead of `now`
+ * counts in full rather than more than in full.
+ */
+export const signalWeight = (ts: number, now: number, halfLifeSeconds: number): number =>
+  Math.pow(0.5, (Math.floor(Math.max(0, now - ts) / DAY) * DAY) / halfLifeSeconds)
+
 export const derive = (
   events: ReadonlyArray<Event>,
   skill: SkillId,
   policy: TrustPolicy,
   now: EpochSeconds
 ): DerivedTrust => {
-  let competencePositive = 0
+  // Raw counts, for the justification a gear change carries.
   let competenceTotal = 0
-  let compliancePositive = 0
   let complianceTotal = 0
   let redlines = 0
+  // The same signals weighted by age (ADR-014: trust that is not re-earned fades). The weighted
+  // totals are the evidence a gear's `minSignals` is measured against, so an idle skill's evidence
+  // shrinks until it no longer holds its gear; the weighted ratios let recent behaviour outweigh old.
+  let competencePositive = 0
+  let competenceWeight = 0
+  let compliancePositive = 0
+  let complianceWeight = 0
 
   for (const event of events) {
     for (const signal of signalsFrom(event)) {
       if (signal.skill !== skill) continue
 
       if (signal.ledger === "competence") {
+        const weight = signalWeight(event.ts, now, policy.decay.competenceHalfLifeSeconds)
         competenceTotal++
-        if (signal.kind === "positive") competencePositive++
+        competenceWeight += weight
+        if (signal.kind === "positive") competencePositive += weight
       } else {
+        const weight = signalWeight(event.ts, now, policy.decay.complianceHalfLifeSeconds)
         complianceTotal++
-        if (signal.kind === "positive") compliancePositive++
+        complianceWeight += weight
+        if (signal.kind === "positive") compliancePositive += weight
+        // A red line does not fade: demotion on a compliance event is not undone by time either.
         if (signal.kind === "redline") redlines++
       }
     }
   }
 
-  const competence = (competenceTotal === 0 ? 0 : competencePositive / competenceTotal) as Score
+  const competence = (competenceWeight === 0 ? 0 : competencePositive / competenceWeight) as Score
   const compliance = (redlines > 0
     ? COMPLIANCE_FLOOR
-    : complianceTotal === 0
+    : complianceWeight === 0
     ? 0
-    : compliancePositive / complianceTotal) as Score
+    : compliancePositive / complianceWeight) as Score
 
   const record = new TrustRecord({
     skill,
@@ -153,8 +176,8 @@ export const derive = (
     compliance,
     gear: "S0",
     updatedAt: now,
-    competenceSignals: competenceTotal,
-    complianceSignals: complianceTotal
+    competenceSignals: competenceWeight,
+    complianceSignals: complianceWeight
   })
 
   // The gear a skill holds is a consequence of its ledgers, never set independently.
@@ -164,6 +187,24 @@ export const derive = (
     complianceSignals: complianceTotal,
     redlines
   }
+}
+
+/**
+ * The gear the log last recorded for a skill: the destination of its latest `TRUST_PROMOTED` or
+ * `TRUST_DEMOTED`, or S0 if it has none.
+ *
+ * A gear change is measured from here rather than from the gear a skill held when a run began,
+ * because decay moves a skill while nothing runs. Measured from the start of the next run, a
+ * demotion earned by idleness would already be in the "before" and never written down.
+ */
+export const recordedGear = (events: ReadonlyArray<Event>, skill: SkillId): Autonomy => {
+  let gear: Autonomy = "S0"
+  for (const event of events) {
+    if (event.type !== "TRUST_PROMOTED" && event.type !== "TRUST_DEMOTED") continue
+    const payload = event.payload as { skill?: unknown; to?: unknown } | null
+    if (payload?.skill === skill && typeof payload.to === "string") gear = payload.to as Autonomy
+  }
+  return gear
 }
 
 /** Derive a skill's standing from the whole event log. */

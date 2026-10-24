@@ -77,7 +77,8 @@ export const AppConfig: Config.Config<AppConfig> = Config.all({
 /**
  * What a skill must show to hold each gear (ADR-014): a score in both ledgers, each resting on at
  * least `minSignals` signals. An approved, completed run adds about two signals to each ledger, so
- * S2 takes three such runs and S4 at least twenty. A skill with no history is at S0, and
+ * S2 takes three such runs and S4 at least twenty. A signal counts half after one half-life of
+ * `decay`, so evidence that is not renewed falls below the bar and the gear goes with it. A skill with no history is at S0, and
  * every tool step asks for approval until the log shows it has earned more.
  */
 export const TRUST_POLICY = Schema.decodeUnknownSync(TrustPolicy)({
