@@ -66,7 +66,8 @@ describe("the planner produces valid plans", () => {
       "Draft a PRD for a research summarizer",
       "Research the state of the art in RAG",
       "C4 diagrams for a notes app",
-      "Write an API spec for a notes app"
+      "Write an API spec for a notes app",
+      "Scaffold a TypeScript project called notes-api"
     ]
     for (const goal of goals) {
       for (const step of (await planFor(goal)).steps) {
@@ -208,5 +209,48 @@ describe("a document is titled by its subject, not by the request", () => {
 
   it("falls back to the goal when there is no subject to take", async () => {
     expect((await inputOf("Draft a PRD")).title).toBe("Draft a PRD")
+  })
+})
+
+describe("a scaffold goal plans a project the tool will accept", () => {
+  const inputOf = async (goal: string) => {
+    const step = (await planFor(goal)).steps.find((s) => s.toolCall?.capability === "build.scaffold@0.1")
+    expect(step, goal).toBeDefined()
+    return step!.toolCall!.input
+  }
+
+  it("uses the name the goal gives, and infers the stack", async () => {
+    expect(await inputOf("Scaffold a TypeScript project called notes-api")).toEqual({
+      name: "notes-api",
+      stack: "node-ts"
+    })
+    expect(await inputOf("Bootstrap a new Python service named Data_Tool")).toEqual({
+      name: "data-tool",
+      stack: "python"
+    })
+  })
+
+  it("derives a name from the subject when none is given", async () => {
+    expect((await inputOf("Scaffold a project for an offline-first notes app")).name).toBe("offline-first-notes-app")
+    expect((await inputOf("Scaffold 3D viewer")).name).toBe("app-3d-viewer")
+    expect((await inputOf("Scaffold a project")).name).toBe("new-project")
+  })
+
+  it("always produces a name build.scaffold accepts", async () => {
+    for (
+      const goal of [
+        "Scaffold a project called ../../etc",
+        "bootstrap a service named /root",
+        `Scaffold a project for ${"very long name ".repeat(10).trim()}`,
+        "Scaffold a project called ---"
+      ]
+    ) {
+      expect((await inputOf(goal)).name, goal).toMatch(/^[a-z][a-z0-9-]{0,62}$/)
+    }
+  })
+
+  it("leaves a document request about scaffolding to the document template", async () => {
+    expect((await planFor("Draft a PRD for a scaffold generator")).steps.map((s) => s.toolCall?.capability))
+      .toEqual(["research.search@0.1", "design.prd@1.0"])
   })
 })

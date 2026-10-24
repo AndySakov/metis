@@ -39,7 +39,8 @@
         "autonomy": "S4",
         "capability": "build.scaffold@0.1",
         "registered": true,
-        "idempotent": false
+        "idempotent": false,
+        "scopes": ["fs.workspace"]
       },
       "mustNotBe": "allow"
     },

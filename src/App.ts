@@ -2,15 +2,17 @@
  * The composition root: every service the HTTP API needs, assembled from real implementations.
  *
  * Until this existed, the loop only ever ran inside tests, each assembling its own stack. This is
- * the one assembly that runs for real, so three choices are made here and nowhere else:
+ * the one assembly that runs for real, so four choices are made here and nowhere else:
  *
  * - **Tools are registered only if their server serves them.** Each MCP server is asked for its
  *   tool list at startup, and a descriptor is kept only when its server answers for its tool. The
- *   descriptors for the nine unbuilt capabilities therefore never reach the registry, and the
+ *   descriptors for the eight unbuilt capabilities therefore never reach the registry, and the
  *   planner, which plans against the registry, never targets them.
  * - **Claude answers `design.*` when, and only when, a key is configured.** Its descriptors are
  *   registered ahead of the templates, so the registry selects them; without a key `metis.model`
  *   is not started at all and the templates answer.
+ * - **Nothing is written to disk unless a workspace is configured.** `metis.build` is started only
+ *   when `METIS_WORKSPACE` is set, and that directory is the only one it is told about.
  * - **The live policy is `specs/policy/default.json`,** the same file the red-team suite measures.
  *
  * Building the layer starts nothing on its own. `Program.ts` launches it.
@@ -18,6 +20,7 @@
 
 import { readdirSync, readFileSync } from "node:fs"
 import { createServer } from "node:http"
+import { resolve } from "node:path"
 import { fileURLToPath } from "node:url"
 
 import { HttpApiBuilder } from "@effect/platform"
@@ -71,6 +74,11 @@ export interface AppConfig {
    * says `mode: "direct"`.
    */
   readonly restate: Option.Option<PlanExecution.RestateOptions>
+  /**
+   * Where `build.scaffold` may write, from `METIS_WORKSPACE`. Handed to `metis.build` alone, and
+   * without it that server is not started, so nothing is planned that writes to disk.
+   */
+  readonly workspace: Option.Option<string>
 }
 
 export const AppConfig: Config.Config<AppConfig> = Config.all({
@@ -87,7 +95,8 @@ export const AppConfig: Config.Config<AppConfig> = Config.all({
         Config.map(Option.getOrUndefined)
       )
     })
-  )
+  ),
+  workspace: Config.option(Config.string("METIS_WORKSPACE"))
 })
 
 /**
@@ -132,6 +141,9 @@ export const serversFor = (config: AppConfig): ServerMap => ({
         }
       }
     }
+    : {}),
+  ...(Option.isSome(config.workspace)
+    ? { "metis.build": { ...node("build.ts"), env: { METIS_WORKSPACE: resolve(config.workspace.value) } } }
     : {}),
   "metis.design": node("design.ts"),
   "metis.research": node("research.ts"),
@@ -247,6 +259,12 @@ const announce = (config: AppConfig) =>
         Option.isSome(config.anthropicApiKey)
           ? "design.* answered by Claude (metis.model)"
           : "design.* answered by templates: set ANTHROPIC_API_KEY for Claude"
+      )
+      yield* Effect.log(
+        Option.match(config.workspace, {
+          onNone: () => "build.scaffold off: set METIS_WORKSPACE to let METIS write projects",
+          onSome: (dir) => `build.scaffold writes under ${resolve(dir)}`
+        })
       )
       yield* Effect.log(`capabilities: ${[...new Set(specs.map((spec) => spec.capability))].sort().join(", ")}`)
     })

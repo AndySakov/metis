@@ -134,6 +134,10 @@ Stated plainly rather than implied away. These are open, not managed.
   the container-or-WASM story in ADR-003. A WASM component host is the intended destination and has
   not been started. Until it exists, treat every tool as trusted-by-configuration and do not
   describe METIS as sandboxing tools.
+- **`build.scaffold`'s workspace is enforced by the tool, not the OS.** The server refuses any name
+  that is not one safe path segment and checks the resolved path before writing, but the process
+  runs with the user's own file permissions. A bug in that check would write wherever the user
+  can. A container or WASM tier with only the workspace mounted is what makes it a boundary.
 - **No module signing, SBOM or reproducible builds.** Listed as must-haves above; none are built.
 - **`research.fetch`'s SSRF guard is coarse.** It blocks by literal host — loopback, private ranges,
   and the link-local metadata address — but does not resolve DNS, so a hostname that resolves to a

@@ -80,6 +80,23 @@ const PRD_REQUEST = /\bprd\b|product requirements(?: document)?/i
 const C4_REQUEST = /\bc4\b(?: diagrams?)?|architecture diagrams?/i
 const API_REQUEST = /\bapi spec(?:ification)?|\bopenapi\b(?: spec(?:ification)?)?/i
 
+const SCAFFOLD_REQUEST =
+  /\b(?:scaffold|bootstrap)\b(?:\s+(?:a|an|the))?(?:\s+new)?(?:\s+(?:typescript|ts|node(?:\.js)?|python))?(?:\s+(?:project|app|service|repo|package|library|cli))?/i
+
+/**
+ * The directory name for a project, taken from the goal: what follows "called" or "named" if the
+ * goal says, otherwise its subject. Lowercased and hyphenated to the single path segment
+ * `build.scaffold` accepts, so a derived name is never the reason the tool refuses.
+ */
+export const projectNameOf = (goal: string): string => {
+  const named = /\b(?:called|named)\s+["'`]?([^\s"'`]+)/i.exec(goal)?.[1]
+  const subject = subjectOf(goal, SCAFFOLD_REQUEST)
+  const source = named ?? (subject === goal ? "" : subject)
+  const slug = source.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "")
+  if (slug === "") return "new-project"
+  return (/^[a-z]/.test(slug) ? slug : `app-${slug}`).slice(0, 63).replace(/-+$/, "")
+}
+
 const TEMPLATES: ReadonlyArray<Template> = [
   {
     name: "prd",
@@ -133,6 +150,22 @@ const TEMPLATES: ReadonlyArray<Template> = [
     assumptions: ["Endpoints can be inferred from the goal"],
     risks: ["Endpoints are inferred, not supplied, and need review"],
     expects: [{ kind: "text", description: "OpenAPI document" }]
+  },
+  {
+    // After the document templates, so "a PRD for a scaffold generator" is still a PRD.
+    name: "scaffold",
+    matches: (goal) => /\b(?:scaffold|bootstrap)\b/i.test(goal),
+    steps: (intent) => [
+      {
+        kind: "tool",
+        description: "Scaffold the project in the workspace",
+        capability: "build.scaffold@0.1",
+        input: { name: projectNameOf(intent.goal), stack: /\bpython\b/i.test(intent.goal) ? "python" : "node-ts" }
+      }
+    ],
+    assumptions: ["The workspace is where the project should live"],
+    risks: ["The project name is derived from the goal and may need renaming"],
+    expects: [{ kind: "text", description: "The files created" }]
   },
   {
     name: "research",

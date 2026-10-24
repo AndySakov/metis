@@ -1,5 +1,8 @@
+import { existsSync, mkdtempSync, readFileSync, rmSync } from "node:fs"
 import { createServer } from "node:http"
 import type { AddressInfo } from "node:net"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 
 import { afterAll, beforeAll, describe, expect, it } from "@effect/vitest"
 import { Effect, Layer, ManagedRuntime, Option, Redacted } from "effect"
@@ -38,6 +41,7 @@ const api = createServer((req, res) => {
 })
 
 let runtime: ManagedRuntime.ManagedRuntime<EventLogStore, unknown>
+const workspace = mkdtempSync(join(tmpdir(), "metis-app-workspace-"))
 
 beforeAll(async () => {
   await new Promise<void>((done) => api.listen(0, "127.0.0.1", done))
@@ -46,7 +50,8 @@ beforeAll(async () => {
     anthropicApiKey: Option.some(Redacted.make("test-key")),
     anthropicBaseUrl: Option.some(`http://127.0.0.1:${(api.address() as AddressInfo).port}`),
     postgres: false,
-    restate: Option.none()
+    restate: Option.none(),
+    workspace: Option.some(workspace)
   }
   // One `backing` value for both, so the test reads the very event log the server writes to.
   const backing = App.services(config)
@@ -57,6 +62,7 @@ beforeAll(async () => {
 afterAll(async () => {
   await runtime?.dispose()
   await new Promise<void>((done) => api.close(() => done()))
+  rmSync(workspace, { recursive: true, force: true })
 }, 20_000)
 
 const post = (path: string, body: unknown) =>
@@ -169,6 +175,47 @@ describe("pnpm start", () => {
     const content = await fetch(`http://127.0.0.1:${PORT}/artifacts/${done.steps[0].artifactId}/content`)
     expect(content.status).toBe(200)
   }, 60_000)
+
+  it("scaffolds a project into the workspace, and asks first at any gear because it cannot be undone", async () => {
+    const plan = await (await post("/intent", {
+      actor: "user:andysakov",
+      goal: "Scaffold a TypeScript project called notes-api",
+      autonomy: "S4"
+    })).json()
+    expect(plan.steps.map((s: any) => s.toolCall)).toEqual([
+      { capability: "build.scaffold@0.1", input: { name: "notes-api", stack: "node-ts" } }
+    ])
+
+    // Even at S4: the tool is declared non-idempotent, and a replay would write twice.
+    const first = await (await post(`/plans/${plan.id}/execute`, {})).json()
+    expect(first.status).toBe("awaiting_approval")
+    expect(existsSync(join(workspace, "notes-api"))).toBe(false)
+
+    const approved = await (await post(`/plans/${plan.id}/execute`, { approvedSteps: [plan.steps[0].id] })).json()
+    expect(approved.status).toBe("completed")
+    expect(JSON.parse(readFileSync(join(workspace, "notes-api", "package.json"), "utf8")).name).toBe("notes-api")
+
+    const summary = await fetch(`http://127.0.0.1:${PORT}/artifacts/${approved.steps[0].artifactId}/content`)
+    expect(await summary.text()).toContain("`package.json`")
+  }, 60_000)
+
+  it("starts no server that writes to disk unless a workspace is configured", () => {
+    const base: App.AppConfig = {
+      port: PORT,
+      anthropicApiKey: Option.none(),
+      anthropicBaseUrl: Option.none(),
+      postgres: false,
+      restate: Option.none(),
+      workspace: Option.none()
+    }
+    expect(Object.keys(App.serversFor(base))).not.toContain("metis.build")
+    // The workspace reaches that server alone, as an absolute path.
+    const servers = App.serversFor({ ...base, workspace: Option.some("relative/ws") })
+    expect(servers["metis.build"]!.env!.METIS_WORKSPACE).toBe(join(process.cwd(), "relative/ws"))
+    for (const [name, spawn] of Object.entries(servers)) {
+      if (name !== "metis.build") expect(spawn.env?.METIS_WORKSPACE, name).toBeUndefined()
+    }
+  })
 
   it("answers a missing plan with the 404 the spec declares", async () => {
     const response = await fetch(`http://127.0.0.1:${PORT}/plans/01890a5d-0000-7000-8000-000000000000`)

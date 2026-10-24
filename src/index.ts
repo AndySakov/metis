@@ -2,15 +2,17 @@
  * The composition root: every service the HTTP API needs, assembled from real implementations.
  *
  * Until this existed, the loop only ever ran inside tests, each assembling its own stack. This is
- * the one assembly that runs for real, so three choices are made here and nowhere else:
+ * the one assembly that runs for real, so four choices are made here and nowhere else:
  *
  * - **Tools are registered only if their server serves them.** Each MCP server is asked for its
  *   tool list at startup, and a descriptor is kept only when its server answers for its tool. The
- *   descriptors for the nine unbuilt capabilities therefore never reach the registry, and the
+ *   descriptors for the eight unbuilt capabilities therefore never reach the registry, and the
  *   planner, which plans against the registry, never targets them.
  * - **Claude answers `design.*` when, and only when, a key is configured.** Its descriptors are
  *   registered ahead of the templates, so the registry selects them; without a key `metis.model`
  *   is not started at all and the templates answer.
+ * - **Nothing is written to disk unless a workspace is configured.** `metis.build` is started only
+ *   when `METIS_WORKSPACE` is set, and that directory is the only one it is told about.
  * - **The live policy is `specs/policy/default.json`,** the same file the red-team suite measures.
  *
  * Building the layer starts nothing on its own. `Program.ts` launches it.
@@ -454,6 +456,22 @@ export * as ToolRegistry from "./tools/ToolRegistry.js"
  * spawning processes.
  */
 export * as ToolRunner from "./tools/ToolRunner.js"
+
+/**
+ * An MCP server exposing `build.scaffold`: a new project directory, written to disk.
+ *
+ * The first capability whose effect outlives the call, so its boundary is the workspace:
+ *
+ * - **It writes only under `METIS_WORKSPACE`,** handed to this process and to no other. Without it
+ *   the tool refuses rather than picking a directory of its own.
+ * - **The project name is a single path segment** of lowercase letters, digits and hyphens, and
+ *   the resolved directory is checked to sit directly inside the workspace. A name shaped by
+ *   untrusted content cannot climb out of it.
+ * - **It never writes over anything.** The descriptor declares the tool non-idempotent, and a
+ *   second call for the same name is refused rather than merged into what is already there. The
+ *   directory is created with `recursive: false`, so a race with another writer fails too.
+ */
+export * as build from "./tools/servers/build.js"
 
 /**
  * An MCP server exposing the `design.*` capabilities.

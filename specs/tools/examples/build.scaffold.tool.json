@@ -15,7 +15,7 @@
   "outputSchema": {
     "$ref": "../../capabilities/build.scaffold@0.1.output.schema.json"
   },
-  "authScopes": [],
+  "authScopes": ["fs.workspace"],
   "tests": [
     {
       "name": "minimal",
