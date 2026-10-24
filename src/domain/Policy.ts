@@ -32,6 +32,19 @@ export const PolicyEffect = Schema.Literal("allow", "deny", "require_approval")
 export type PolicyEffect = typeof PolicyEffect.Type
 
 /**
+ * Policy is decoded strictly: a key the schema does not know is a decode error, not a silently
+ * dropped field. Every condition is optional, so dropping one widens a rule — and a rule whose only
+ * condition was a typo (`tagz`) or a condition from a newer version becomes a rule with no
+ * conditions, which matches every request. For an `allow` rule that fails open. This matches the
+ * `additionalProperties: false` already declared in `specs/policy/Policy.schema.json`.
+ *
+ * The option goes in the third slot — the class's encoded side, the struct the input is actually
+ * decoded through. Annotating the class itself reaches only its type side and leaves the
+ * excess-property check at the default, `ignore`.
+ */
+const strict = [undefined, undefined, { parseOptions: { onExcessProperty: "error" } }] as const
+
+/**
  * What a rule looks at. Every condition is optional; a rule with none matches everything, which is
  * legal and is exactly what the vacuous-rule report is for (ADR-014).
  */
@@ -54,7 +67,7 @@ export class PolicyCondition extends Schema.Class<PolicyCondition>("PolicyCondit
   nonIdempotent: Schema.optional(Schema.Boolean),
   /** Fires when the capability has no registry entry, so no reviewed descriptor stands behind it. */
   unregistered: Schema.optional(Schema.Boolean)
-}) {}
+}, strict) {}
 
 export class PolicyRule extends Schema.Class<PolicyRule>("PolicyRule")({
   id: PolicyRuleId,
@@ -66,7 +79,7 @@ export class PolicyRule extends Schema.Class<PolicyRule>("PolicyRule")({
   priority: Schema.Int.pipe(Schema.nonNegative()),
   effect: PolicyEffect,
   when: PolicyCondition
-}) {}
+}, strict) {}
 
 export class Policy extends Schema.Class<Policy>("Policy")({
   version: Schema.NonEmptyTrimmedString,
@@ -77,7 +90,7 @@ export class Policy extends Schema.Class<Policy>("Policy")({
    * is available for the day coverage is good enough to close the world.
    */
   defaultEffect: Schema.optionalWith(PolicyEffect, { default: () => "allow" as const })
-}) {}
+}, strict) {}
 
 /** The request a decision is made about. */
 export class PolicyRequest extends Schema.Class<PolicyRequest>("PolicyRequest")({
