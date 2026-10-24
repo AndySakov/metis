@@ -20,6 +20,7 @@ const descriptor = (file: string) =>
   )
 const spec = descriptor("stays.triage.tool.json")
 const availabilitySpec = descriptor("stays.availability.tool.json")
+const replySpec = descriptor("stays.reply.tool.json")
 const dir = mkdtempSync(join(tmpdir(), "metis-stays-"))
 afterAll(() => rmSync(dir, { recursive: true, force: true }))
 
@@ -231,5 +232,43 @@ describe("reading the sheet from Google, as a read-only service account", () => 
     } finally {
       shared = true
     }
+  }, 30_000)
+})
+
+describe("reply drafts", () => {
+  const snapshotFile = join(dir, "sheet-for-replies.json")
+  beforeAll(() => writeFileSync(snapshotFile, JSON.stringify(SNAPSHOT)))
+
+  it("come with every lead in a sweep, offering the next window when the dates are taken", async () => {
+    const outcome = await call({ messages: LEADS, now: NOW }, { METIS_STAYS_AVAILABILITY_SNAPSHOT: snapshotFile })
+    const bySender = Object.fromEntries(outcome.right.output.results.map((r: any) => [r.sender, r.reply?.text]))
+    // That lead wrote in Swahili, so its reply does, offering the next free window.
+    expect(bySender.Booked).toContain("imeshachukuliwa, lakini inapatikana tarehe 25 Ago hadi 27 Ago")
+    expect(bySender.Open).toMatch(/^Habari|^Hi/)
+    const markdown: string = outcome.right.output.markdown
+    expect(markdown).toContain("Draft reply (yours to send):")
+    // The example profile has no rate or photos, so the drafts say so instead of inventing them.
+    expect(markdown).toContain("Fill before sending: [nightly rate], [photos link].")
+  }, 30_000)
+
+  it("answer a single pasted enquiry in its own language, flagging what was not checked", async () => {
+    const outcome = await call(
+      { message: "Naomba 1 bedroom Westlands tarehe 15 mpaka 18", sender: "Wanjiru", now: NOW },
+      undefined,
+      replySpec
+    )
+    const { draft, markdown } = outcome.right.output
+    expect(draft.language).toBe("sw")
+    expect(draft.text).toContain("Habari Wanjiru! Nina 1-bedroom Westlands kwa tarehe 15 Ago hadi 18 Ago.")
+    expect(draft.unverified).toEqual([
+      "availability was not checked: confirm tarehe 15 Ago hadi 18 Ago is free before sending"
+    ])
+    expect(markdown).toContain("no booking sheet configured")
+  }, 30_000)
+
+  it("draft nothing for an advert", async () => {
+    const outcome = await call({ message: "1 BEDROOM WESTLANDS ✅ Ksh7000/night 📞 0712345678" }, undefined, replySpec)
+    expect(outcome.right.output.draft).toBeUndefined()
+    expect(outcome.right.output.markdown).toContain("No reply drafted")
   }, 30_000)
 })

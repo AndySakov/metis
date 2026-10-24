@@ -104,5 +104,14 @@
       "Malindi",
       "Naivasha"
     ]
+  },
+  "listing": {
+    "headline": "a 1-bedroom in Westlands",
+    "headlineSw": "1-bedroom Westlands",
+    "currency": "Ksh",
+    "highlights": [
+      "fibre Wi-Fi",
+      "backup power"
+    ]
   }
 }

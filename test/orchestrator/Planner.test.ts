@@ -359,3 +359,33 @@ describe("an availability question checks the booking sheet", () => {
     expect((await planFor("Any leads available today?")).steps.map((s) => s.kind)).toEqual(["ask"])
   })
 })
+
+describe("a reply goal drafts a reply to what was pasted", () => {
+  const withPaste = (goal: string, pasted?: string) =>
+    Effect.runPromise(
+      Effect.gen(function*() {
+        const planner = yield* Planner.Planner
+        return yield* planner.plan(
+          Schema.decodeUnknownSync(Intent)({
+            id: "01890a5d-ac96-774b-bcce-b302099a8057",
+            ts: 1735872000,
+            actor: "user:andysakov",
+            goal,
+            autonomy: "S2",
+            inputs: pasted === undefined ? [] : [{ name: "pasted", value: pasted, tags: ["untrusted", "pasted"] }]
+          })
+        )
+      }).pipe(Effect.provide(Planner.layer))
+    )
+
+  it("plans stays.reply over the pasted enquiry, even when the goal says lead", async () => {
+    const plan = await withPaste("Draft a reply to this lead", "Anyone with a 1br in Westlands?")
+    expect(plan.steps.map((s) => s.toolCall)).toEqual([
+      expect.objectContaining({ capability: "stays.reply@0.1", input: { message: "Anyone with a 1br in Westlands?" } })
+    ])
+  })
+
+  it("asks for the enquiry when nothing was pasted", async () => {
+    expect((await withPaste("Help me reply to a guest")).steps[0]!.description).toContain("Paste the enquiry")
+  })
+})

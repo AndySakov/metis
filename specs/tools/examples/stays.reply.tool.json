@@ -1,0 +1,36 @@
+{
+  "name": "stays-reply-listing-first",
+  "version": "0.1.0",
+  "capability": "stays.reply@0.1",
+  "mcp": {
+    "server": "metis.stays",
+    "tool": "reply",
+    "transport": "stdio"
+  },
+  "idempotent": true,
+  "isolation": "process",
+  "inputSchema": {
+    "$ref": "../../capabilities/stays.reply@0.1.input.schema.json"
+  },
+  "outputSchema": {
+    "$ref": "../../capabilities/stays.reply@0.1.output.schema.json"
+  },
+  "authScopes": [
+    "google.sheets.read"
+  ],
+  "tests": [
+    {
+      "name": "minimal",
+      "input": {
+        "message": "Anyone with a 1br in Westlands from the 15th, 3 nights?"
+      },
+      "expect": {
+        "type": "object",
+        "required": [
+          "lead",
+          "markdown"
+        ]
+      }
+    }
+  ]
+}

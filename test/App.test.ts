@@ -337,6 +337,25 @@ describe("pnpm start", () => {
     expect(dispatch.payload.tags).toEqual(["untrusted", "pasted"])
   }, 30_000)
 
+  it("drafts a reply to a pasted enquiry, in its language, and sends nothing", async () => {
+    const plan = await (await post("/intent", {
+      actor: "user:andysakov",
+      goal: "Draft a reply to this enquiry",
+      autonomy: "S2",
+      inputs: [{
+        name: "pasted",
+        value: "Naomba 1 bedroom Westlands tarehe 15 mpaka 18",
+        tags: ["untrusted", "pasted"]
+      }]
+    })).json()
+    expect(plan.steps.map((s: any) => s.toolCall?.capability)).toEqual(["stays.reply@0.1"])
+
+    const done = await (await post(`/plans/${plan.id}/execute`, { approvedSteps: [plan.steps[0].id] })).json()
+    const reply = await (await fetch(`http://127.0.0.1:${PORT}/artifacts/${done.steps[0].artifactId}/content`)).text()
+    expect(reply).toContain("Habari! Nina 1-bedroom Westlands")
+    expect(reply).toContain("Fill before sending: [nightly rate], [photos link].")
+  }, 30_000)
+
   it("answers a missing plan with the 404 the spec declares", async () => {
     const response = await fetch(`http://127.0.0.1:${PORT}/plans/01890a5d-0000-7000-8000-000000000000`)
     expect(response.status).toBe(404)

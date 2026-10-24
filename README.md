@@ -21,7 +21,7 @@ multi-user seams left open but not built.
 What exists and works:
 
 - Contract schemas in `specs/` — Intent, IntentDraft, Plan, Artifact, Event, ToolSpec, shared types,
-  19 capability contracts, 27 example tool descriptors.
+  20 capability contracts, 28 example tool descriptors.
 - Effect Schema domain types in `src/domain/` that decode those contracts, with branded identifiers
   and tagged errors.
 - A PostgreSQL schema in `migrations/`, with domain constraints and a checksum-verifying migration
@@ -84,6 +84,13 @@ What exists and works:
   dates written month-first in one tab and day-first in another are settled by the sheet's own
   night count. "Is the unit free this weekend?" asks it directly. The sheet is read by a
   service account with a read-only scope.
+- **Reply drafts** (`stays.reply`, `src/stays/Reply.ts`). Every lead in a sweep comes with a
+  first reply, and "Draft a reply to this enquiry" answers one pasted message. The draft opens
+  with the listing and the price for the nights asked and ends on one question that moves toward
+  a booking; when the dates are taken it offers the next free window. It answers in the lead's
+  language (English or Swahili) and states only what the unit profile's `listing` records: a
+  missing price or photo link is a visible `[placeholder]`, and dates nobody checked are flagged
+  to confirm. Drafts only: nothing in METIS sends a message.
 - **A project scaffolder that writes to disk.** `build.scaffold` (`src/tools/servers/build.ts`)
   creates a `node-ts` or `python` project under `METIS_WORKSPACE` and nowhere else: the name must
   be one safe path segment, and it never writes over an existing directory. It is declared
@@ -121,7 +128,7 @@ artifact, and an unresolvable capability that fails cleanly instead of dispatchi
 
 What does **not** exist yet, despite being described in `docs/`:
 
-- Seven of the nineteen capabilities remain descriptors: `run.notebook`, `graph.link`, `vector.upsert`, and the four `agent.*` ones, which need real browser and device control. Implementing any of them against canned
+- Seven of the twenty capabilities remain descriptors: `run.notebook`, `graph.link`, `vector.upsert`, and the four `agent.*` ones, which need real browser and device control. Implementing any of them against canned
   responses would be worse than leaving them out — the registry would claim a capability that does
   not do what its contract says.
 - The monorepo layout, `examples/`, voice, device control, the Adaptive Agent Foundry.

@@ -78,6 +78,49 @@
           "$ref": "#/$defs/SpreadsheetId"
         }
       }
+    },
+    "listing": {
+      "description": "The facts a reply to a lead may state, and nothing else: a reply never invents a price or an amenity. A fact left out becomes a visible [placeholder] in the draft, listed for the owner to fill before sending.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "headline": {
+          "description": "How the unit is described in a reply, e.g. \"a 1-bedroom in Westlands\".",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "headlineSw": {
+          "description": "The same in Swahili, for replies to leads written in Swahili.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "currency": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 8
+        },
+        "nightlyRate": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "highlights": {
+          "description": "Two or three short, true selling points, in the order they should be mentioned.",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 80
+          },
+          "maxItems": 5
+        },
+        "photos": {
+          "description": "A link to the listing's photos.",
+          "type": "string",
+          "pattern": "^https://"
+        }
+      }
     }
   },
   "$defs": {
@@ -199,6 +242,15 @@
           "Diani",
           "Malindi",
           "Naivasha"
+        ]
+      },
+      "listing": {
+        "headline": "a 1-bedroom in Westlands",
+        "headlineSw": "1-bedroom Westlands",
+        "currency": "Ksh",
+        "highlights": [
+          "fibre Wi-Fi",
+          "backup power"
         ]
       }
     }
