@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://packs.metis.dev/plain/text.plain@0.1.output.schema.json",
+  "title": "text.plain@0.1 output",
+  "description": "The rewrite, and the deterministic check it was held to: every number, date, link and email of the original kept as written, and no longer than the original. A rewrite that failed after its retry is returned with `check.passed` false, never as a clean one.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "text",
+    "check",
+    "attempts",
+    "markdown"
+  ],
+  "properties": {
+    "text": {
+      "type": "string"
+    },
+    "check": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "passed",
+        "missing",
+        "longer"
+      ],
+      "properties": {
+        "passed": {
+          "type": "boolean"
+        },
+        "missing": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "longer": {
+          "type": "boolean"
+        }
+      }
+    },
+    "attempts": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 2
+    },
+    "markdown": {
+      "type": "string"
+    }
+  },
+  "examples": [
+    {
+      "text": "You owe Ksh 1,250,000 under the 2026-10-24 agreement. Pay within 30 days.",
+      "check": {
+        "passed": true,
+        "missing": [],
+        "longer": false
+      },
+      "attempts": 1,
+      "markdown": "## Plain English\n"
+    }
+  ]
+}

@@ -90,9 +90,18 @@ What exists and works:
   own servers, may not use core's `metis.*` names or another pack's, never points outside its
   directory, and hands its servers only the environment variables it names. Its templates are
   tried after core's specific ones and before the broad ones, so a document goal stays a document.
-  `packs/redact` is the reference pack: `text.redact` replaces emails, phone numbers, Luhn-valid
-  card numbers and IP addresses in pasted text, held by its own conformance vectors. Packs in the
-  repository are held by the same spec checks as `specs/`.
+  A pack's server can also use the model METIS is configured with (`METIS_MODEL_CLI`, or the API
+  key) by asking for completions over MCP sampling, if its manifest says `"model": true`. METIS
+  answers through its own model server, so the pack holds no credential and runs no CLI; every
+  tool on such a server must declare the `model.sample` scope; one tool call may ask at most eight
+  times; and how many it asked is written on its `TOOL_COMPLETED` event.
+  `packs/redact` is the reference pack for a deterministic capability: `text.redact` replaces
+  emails, phone numbers, Luhn-valid card numbers and IP addresses in pasted text. `packs/plain` is
+  the reference for one that uses the model: `text.plain` has the model rewrite pasted text in
+  plain English and checks in code that every number, date, link and email survived, sending a
+  failed draft back once with what it dropped and marking a second failure rather than hiding it.
+  Each is held by its own conformance vectors, and packs in the repository by the same spec checks
+  as `specs/`.
 - **Durable execution on Restate** (ADR-016), reachable through the API. `POST /plans/{id}/execute`
   submits the plan and reports which path ran it: `restate` is durable — retries, checkpointing,
   real suspension on an approval gate — and `direct` runs in-process and is **not**. The mode is
@@ -192,7 +201,8 @@ metis/
     tools/           registry, MCP client, and the MCP servers themselves
     db/              migration runner and column codecs
     config/          configuration
-  packs/redact/       the reference pack: manifest, server, contracts, vectors
+  packs/redact/       a reference pack: manifest, server, contracts, vectors
+  packs/plain/        a reference pack whose server uses the model: drafts checked in code
   test/specs/        the checks that keep specs and code from drifting apart
   test/storage/      conformance vectors run against every adapter
   test/policy/       policy and trust vectors

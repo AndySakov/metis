@@ -11,6 +11,9 @@
  *   would otherwise silently replace the first.
  * - **Its environment is what it names.** A server gets the variables its manifest lists, from
  *   METIS's environment, and no others, the same rule core's servers follow.
+ * - **Model use is declared twice.** A server asks for completions only if its manifest says
+ *   `"model": true`, and every tool on such a server declares the `model.sample` scope, so policy
+ *   and the event log see model use on every call rather than discovering it inside one.
  *
  * What a pack cannot do from here is run code in the orchestrator. Its templates are data, compiled
  * by the planner; its code runs in the processes it declares, as any MCP server does.
@@ -28,6 +31,9 @@ import { fromPack } from "../orchestrator/Planner.js"
 import { readDescriptor } from "../tools/Descriptors.js"
 import type { ServerMap } from "../tools/McpToolRunner.js"
 
+/** The scope a tool declares when its server may ask the model for completions. */
+export const MODEL_SCOPE = "model.sample"
+
 export class PackError extends Schema.TaggedError<PackError>()("PackError", {
   pack: Schema.String,
   message: Schema.String
@@ -40,6 +46,8 @@ export interface LoadedPack {
   readonly servers: ServerMap
   /** Its descriptors, with their schemas resolved. */
   readonly tools: ReadonlyArray<ToolSpec>
+  /** Its servers that may ask the model for completions. */
+  readonly sampling: ReadonlyArray<string>
   readonly templates: ReadonlyArray<Template>
 }
 
@@ -81,14 +89,20 @@ export const load = (directory: string): Effect.Effect<LoadedPack, PackError> =>
         try: () => readDescriptor(resolve(dir, path)),
         catch: (cause) => fail(`${path}: ${cause instanceof Error ? cause.message : String(cause)}`)
       }))
+    const sampling = Object.entries(manifest.servers).flatMap(([name, server]) => server.model ? [name] : [])
     for (const tool of tools) {
       if (!(tool.mcp.server in servers)) {
         return yield* fail(
           `${tool.name} binds ${tool.mcp.server}, which this pack does not run: a pack binds only its own servers`
         )
       }
+      if (sampling.includes(tool.mcp.server) && !tool.authScopes.includes(MODEL_SCOPE)) {
+        return yield* fail(
+          `${tool.name} runs on ${tool.mcp.server}, which may use the model, so it must declare the ${MODEL_SCOPE} scope`
+        )
+      }
     }
-    return { dir, manifest, servers, tools, templates: manifest.templates.map(fromPack) }
+    return { dir, manifest, servers, tools, sampling, templates: manifest.templates.map(fromPack) }
   })
 
 /** Every pack in `directories`, in order, refusing a pack or server name used twice. */

@@ -20,6 +20,10 @@
  * `claude -p` on a Claude Code login, `codex exec`, `ollama run`, or a command of your own. The
  * prompt is the same; the CLI runs in an empty temporary directory, so it finds no project to
  * read, and whatever it prints is the document. Run that way it is registered as `metis.model-cli`.
+ *
+ * `complete` is not a capability. It is how a pack's server reaches the model: the pack asks METIS
+ * for a completion over MCP sampling, and METIS answers through this tool (`McpToolRunner.ts`), so
+ * a pack uses whatever model is configured without ever holding its credentials or its CLI.
  */
 
 import { spawn } from "node:child_process"
@@ -114,16 +118,27 @@ const tail = (text: string): string => {
   return trimmed.length > 400 ? `…${trimmed.slice(-400)}` : trimmed
 }
 
-/** One document through a model CLI. Every way it can fall short is a tool error, as for the API. */
-const draftViaCli = (program: ModelCli, task: Task, inputs: Record<string, unknown>): Promise<ToolResult> => {
+/** One turn of a conversation with the model. */
+interface Turn {
+  readonly role: "user" | "assistant"
+  readonly text: string
+}
+
+/**
+ * A conversation as the single request a CLI takes: one user turn as itself, several as a
+ * transcript, each turn tagged with who spoke.
+ */
+const transcript = (turns: ReadonlyArray<Turn>): string =>
+  turns.length === 1 && turns[0]!.role === "user"
+    ? turns[0]!.text
+    : turns.map((turn) => `<${turn.role}>\n${turn.text}\n</${turn.role}>`).join("\n\n")
+
+/** One answer through a model CLI. Every way it can fall short is a tool error, as for the API. */
+const viaCli = (program: ModelCli, system: string, turns: ReadonlyArray<Turn>): Promise<ToolResult> => {
   if (program.requiresModel && cliModel === undefined) {
     return Promise.resolve(failure(`${program.name} needs a model: set METIS_MODEL_CLI_MODEL`))
   }
-  const call = program.invoke(
-    `${PREAMBLE}\n\n${TASKS[task]}`,
-    `<inputs>\n${JSON.stringify(inputs, null, 2)}\n</inputs>`,
-    cliModel
-  )
+  const call = program.invoke(system, transcript(turns), cliModel)
   // An empty directory, so the CLI finds no project, instructions or files to read.
   const cwd = mkdtempSync(join(tmpdir(), "metis-model-cli-"))
 
@@ -166,9 +181,13 @@ const draftViaCli = (program: ModelCli, task: Task, inputs: Record<string, unkno
   })
 }
 
-/** One request, one document. Every way it can fall short is a tool error, not partial text. */
-const draft = async (task: Task, inputs: Record<string, unknown>): Promise<ToolResult> => {
-  if (cli !== undefined) return "error" in cli ? failure(cli.error) : draftViaCli(cli, task, inputs)
+/** One request, one answer. Every way it can fall short is a tool error, not partial text. */
+const complete = async (
+  system: string,
+  turns: ReadonlyArray<Turn>,
+  maxTokens = MAX_TOKENS
+): Promise<ToolResult> => {
+  if (cli !== undefined) return "error" in cli ? failure(cli.error) : viaCli(cli, system, turns)
 
   if (!hasCredentials()) {
     return failure("metis.model has no Anthropic credentials: set ANTHROPIC_API_KEY for this server")
@@ -178,14 +197,14 @@ const draft = async (task: Task, inputs: Record<string, unknown>): Promise<ToolR
   try {
     const response = await client.beta.messages.create({
       model: MODEL,
-      max_tokens: MAX_TOKENS,
+      max_tokens: maxTokens,
       output_config: { effort: "high" },
       // Server-side refusal fallback: a false-positive decline is re-run on another model inside
       // the same request instead of failing the step.
       betas: ["server-side-fallback-2026-07-01"],
       fallbacks: "default",
-      system: `${PREAMBLE}\n\n${TASKS[task]}`,
-      messages: [{ role: "user", content: `<inputs>\n${JSON.stringify(inputs, null, 2)}\n</inputs>` }]
+      system,
+      messages: turns.map((turn) => ({ role: turn.role, content: turn.text }))
     })
 
     if (response.stop_reason === "refusal") {
@@ -211,7 +230,28 @@ const draft = async (task: Task, inputs: Record<string, unknown>): Promise<ToolR
   }
 }
 
+/** One design document: the task's instructions, and the inputs as data. */
+const draft = (task: Task, inputs: Record<string, unknown>): Promise<ToolResult> =>
+  complete(`${PREAMBLE}\n\n${TASKS[task]}`, [
+    { role: "user", text: `<inputs>\n${JSON.stringify(inputs, null, 2)}\n</inputs>` }
+  ])
+
 const server = new McpServer({ name: "metis.model", version: "1.0.0" })
+
+server.registerTool(
+  "complete",
+  {
+    title: "Complete",
+    description:
+      "One completion, text in and text out, with no tools. Answers a pack server's sampling request; not a capability.",
+    inputSchema: {
+      system: z.string(),
+      messages: z.array(z.object({ role: z.enum(["user", "assistant"]), text: z.string() })).min(1),
+      maxTokens: z.number().int().positive().max(MAX_TOKENS).optional()
+    }
+  },
+  ({ maxTokens, messages, system }) => complete(system, messages, maxTokens)
+)
 
 server.registerTool(
   "prd",

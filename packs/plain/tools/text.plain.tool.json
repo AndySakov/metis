@@ -1,0 +1,36 @@
+{
+  "name": "text-plain-checked",
+  "version": "0.1.0",
+  "capability": "text.plain@0.1",
+  "mcp": {
+    "server": "plain.tools",
+    "tool": "plain",
+    "transport": "stdio"
+  },
+  "idempotent": true,
+  "isolation": "process",
+  "inputSchema": {
+    "$ref": "../capabilities/text.plain@0.1.input.schema.json"
+  },
+  "outputSchema": {
+    "$ref": "../capabilities/text.plain@0.1.output.schema.json"
+  },
+  "authScopes": [
+    "model.sample"
+  ],
+  "tests": [
+    {
+      "name": "minimal",
+      "input": {
+        "text": "Payment of Ksh 1,250,000 is due on 2026-11-01."
+      },
+      "expect": {
+        "type": "object",
+        "required": [
+          "text",
+          "check"
+        ]
+      }
+    }
+  ]
+}

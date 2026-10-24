@@ -25,6 +25,10 @@ this" with some text pasted.
 - **Descriptors.** Each binds a tool on one of the pack's own servers to a capability, and
   declares `idempotent` and `isolation` like any of core's. Their schema `$ref`s are relative to
   the descriptor, and are resolved at load, so sampled verification checks outputs against them.
+- **The model.** A server whose manifest entry says `"model": true` may ask METIS for completions
+  with MCP sampling (`server.createMessage`). The configured model answers, so the pack needs no
+  key; each of its tools must declare the `model.sample` scope; and one tool call may ask at most
+  eight times. Check what comes back in code before returning it: `packs/plain` shows how.
 - **Templates.** A `match` pattern (case-insensitive), an optional `unless`, and steps whose
   input strings may use `{{goal}}` and `{{pasted}}`. With `needsPasted`, a goal with nothing pasted
   plans a question instead. Templates are tried after core's specific ones and before its broad

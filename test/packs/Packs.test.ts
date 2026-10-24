@@ -105,6 +105,14 @@ describe("a pack that is refused", () => {
     expect(await refusal([dir])).toContain("not a valid pack")
   })
 
+  it("may not let a server use the model without its tools declaring it", async () => {
+    const dir = variant("model", (pack) => {
+      pack.servers["redact.tools"].model = true
+      return pack
+    })
+    expect(await refusal([dir])).toContain("which may use the model, so it must declare the model.sample scope")
+  })
+
   it("may not carry a template whose pattern does not compile", async () => {
     const dir = variant("regex", (pack) => {
       pack.templates[0].match = "(unclosed"

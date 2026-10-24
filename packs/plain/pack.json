@@ -1,0 +1,50 @@
+{
+  "name": "plain",
+  "version": "0.1.0",
+  "description": "Rewrites text in plain English with the configured model, and checks in code that every number, date, link and email survived.",
+  "servers": {
+    "plain.tools": {
+      "command": "node",
+      "args": [
+        "--experimental-strip-types",
+        "${pack}/src/server.ts"
+      ],
+      "model": true
+    }
+  },
+  "tools": [
+    "tools/text.plain.tool.json"
+  ],
+  "templates": [
+    {
+      "name": "plain",
+      "match": "\\b(plain english|plainer|simplify|in simple terms)\\b",
+      "unless": "\\b(prd|c4|api spec)\\b",
+      "needsPasted": "Paste the text to rewrite",
+      "steps": [
+        {
+          "description": "Rewrite in plain English, keeping every fact as written",
+          "capability": "text.plain@0.1",
+          "input": {
+            "text": "{{pasted}}"
+          }
+        }
+      ],
+      "risks": [
+        "The check covers numbers, dates, links and emails: a changed meaning in the words around them is for you to read"
+      ],
+      "expects": [
+        {
+          "kind": "text",
+          "description": "The rewrite, and whether it kept every fact"
+        }
+      ]
+    }
+  ],
+  "examples": [
+    {
+      "goal": "Rewrite this in plain English",
+      "pasted": "Pursuant to the agreement dated 2026-10-24, the outstanding balance of Ksh 1,250,000 shall be remitted within 30 days to accounts@example.com, failing which a late fee of 2.5% per month shall accrue."
+    }
+  ]
+}

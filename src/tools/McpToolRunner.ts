@@ -7,10 +7,18 @@
  *
  * Clients are cached per server and closed with the scope, so a plan calling three tools on one
  * server spawns one process rather than three.
+ *
+ * It also answers MCP sampling: a server asking its client for a completion. Only servers granted
+ * it may ask (a pack's manifest says `"model": true`); the answer comes from the configured model
+ * server's `complete` tool, so the asking server never holds a credential or a CLI; and one tool
+ * call may ask only so many times, so a looping server cannot spend the user's model without limit.
+ * How many it asked for is reported with the result, and so reaches the event log.
  */
 
 import { Client } from "@modelcontextprotocol/sdk/client/index.js"
 import { getDefaultEnvironment, StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js"
+import type { CreateMessageRequest, CreateMessageResult } from "@modelcontextprotocol/sdk/types.js"
+import { CreateMessageRequestSchema, ErrorCode, McpError } from "@modelcontextprotocol/sdk/types.js"
 import { Effect, Layer } from "effect"
 
 import type { ToolSpec } from "../domain/ToolSpec.js"
@@ -29,6 +37,19 @@ export interface ServerCommand {
 }
 
 export type ServerMap = Readonly<Record<string, ServerCommand>>
+
+/** Which servers may ask for a completion, and who answers. */
+export interface Sampling {
+  /** Servers allowed to ask. Any other server's request is refused. */
+  readonly granted: ReadonlySet<string>
+  /** The model server whose `complete` tool answers, or none when no model is configured. */
+  readonly via: string | undefined
+  /** How many completions one tool call may ask for. */
+  readonly perCall: number
+}
+
+/** The most tokens a sampled completion may ask for: the model server's own ceiling. */
+const MAX_SAMPLE_TOKENS = 16000
 
 /**
  * The output of an MCP tool call.
@@ -62,11 +83,54 @@ const textOutput = (content: unknown): unknown => {
   return { markdown: text }
 }
 
-export const make = (servers: ServerMap) =>
+export const make = (servers: ServerMap, sampling?: Sampling) =>
   Effect.gen(function*() {
     const clients = new Map<string, Client>()
+    /** Completions asked for by each server's current tool call. */
+    const sampled = new Map<string, number>()
 
-    const connect = (serverId: string) =>
+    /** A completion for `serverId`, from the model server, within its call's allowance. */
+    const answer = async (serverId: string, request: CreateMessageRequest): Promise<CreateMessageResult> => {
+      const used = sampled.get(serverId) ?? 0
+      if (used >= sampling!.perCall) {
+        throw new McpError(
+          ErrorCode.InvalidRequest,
+          `${serverId} asked for more than ${sampling!.perCall} completions in one tool call`
+        )
+      }
+      sampled.set(serverId, used + 1)
+      const messages = request.params.messages.map((message) => {
+        const blocks = Array.isArray(message.content) ? message.content : [message.content]
+        if (blocks.some((block) => block.type !== "text")) {
+          throw new McpError(ErrorCode.InvalidParams, "only text can be sampled")
+        }
+        return { role: message.role, text: blocks.map((block) => (block as { text: string }).text).join("\n") }
+      })
+      if (sampling!.via === undefined) {
+        throw new McpError(
+          ErrorCode.InternalError,
+          "no model is configured: set METIS_MODEL_CLI or ANTHROPIC_API_KEY"
+        )
+      }
+      const model = await Effect.runPromise(connect(sampling!.via))
+      const result = await model.callTool(
+        {
+          name: "complete",
+          arguments: {
+            system: request.params.systemPrompt ?? "",
+            messages,
+            maxTokens: Math.min(request.params.maxTokens, MAX_SAMPLE_TOKENS)
+          }
+        },
+        undefined,
+        { timeout: CALL_TIMEOUT_MS }
+      )
+      const text = (textOutput(result.content) as { markdown: string }).markdown
+      if (result.isError === true) throw new McpError(ErrorCode.InternalError, text)
+      return { model: sampling!.via, role: "assistant", content: { type: "text", text }, stopReason: "endTurn" }
+    }
+
+    const connect = (serverId: string): Effect.Effect<Client, ToolRunError> =>
       Effect.gen(function*() {
         const existing = clients.get(serverId)
         if (existing !== undefined) return existing
@@ -79,7 +143,12 @@ export const make = (servers: ServerMap) =>
           })
         }
 
-        const client = new Client({ name: "metis", version: "0.1.0" })
+        const granted = sampling?.granted.has(serverId) === true
+        const client = new Client(
+          { name: "metis", version: "0.1.0" },
+          granted ? { capabilities: { sampling: {} } } : undefined
+        )
+        if (granted) client.setRequestHandler(CreateMessageRequestSchema, (request) => answer(serverId, request))
         yield* Effect.tryPromise({
           try: () =>
             client.connect(
@@ -110,6 +179,7 @@ export const make = (servers: ServerMap) =>
       run: (spec: ToolSpec, input) =>
         Effect.gen(function*() {
           const client = yield* connect(spec.mcp.server)
+          sampled.set(spec.mcp.server, 0)
           const startedAt = yield* Effect.clockWith((clock) => clock.currentTimeMillis)
 
           const result = yield* Effect.tryPromise({
@@ -127,9 +197,11 @@ export const make = (servers: ServerMap) =>
             })
           }
 
+          const samples = sampled.get(spec.mcp.server) ?? 0
           return {
             output: toOutput(result.content, result.structuredContent),
-            durationMs: finishedAt - startedAt
+            durationMs: finishedAt - startedAt,
+            ...(samples > 0 ? { samples } : {})
           }
         })
     })
@@ -142,4 +214,4 @@ export const make = (servers: ServerMap) =>
  */
 export const CALL_TIMEOUT_MS = 15 * 60 * 1000
 
-export const layer = (servers: ServerMap) => Layer.scoped(ToolRunner, make(servers))
+export const layer = (servers: ServerMap, sampling?: Sampling) => Layer.scoped(ToolRunner, make(servers, sampling))

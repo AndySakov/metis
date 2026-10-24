@@ -21,6 +21,8 @@ export interface ToolResult {
   readonly output: unknown
   /** Milliseconds spent in the tool — surfaced on TOOL_COMPLETED for the observability story. */
   readonly durationMs: number
+  /** Completions the tool's server asked the model for while it ran, when it asked for any. */
+  readonly samples?: number
 }
 
 export class ToolRunner extends Context.Tag("tools/ToolRunner")<ToolRunner, {

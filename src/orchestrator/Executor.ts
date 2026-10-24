@@ -386,7 +386,8 @@ export const execute = (
           stepId: step.id,
           capability: step.toolCall.capability,
           tool: spec.name,
-          durationMs: ran.right.durationMs
+          durationMs: ran.right.durationMs,
+          ...(ran.right.samples !== undefined ? { samples: ran.right.samples } : {})
         })
         const outputTags = spec.authScopes.includes("public.web") ? union(tags, WEB_CONTENT) : tags
         produced.set(step.id, { output: ran.right.output, tags: outputTags })

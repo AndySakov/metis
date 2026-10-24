@@ -109,6 +109,11 @@
           "items": {
             "$ref": "#/$defs/EnvName"
           }
+        },
+        "model": {
+          "description": "Whether this server may ask METIS for completions over MCP sampling. They are answered by the configured model (METIS_MODEL_CLI or ANTHROPIC_API_KEY), so the server never holds a credential, and are limited per tool call. Every tool on such a server declares the `model.sample` scope, so policy sees model use on every call.",
+          "type": "boolean",
+          "default": false
         }
       }
     },
