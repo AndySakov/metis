@@ -86,7 +86,8 @@ describe.skipIf(!available)("pnpm start on Restate", () => {
         ingressUrl: `http://127.0.0.1:${INGRESS}`,
         adminUrl: `http://127.0.0.1:${ADMIN}`,
         endpointPort: ENDPOINT
-      })
+      }),
+      workspace: Option.none()
     }
     // Building the layer registers the workflow, retrying until the Restate server is up.
     runtime = ManagedRuntime.make(App.layer(config) as never)

@@ -55,11 +55,15 @@ What exists and works:
   running unattended, and the decision is recorded as `TRUST_GATE`.
 - **Sampled verification** (ADR-014 §4) — a configurable fraction of executed actions is checked
   against the output schema its capability declares, independent of whether any rule flagged it.
-- **Eight capabilities with real MCP implementations** across three servers: `design.prd`,
+- **Nine capabilities with real MCP implementations** across four servers: `design.prd`,
   `design.c4`, `design.api_spec`, `design.trade_study`, `transform.extract`, `research.fetch`,
-  `research.summarize`, `research.claim_graph`. `research.fetch` does real HTTP and refuses
-  loopback, private and link-local hosts; `research.summarize` is extractive, so a citation always
-  points at text that was genuinely supplied.
+  `research.summarize`, `research.claim_graph`, `build.scaffold`. `research.fetch` does real HTTP
+  and refuses loopback, private and link-local hosts; `research.summarize` is extractive, so a
+  citation always points at text that was genuinely supplied.
+- **A project scaffolder that writes to disk.** `build.scaffold` (`src/tools/servers/build.ts`)
+  creates a `node-ts` or `python` project under `METIS_WORKSPACE` and nowhere else: the name must
+  be one safe path segment, and it never writes over an existing directory. It is declared
+  non-idempotent, so policy asks a human before every run at every gear.
 - **A model behind the design capabilities.** `metis.model` (`src/tools/servers/model.ts`) answers
   the four `design.*` capabilities with Claude, as a second implementation beside the
   deterministic templates in `metis.design`. The model gets no tools, so a call's only effect is
@@ -87,9 +91,8 @@ artifact, and an unresolvable capability that fails cleanly instead of dispatchi
 
 What does **not** exist yet, despite being described in `docs/`:
 
-- Nine of the seventeen capabilities remain descriptors: `research.search` (needs a search
-  backend), `build.scaffold`, `run.notebook`, `graph.link`, `vector.upsert`, and the four `agent.*`
-  ones, which need real browser and device control. Implementing any of them against canned
+- Eight of the seventeen capabilities remain descriptors: `research.search` (needs a search
+  backend), `run.notebook`, `graph.link`, `vector.upsert`, and the four `agent.*` ones, which need real browser and device control. Implementing any of them against canned
   responses would be worse than leaving them out — the registry would claim a capability that does
   not do what its contract says.
 - The monorepo layout, `examples/`, voice, device control, the Adaptive Agent Foundry.
@@ -119,7 +122,7 @@ Seven layers (ADR-000). Marked by what actually exists:
 | Orchestrator              | intent → plan → dispatch → memory writes                         | **built**    |
 | Memory (`mneme`)          | event log, artifact store, external retrieval                    | **built**    |
 | Knowledge Engine          | multi-corpus retrieval, claims/evidence, licensing               | not started  |
-| Tooling/Execution         | MCP tools, notebook runner, CI hooks                             | 1 real tool  |
+| Tooling/Execution         | MCP tools, notebook runner, CI hooks                             | MCP tools    |
 | Governance/Safety         | capability gating, approvals, policy-as-code, audit              | **live**     |
 | Observability             | traces, cost/latency budgets, eval dashboards                    | not started  |
 
@@ -219,6 +222,8 @@ ANTHROPIC_API_KEY=... pnpm start     # http://localhost:8787, METIS_PORT to chan
   run parks on an approval and survives a restart. Pair it with Postgres, or the plans and record a
   resumed run needs are gone. Without it, plans run in-process (`mode: "direct"`), which is not
   durable. `node_modules/.bin/restate-server` is a Restate server to point it at.
+- `METIS_WORKSPACE` lets `build.scaffold` create projects in that directory ("Scaffold a
+  TypeScript project called notes-api"). Without it the server that writes to disk is not started.
 - `GET /plans/{id}/execution` reports a plan's latest run from the event log, in either mode. A
   durable execute returns `accepted` before anything has run, so this is where its outcome, and the
   `artifactId` of what it wrote, is read.
