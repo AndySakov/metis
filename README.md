@@ -225,14 +225,31 @@ it was applied fails loudly rather than silently diverging.
 ## Running it
 
 ```bash
-ANTHROPIC_API_KEY=... pnpm start     # http://localhost:8787, METIS_PORT to change it
+METIS_MODEL_CLI=claude pnpm start    # http://localhost:8787, METIS_PORT to change it
 ```
 
 Open http://localhost:8787/ for the console. Try "Summarize https://en.wikipedia.org/wiki/Metis_(mythology)",
 then a PRD or C4 diagrams, and approve the steps it asks about. Run the same kind of goal a few times
 and watch that skill's gear climb until it stops asking.
 
-- `ANTHROPIC_API_KEY` makes Claude answer the `design.*` capabilities; without it the templates do.
+- `METIS_MODEL_CLI` has a model CLI answer the `design.*` capabilities, on whatever login that CLI
+  already has, so no API key is needed. Without a model configured, the templates answer.
+
+  | `METIS_MODEL_CLI` | Runs                                            | Its own tools while answering           |
+  | ----------------- | ----------------------------------------------- | --------------------------------------- |
+  | `claude`          | `claude -p` (Claude Code login)                 | all switched off                        |
+  | `codex`           | `codex exec`, read-only sandbox                 | shell stays on, read-only               |
+  | `gemini`          | `gemini -p`                                     | read-only tools may run                 |
+  | `ollama`          | `ollama run $METIS_MODEL_CLI_MODEL` (local)     | none                                    |
+  | `llm`             | Simon Willison's `llm`                          | none                                    |
+  | `["cmd", "arg"]`  | your own command: prompt on stdin, answer on stdout | unknown                             |
+
+  `METIS_MODEL_CLI_MODEL` picks the model where the CLI takes one (`{model}` in a custom command).
+  The CLI gets only its own credential variables (`METIS_MODEL_CLI_ENV=A,B` adds more) and runs in
+  an empty temporary directory. Startup warns when the chosen CLI keeps tools of its own. Only the
+  `claude` preset was run end to end while building this; the others follow their documentation.
+- `ANTHROPIC_API_KEY` has Claude answer through the API instead (`metis.model`); a configured CLI
+  is preferred when both are set.
 - `POSTGRES_*` (as for `pnpm migrate`) stores everything in Postgres; without `POSTGRES_DATABASE`
   everything is in memory and a restart empties it.
 - `RESTATE_INGRESS_URL` (and `RESTATE_ADMIN_URL`, default `http://127.0.0.1:9070`) runs plans as

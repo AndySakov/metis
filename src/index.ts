@@ -8,9 +8,10 @@
  *   tool list at startup, and a descriptor is kept only when its server answers for its tool. The
  *   descriptors for the eight unbuilt capabilities therefore never reach the registry, and the
  *   planner, which plans against the registry, never targets them.
- * - **Claude answers `design.*` when, and only when, a key is configured.** Its descriptors are
- *   registered ahead of the templates, so the registry selects them; without a key `metis.model`
- *   is not started at all and the templates answer.
+ * - **A model answers `design.*` when, and only when, one is configured:** a model CLI
+ *   (`METIS_MODEL_CLI`, such as `claude` on a Claude Code login) or an API key. Its descriptors are
+ *   registered ahead of the templates, so the registry selects them; with neither, no model server
+ *   is started and the templates answer.
  * - **Nothing is written to disk unless a workspace is configured.** `metis.build` is started only
  *   when `METIS_WORKSPACE` is set, and that directory is the only one it is told about.
  * - **The live policy is `specs/policy/default.json`,** the same file the red-team suite measures.
@@ -451,6 +452,22 @@ export * as Verification from "./policy/Verification.js"
 export * as McpToolRunner from "./tools/McpToolRunner.js"
 
 /**
+ * Model CLIs: any command-line program that takes a prompt and prints an answer, used as the model
+ * behind the `design.*` capabilities.
+ *
+ * This is how METIS runs on a subscription rather than an API key: `claude -p` signed in to Claude
+ * Code, `codex exec` signed in to ChatGPT, a local `ollama`, or anything else that reads a prompt
+ * and writes text. Each preset says how to call its program, how to read its answer, which
+ * environment variables carry its credentials, and, plainly, whether the program keeps tools of its
+ * own while it answers. `metis.model`'s guarantee is that the model has none; a CLI agent that
+ * cannot be told to put its tools down breaks that guarantee, and startup says so.
+ *
+ * Kept free of Node APIs, so the model server can import it under Node's type stripping as well as
+ * the composition root under the compiler.
+ */
+export * as ModelCli from "./tools/ModelCli.js"
+
+/**
  * The tool registry (ADR-006, ADR-017).
  *
  * Maps a capability id to the implementations that satisfy it. This indirection is the thing that
@@ -521,6 +538,11 @@ export * as design from "./tools/servers/design.js"
  * Credentials come from this process's environment, which the runner fills per server: only a
  * server configured to receive `ANTHROPIC_API_KEY` ever sees it. Without credentials every call is a
  * tool error naming the missing variable, never a template passed off as a model's answer.
+ *
+ * With `METIS_MODEL_CLI` set, the same server answers through a model CLI instead (`ModelCli.ts`):
+ * `claude -p` on a Claude Code login, `codex exec`, `ollama run`, or a command of your own. The
+ * prompt is the same; the CLI runs in an empty temporary directory, so it finds no project to
+ * read, and whatever it prints is the document. Run that way it is registered as `metis.model-cli`.
  */
 export * as model from "./tools/servers/model.js"
 

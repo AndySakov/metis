@@ -267,11 +267,13 @@ const renderExamples = () => {
 };
 
 const renderWriter = () => {
-  const claude = state.tools.some((t) => t.mcp.server === "metis.model")
+  const servers = new Set(state.tools.map((t) => t.mcp.server));
   $("writer").hidden = false;
-  $("writer").textContent = claude
-    ? "Documents are written by Claude (metis.model)."
-    : "Documents come from built-in templates. Set ANTHROPIC_API_KEY and restart METIS to have Claude write them.";
+  $("writer").textContent = servers.has("metis.model-cli")
+    ? "Documents are written by your model CLI (metis.model-cli)."
+    : servers.has("metis.model")
+    ? "Documents are written by Claude through the API (metis.model)."
+    : "Documents come from built-in templates. Start METIS with METIS_MODEL_CLI=claude to have Claude write them on your Claude Code login.";
 };
 
 const renderTools = () => {

@@ -113,7 +113,8 @@ export const make = (servers: ServerMap) =>
           const startedAt = yield* Effect.clockWith((clock) => clock.currentTimeMillis)
 
           const result = yield* Effect.tryPromise({
-            try: () => client.callTool({ name: spec.mcp.tool, arguments: input }),
+            try: () =>
+              client.callTool({ name: spec.mcp.tool, arguments: input }, undefined, { timeout: CALL_TIMEOUT_MS }),
             catch: (cause) => new ToolRunError({ tool: spec.name, message: `call failed: ${String(cause)}` })
           })
 
@@ -133,5 +134,12 @@ export const make = (servers: ServerMap) =>
         })
     })
   })
+
+/**
+ * How long one tool call may take. The MCP SDK's default is a minute, which a model writing a whole
+ * document can exceed; a call cut off at a minute fails a step that was about to succeed. Tools with
+ * their own limits (a model CLI stops at ten minutes) report those first.
+ */
+export const CALL_TIMEOUT_MS = 15 * 60 * 1000
 
 export const layer = (servers: ServerMap) => Layer.scoped(ToolRunner, make(servers))

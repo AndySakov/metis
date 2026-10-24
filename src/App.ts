@@ -8,9 +8,10 @@
  *   tool list at startup, and a descriptor is kept only when its server answers for its tool. The
  *   descriptors for the eight unbuilt capabilities therefore never reach the registry, and the
  *   planner, which plans against the registry, never targets them.
- * - **Claude answers `design.*` when, and only when, a key is configured.** Its descriptors are
- *   registered ahead of the templates, so the registry selects them; without a key `metis.model`
- *   is not started at all and the templates answer.
+ * - **A model answers `design.*` when, and only when, one is configured:** a model CLI
+ *   (`METIS_MODEL_CLI`, such as `claude` on a Claude Code login) or an API key. Its descriptors are
+ *   registered ahead of the templates, so the registry selects them; with neither, no model server
+ *   is started and the templates answer.
  * - **Nothing is written to disk unless a workspace is configured.** `metis.build` is started only
  *   when `METIS_WORKSPACE` is set, and that directory is the only one it is told about.
  * - **The live policy is `specs/policy/default.json`,** the same file the red-team suite measures.
@@ -50,6 +51,7 @@ import { ledgerFromLog, sweeper } from "./policy/TrustUpdater.js"
 import * as Verification from "./policy/Verification.js"
 import type { ServerMap } from "./tools/McpToolRunner.js"
 import * as McpToolRunner from "./tools/McpToolRunner.js"
+import * as ModelCli from "./tools/ModelCli.js"
 import * as ToolRegistry from "./tools/ToolRegistry.js"
 
 const path = (relative: string): string => fileURLToPath(new URL(relative, import.meta.url))
@@ -80,6 +82,19 @@ export interface AppConfig {
    * without it that server is not started, so nothing is planned that writes to disk.
    */
   readonly workspace: Option.Option<string>
+  /**
+   * A model CLI to answer `design.*` (`ModelCli.ts`), from `METIS_MODEL_CLI`: a preset such as
+   * `claude`, which uses a Claude Code login instead of an API key, or a JSON array for a command
+   * of your own. Run as `metis.model-cli` and preferred over `metis.model` when both are set.
+   */
+  readonly modelCli: Option.Option<ModelCliConfig>
+}
+
+export interface ModelCliConfig {
+  readonly cli: string
+  readonly model: Option.Option<string>
+  /** Extra environment variables to hand the CLI, beyond the ones its preset names. */
+  readonly env: ReadonlyArray<string>
 }
 
 export const AppConfig: Config.Config<AppConfig> = Config.all({
@@ -97,7 +112,17 @@ export const AppConfig: Config.Config<AppConfig> = Config.all({
       )
     })
   ),
-  workspace: Config.option(Config.string("METIS_WORKSPACE"))
+  workspace: Config.option(Config.string("METIS_WORKSPACE")),
+  modelCli: Config.option(
+    Config.all({
+      cli: Config.string("METIS_MODEL_CLI"),
+      model: Config.option(Config.string("METIS_MODEL_CLI_MODEL")),
+      env: Config.string("METIS_MODEL_CLI_ENV").pipe(
+        Config.withDefault(""),
+        Config.map((names) => names.split(",").map((name) => name.trim()).filter((name) => name !== ""))
+      )
+    })
+  )
 })
 
 /**
@@ -131,7 +156,34 @@ const node = (file: string) => ({
   args: ["--experimental-strip-types", `${SERVERS}${file}`]
 })
 
+/**
+ * The CLI `config` names, or why it cannot be used. Checked at startup, so a typo stops METIS
+ * rather than failing every design step later.
+ */
+export const modelCliOf = (config: ModelCliConfig): ModelCli.ModelCli | { readonly error: string } => {
+  const cli = ModelCli.resolve(config.cli)
+  if ("error" in cli) return cli
+  if (cli.requiresModel && Option.isNone(config.model)) {
+    return { error: `${cli.name} needs a model: set METIS_MODEL_CLI_MODEL` }
+  }
+  return cli
+}
+
+/** The CLI's own settings, and only the credentials it reads, taken from this process's environment. */
+const cliEnvironment = (config: ModelCliConfig): Record<string, string> => {
+  const cli = ModelCli.resolve(config.cli)
+  const names = [...("error" in cli ? [] : cli.env), ...config.env]
+  return {
+    METIS_MODEL_CLI: config.cli,
+    ...Option.match(config.model, { onNone: () => ({}), onSome: (model) => ({ METIS_MODEL_CLI_MODEL: model }) }),
+    ...Object.fromEntries(names.flatMap((name) => process.env[name] === undefined ? [] : [[name, process.env[name]!]]))
+  }
+}
+
 export const serversFor = (config: AppConfig): ServerMap => ({
+  ...(Option.isSome(config.modelCli)
+    ? { "metis.model-cli": { ...node("model.ts"), env: cliEnvironment(config.modelCli.value) } }
+    : {}),
   ...(Option.isSome(config.anthropicApiKey)
     ? {
       "metis.model": {
@@ -176,6 +228,9 @@ const servedTools = (servers: ServerMap) =>
       (client) => Effect.promise(() => client.close().catch(() => {}))
     ).pipe(Effect.orDie)).pipe(Effect.map((lists) => new Set(lists.flat())))
 
+/** Model-backed servers in the order the registry prefers them: a configured CLI, then the API. */
+const MODEL_SERVERS = ["metis.model-cli", "metis.model"]
+
 /** Every descriptor whose server serves its tool, model-backed ones first. */
 export const registrySpecs = (servers: ServerMap) =>
   Effect.gen(function*() {
@@ -187,8 +242,8 @@ export const registrySpecs = (servers: ServerMap) =>
       .map((file) => Schema.decodeUnknownSync(ToolSpec)(JSON.parse(readFileSync(`${dir}${file}`, "utf8"))))
       .filter((spec) => served.has(`${spec.mcp.server}/${spec.mcp.tool}`))
     return [
-      ...specs.filter((spec) => spec.mcp.server === "metis.model"),
-      ...specs.filter((spec) => spec.mcp.server !== "metis.model")
+      ...MODEL_SERVERS.flatMap((server) => specs.filter((spec) => spec.mcp.server === server)),
+      ...specs.filter((spec) => !MODEL_SERVERS.includes(spec.mcp.server))
     ]
   })
 
@@ -221,7 +276,13 @@ export const services = (config: AppConfig) => {
   const tools = Layer.mergeAll(
     Layer.effect(
       ToolRegistry.ToolRegistry,
-      Effect.flatMap(registrySpecs(servers), ToolRegistry.make).pipe(Effect.orDie)
+      Effect.gen(function*() {
+        if (Option.isSome(config.modelCli)) {
+          const cli = modelCliOf(config.modelCli.value)
+          if ("error" in cli) return yield* Effect.dieMessage(cli.error)
+        }
+        return yield* Effect.orDie(Effect.flatMap(registrySpecs(servers), ToolRegistry.make))
+      })
     ),
     McpToolRunner.layer(servers)
   )
@@ -264,11 +325,22 @@ const announce = (config: AppConfig) =>
         // it resumes against would be gone.
         yield* Effect.logWarning("restate without postgres: a run survives a restart, but its plan and record do not")
       }
-      yield* Effect.log(
-        Option.isSome(config.anthropicApiKey)
-          ? "design.* answered by Claude (metis.model)"
-          : "design.* answered by templates: set ANTHROPIC_API_KEY for Claude"
-      )
+      const cli = Option.map(config.modelCli, modelCliOf)
+      if (Option.isSome(cli) && !("error" in cli.value)) {
+        yield* Effect.log(`design.* answered by the ${cli.value.name} CLI (metis.model-cli)`)
+        if (!ModelCli.toolless(cli.value.tools)) {
+          // metis.model's guarantee is a model with no tools. This CLI does not give that.
+          yield* Effect.logWarning(
+            `${cli.value.name} keeps tools of its own: ${cli.value.toolsNote} Design inputs reach it, and they can quote the web.`
+          )
+        }
+      } else {
+        yield* Effect.log(
+          Option.isSome(config.anthropicApiKey)
+            ? "design.* answered by Claude (metis.model)"
+            : "design.* answered by templates: set METIS_MODEL_CLI=claude to use a Claude Code login, or ANTHROPIC_API_KEY"
+        )
+      }
       yield* Effect.log(
         Option.match(config.workspace, {
           onNone: () => "build.scaffold off: set METIS_WORKSPACE to let METIS write projects",

@@ -27,7 +27,8 @@ beforeAll(async () => {
     anthropicBaseUrl: Option.none(),
     postgres: false,
     restate: Option.none(),
-    workspace: Option.none()
+    workspace: Option.none(),
+    modelCli: Option.none()
   }
   runtime = ManagedRuntime.make(App.layer(config) as never)
   await runtime.runtime()
