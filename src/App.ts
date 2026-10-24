@@ -45,7 +45,7 @@ import * as PlanExecution from "./orchestrator/PlanExecution.js"
 import * as Planner from "./orchestrator/Planner.js"
 import * as PolicyEngine from "./policy/PolicyEngine.js"
 import * as PolicyGate from "./policy/PolicyGate.js"
-import { ledgerFromLog } from "./policy/TrustUpdater.js"
+import { ledgerFromLog, sweeper } from "./policy/TrustUpdater.js"
 import * as Verification from "./policy/Verification.js"
 import type { ServerMap } from "./tools/McpToolRunner.js"
 import * as McpToolRunner from "./tools/McpToolRunner.js"
@@ -115,6 +115,9 @@ export const TRUST_POLICY = Schema.decodeUnknownSync(TrustPolicy)({
     { gear: "S4", minCompetence: 0.8, minCompliance: 0.95, minSignals: 40 }
   ]
 })
+
+/** How often gear changes earned by decay alone are written to the log. */
+const TRUST_SWEEP_INTERVAL = "1 hour"
 
 /** A share of executed actions is checked against its declared output schema (ADR-014 §4). */
 const VERIFICATION_RATE = 0.25
@@ -227,7 +230,12 @@ export const services = (config: AppConfig) => {
     PolicyEngine.layer(livePolicy()),
     Verification.randomSampler(VERIFICATION_RATE)
   )
-  const middle = Layer.mergeAll(PolicyGate.layer, ledgerFromLog(TRUST_POLICY), plannerFromRegistry).pipe(
+  const middle = Layer.mergeAll(
+    PolicyGate.layer,
+    ledgerFromLog(TRUST_POLICY),
+    sweeper(TRUST_POLICY, TRUST_SWEEP_INTERVAL),
+    plannerFromRegistry
+  ).pipe(
     Layer.provideMerge(base)
   )
   const execution = Option.match(config.restate, {

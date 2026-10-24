@@ -1,5 +1,5 @@
 import { describe, expect, it } from "@effect/vitest"
-import { Effect, Schema } from "effect"
+import { Effect, Layer, Schema, TestClock } from "effect"
 
 import type { EpochSeconds } from "../../src/domain/Common.js"
 import { Event } from "../../src/domain/Event.js"
@@ -8,7 +8,16 @@ import type { SkillId } from "../../src/domain/Trust.js"
 import { TrustPolicy } from "../../src/domain/Trust.js"
 import { EventLogStore } from "../../src/mneme/EventLogStore.js"
 import * as InMemoryEventLogStore from "../../src/mneme/InMemoryEventLogStore.js"
-import { derive, reconcile, recordedGear, skillOf } from "../../src/policy/TrustUpdater.js"
+import {
+  derive,
+  reconcile,
+  reconcileRecorded,
+  recordedGear,
+  skillOf,
+  skillsIn,
+  sweep,
+  sweeper
+} from "../../src/policy/TrustUpdater.js"
 
 /**
  * ADR-014's claim under test: competence and compliance move on disjoint evidence, and no amount
@@ -411,4 +420,125 @@ describe("evidence fades with age (ADR-014: trust that is not re-earned fades)",
   it("a skill with no recorded gear is at S0", () => {
     expect(recordedGear([completed()], SKILL)).toBe("S0")
   })
+})
+
+describe("decay is written down when it happens, not at the next run", () => {
+  const live = Schema.decodeUnknownSync(TrustPolicy)({
+    decay: { competenceHalfLifeSeconds: 30 * DAY, complianceHalfLifeSeconds: 14 * DAY },
+    thresholds: [
+      { gear: "S1", minCompetence: 0.2, minCompliance: 0.2, minSignals: 2 },
+      { gear: "S2", minCompetence: 0.5, minCompliance: 0.5, minSignals: 5 },
+      { gear: "S3", minCompetence: 0.7, minCompliance: 0.8, minSignals: 15 },
+      { gear: "S4", minCompetence: 0.8, minCompliance: 0.95, minSignals: 40 }
+    ]
+  })
+  const T = 1_700_000_000
+
+  const stamped = (ts: number, e: Event): Event =>
+    Schema.decodeUnknownSync(Event)({ ...Schema.encodeSync(Event)(e), ts })
+  /** Three approved runs: six signals in each ledger, enough for S2. */
+  const earnedS2 = (ts: number) =>
+    Array.from({ length: 3 }, () => [event("APPROVAL_GRANTED", {}), completed(), cleanEvaluation(), cleanEvaluation()])
+      .flat()
+      .map((e) => stamped(ts, e))
+  const promotion = (ts: number) =>
+    Schema.decodeUnknownSync(Event)({
+      id: uuidv7(),
+      ts,
+      type: "TRUST_PROMOTED",
+      actor: "metis",
+      payload: { skill: SKILL, from: "S0", to: "S2" }
+    })
+
+  const seeded = (events: ReadonlyArray<Event>) =>
+    Effect.flatMap(EventLogStore, (log) => Effect.forEach(events, (e) => Effect.orDie(log.append(e))))
+  const gearChanges = Effect.flatMap(EventLogStore, (log) => Effect.orDie(log.read({}))).pipe(
+    Effect.map((events) =>
+      events
+        .filter((e) => e.type === "TRUST_PROMOTED" || e.type === "TRUST_DEMOTED")
+        .map((e) => ({ ts: e.ts, ...(e.payload as { from: string; to: string }) }))
+        .map(({ from, to, ts }) => ({ day: Math.round((ts - T) / DAY), change: `${from}->${to}` }))
+    )
+  )
+
+  it("names every skill with evidence or a recorded gear", () => {
+    expect(skillsIn([completed(), promotion(T), event("STEP_FAILED", { capability: "build.scaffold@0.1" })]))
+      .toEqual(["build.scaffold", "design.prd"])
+  })
+
+  it.effect("a daily sweep writes each demotion on the day the evidence falls below the bar", () =>
+    Effect.gen(function*() {
+      yield* TestClock.setTime(T * 1000)
+      yield* seeded([...earnedS2(T), promotion(T)])
+
+      yield* Effect.scoped(
+        Effect.gen(function*() {
+          yield* Layer.build(sweeper(live, "1 day"))
+          yield* TestClock.adjust(`${30 * 24} hours`)
+        })
+      )
+
+      // Compliance halves every fourteen days: six signals fall under S2's five on day four and
+      // under S1's two on day twenty-three. No run of the skill happened in between.
+      expect(yield* gearChanges).toEqual([
+        { day: 0, change: "S0->S2" },
+        { day: 4, change: "S2->S1" },
+        { day: 23, change: "S1->S0" }
+      ])
+    }).pipe(Effect.provide(InMemoryEventLogStore.layer)))
+
+  it.effect("a failed sweep does not stop the next one", () =>
+    Effect.gen(function*() {
+      yield* TestClock.setTime((T + 30 * DAY) * 1000)
+      yield* seeded([...earnedS2(T), promotion(T)])
+      const store = yield* EventLogStore
+      let reads = 0
+      // The first sweep's read dies, as it would with the database unreachable.
+      const flaky = Layer.succeed(
+        EventLogStore,
+        EventLogStore.of({
+          append: store.append,
+          read: (query) => ++reads === 1 ? Effect.die("connection refused") : store.read(query)
+        })
+      )
+
+      yield* Effect.scoped(
+        Effect.gen(function*() {
+          yield* Layer.build(sweeper(live, "1 hour").pipe(Layer.provide(flaky)))
+          yield* TestClock.adjust("1 hour")
+        })
+      )
+
+      expect((yield* gearChanges).map((c) => c.change)).toEqual(["S0->S2", "S2->S0"])
+    }).pipe(Effect.provide(InMemoryEventLogStore.layer)))
+
+  it.effect("a sweep with nothing out of date writes nothing", () =>
+    Effect.gen(function*() {
+      yield* TestClock.setTime(T * 1000)
+      yield* seeded([...earnedS2(T), promotion(T)])
+      expect(yield* sweep(live)).toEqual([])
+      expect((yield* gearChanges).length).toBe(1)
+    }).pipe(Effect.provide(InMemoryEventLogStore.layer)))
+
+  /** The in-memory store, yielding before each call the way a database round trip does. */
+  const yielding = Layer.effect(
+    EventLogStore,
+    Effect.map(InMemoryEventLogStore.make, (store) =>
+      EventLogStore.of({
+        append: (e) => Effect.zipRight(Effect.yieldNow(), store.append(e)),
+        read: (query) => Effect.zipRight(Effect.yieldNow(), store.read(query))
+      }))
+  )
+
+  it.effect("a run and the sweep finding the same change write it once", () =>
+    Effect.gen(function*() {
+      yield* TestClock.setTime((T + 30 * DAY) * 1000)
+      yield* seeded([...earnedS2(T), promotion(T)])
+
+      yield* Effect.all([reconcileRecorded(SKILL, live), sweep(live), reconcileRecorded(SKILL, live)], {
+        concurrency: "unbounded"
+      })
+
+      expect((yield* gearChanges).map((c) => c.change)).toEqual(["S0->S2", "S2->S0"])
+    }).pipe(Effect.provide(yielding)))
 })

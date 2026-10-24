@@ -33,7 +33,7 @@ import { EventLogStore } from "../mneme/EventLogStore.js"
 import { checksumOf } from "../mneme/InMemoryArtifactStore.js"
 import { PolicyGate } from "../policy/PolicyGate.js"
 import { TrustLedger } from "../policy/TrustLedger.js"
-import { reconcile, recordedGear, skillOf } from "../policy/TrustUpdater.js"
+import { reconcileRecorded, skillOf } from "../policy/TrustUpdater.js"
 import type { Sampler } from "../policy/Verification.js"
 import { verify } from "../policy/Verification.js"
 import { ToolRegistry } from "../tools/ToolRegistry.js"
@@ -210,9 +210,8 @@ export const execute = (
     // last recorded (ADR-014). That includes a demotion decay earned while the skill sat idle, which
     // would be invisible if measured from the gear the skill held when this run began.
     const trustPolicy = yield* trust.policy
-    const recorded = yield* Effect.orDie(log.read({}))
     for (const skill of skills) {
-      yield* reconcile(skill, recordedGear(recorded, skill), trustPolicy, correlationId)
+      yield* reconcileRecorded(skill, trustPolicy, correlationId)
     }
 
     // The step results ride on the event, so `GET /plans/{id}/execution` can answer from the log

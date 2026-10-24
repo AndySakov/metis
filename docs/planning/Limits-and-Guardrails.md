@@ -148,10 +148,12 @@ Stated plainly rather than implied away. These are open, not managed.
   seen; the registry only requires declared scopes for http-transport tools. Every current
   descriptor that can reach an arbitrary host declares the scope, so this is a property to keep,
   not a hole today. `metis.model` reaches one fixed host and declares `model.anthropic` instead.
-- **A demotion earned by idleness is written late.** Decay moves a skill's gear while nothing runs,
-  but `TRUST_DEMOTED` is written by the next run of that skill, not at the moment the evidence fell
-  below the bar. The gate is never late, since every check derives from the log; only the record
-  of the change is.
+- **A demotion earned by idleness is recorded by a sweep, so up to an hour late, and only while
+  METIS runs.** Decay moves a skill's gear while nothing runs; `pnpm start` sweeps at startup and
+  hourly and writes the `TRUST_DEMOTED` it finds. A demotion earned while the process was down is
+  written at the next startup, stamped then. Reconciliation is serialised within one process, so a
+  run and the sweep never write the same change twice; two processes sharing one Postgres log
+  could. The gate is never late, since every check derives from the log; only the record is.
 - **Memory writes are gated, not labelled.** Untrusted input to a tool declaring `memory.write`
   needs approval, but nothing stores the `untrusted` tag with the record, so an approved write is
   read back later as ordinary memory. The memory server is not built yet; when it lands, the tag
