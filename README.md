@@ -76,8 +76,8 @@ What exists and works:
 real MCP subprocess, with the whole run correlated in the event log — and covers the paths that
 matter: an approval that genuinely stops execution until granted, a policy denial that produces no
 artifact, and an unresolvable capability that fails cleanly instead of dispatching something else.
-- An HTTP surface declaration for three endpoints, reconciled against the OpenAPI document in CI,
-  status codes included.
+- An HTTP surface of five endpoints, reconciled against the OpenAPI document in CI, status codes
+  included.
 - **A runnable entrypoint.** `pnpm start` (`src/App.ts`) serves the API over real implementations:
   the live policy in `specs/policy/default.json` (the same file the red-team suite measures), a
   registry holding only the tools their MCP servers actually serve, a planner that plans only
@@ -91,8 +91,6 @@ What does **not** exist yet, despite being described in `docs/`:
   ones, which need real browser and device control. Implementing any of them against canned
   responses would be worse than leaving them out — the registry would claim a capability that does
   not do what its contract says.
-- A way to read an artifact's content over HTTP. `GET /artifacts/{id}` returns metadata only
-  (ADR-007), and an execution's response does not name the artifacts it wrote.
 - The monorepo layout, `examples/`, voice, device control, the Adaptive Agent Foundry.
 
 ---
@@ -224,6 +222,8 @@ curl -s -X POST localhost:8787/intent -H 'content-type: application/json' \
 # -> a plan; then, naming the step to approve:
 curl -s -X POST localhost:8787/plans/<plan id>/execute -H 'content-type: application/json' \
   -d '{"approvedSteps":["<step id>"]}'
+# -> {"status":"completed","steps":[{"stepId":"...","status":"completed","artifactId":"<id>"}],...}
+curl -s localhost:8787/artifacts/<artifact id>/content    # the document itself
 ```
 
 A skill with no history is at S0, so the first run of every tool step waits for approval until the

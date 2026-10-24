@@ -298,6 +298,24 @@ describe("POST /plans/:id/execute", () => {
     expect(submission.status).toBeDefined()
   }, 20_000)
 
+  it("reports what happened to each step when the run finished in-process", async () => {
+    const plan = await (await fetch(`http://127.0.0.1:${PORT}/intent`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ actor: "user:andysakov", goal: "Draft a PRD", autonomy: "S2" })
+    })).json() as { id: string; steps: Array<{ id: string }> }
+
+    const submission = await (await fetch(`http://127.0.0.1:${PORT}/plans/${plan.id}/execute`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({})
+    })).json() as { steps?: Array<{ stepId: string; status: string }> }
+
+    // No tools are registered here, so the first step fails and the rest are skipped.
+    expect(submission.steps?.map((step) => step.stepId)).toEqual(plan.steps.map((step) => step.id))
+    expect(submission.steps?.[0]?.status).toBe("failed")
+  }, 20_000)
+
   it("404s a plan that does not exist", async () => {
     const executed = await fetch(
       `http://127.0.0.1:${PORT}/plans/01890a5d-0000-7000-8000-000000000000/execute`,
@@ -334,5 +352,13 @@ describe("POST /plans/:id/execute", () => {
     const submitted = events.find((e) => e.type === "PLAN_SUBMITTED")
     expect(submitted, "submission must be auditable").toBeDefined()
     expect((submitted!.payload as { mode: string }).mode).toBe("direct")
+  }, 20_000)
+})
+
+describe("GET /artifacts/:id/content", () => {
+  it("404s an artifact that does not exist, as the metadata endpoint does", async () => {
+    const missing = "01890a5d-0000-7000-8000-000000000000"
+    expect((await fetch(`http://127.0.0.1:${PORT}/artifacts/${missing}/content`)).status).toBe(404)
+    expect((await fetch(`http://127.0.0.1:${PORT}/artifacts/${missing}`)).status).toBe(404)
   }, 20_000)
 })

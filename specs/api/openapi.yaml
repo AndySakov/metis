@@ -92,6 +92,27 @@ paths:
                 $ref: ../Artifact.schema.json
         "404":
           $ref: "#/components/responses/NotFound"
+  /artifacts/{id}/content:
+    get:
+      operationId: getArtifactContent
+      x-status: implemented
+      summary: Get an artifact's bytes
+      description: >
+        The payload, exactly as stored. The store verifies it against the checksum recorded at
+        write time before it is served (ADR-007); a payload that fails the check is a server error,
+        never served and never reported as missing.
+      parameters:
+        - $ref: "#/components/parameters/Identifier"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        "404":
+          $ref: "#/components/responses/NotFound"
   /plans/{id}/execute:
     post:
       operationId: executePlan
@@ -141,6 +162,27 @@ paths:
                     type: string
                     enum:
                       [accepted, completed, awaiting_approval, denied, failed]
+                  steps:
+                    description: >
+                      What happened to each step, present when the run finished in-process
+                      (`direct`). An `artifactId` names what the step wrote, readable at
+                      `/artifacts/{id}/content`. Absent for `restate`, which has only accepted the
+                      run when it answers.
+                    type: array
+                    items:
+                      type: object
+                      additionalProperties: false
+                      required: [stepId, status]
+                      properties:
+                        stepId:
+                          $ref: ../common/Identifier.schema.json
+                        status:
+                          type: string
+                          enum: [completed, awaiting_approval, denied, failed, skipped]
+                        artifactId:
+                          $ref: ../common/Identifier.schema.json
+                        detail:
+                          type: string
         "404":
           $ref: "#/components/responses/NotFound"
         "409":
