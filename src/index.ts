@@ -154,6 +154,15 @@ export * as ToolSpec from "./domain/ToolSpec.js"
 export * as Trust from "./domain/Trust.js"
 
 /**
+ * The console: one page at `/`, over the same API anything else would use.
+ *
+ * It is a client of the HTTP API and nothing more, so it can do nothing the API does not already
+ * allow, and every decision it shows is read back from the event log rather than inferred. The
+ * page is static and has no build step; it is read once when the layer is built.
+ */
+export * as Console from "./ingress/Console.js"
+
+/**
  * The result of submitting a plan.
  *
  * `mode` is not decoration: `direct` means the run is **not** durable, and a caller that cannot

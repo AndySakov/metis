@@ -77,6 +77,8 @@ const AppLive = ApiLive.pipe(
   Layer.provide(Layer.provide(PlanExecution.directLayer, executionDeps)),
   Layer.provide(InMemoryPlanStore.layer),
   Layer.provide(Planner.layer),
+  Layer.provide(ToolRegistry.layer([])),
+  Layer.provide(TrustLedger.layer(trustPolicy, [])),
   Layer.provide(InMemoryEventLogStore.layer),
   Layer.provide(InMemoryArtifactStore.layer)
 )

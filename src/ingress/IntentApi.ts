@@ -2,9 +2,12 @@ import { HttpApi, HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from "@effect/p
 import { Schema } from "effect"
 
 import { Artifact, ArtifactId } from "../domain/Artifact.js"
-import { EpochSeconds } from "../domain/Common.js"
+import { Actor, EpochSeconds } from "../domain/Common.js"
+import { Event, EventType } from "../domain/Event.js"
 import { IntentDraft } from "../domain/Intent.js"
 import { Plan, PlanId, PlanStepId } from "../domain/Plan.js"
+import { ToolSpec } from "../domain/ToolSpec.js"
+import { TrustRecord } from "../domain/Trust.js"
 
 // Each error carries the status `specs/api/openapi.yaml` declares for it. Without one, an error is
 // served as 500, and `test/specs/ApiReconciliation.test.ts` fails on the mismatch.
@@ -116,4 +119,37 @@ export class IntentApiGroup extends HttpApiGroup.make("intent")
   )
 {}
 
-export class IntentApi extends HttpApi.make("api").add(IntentApiGroup) {}
+/** A query parameter that may be given once or repeated. */
+const OneOrMany = <A, I, R>(schema: Schema.Schema<A, I, R>) =>
+  Schema.transform(Schema.Union(schema, Schema.Array(schema)), Schema.Array(Schema.typeSchema(schema)), {
+    strict: true,
+    decode: (value) => Array.isArray(value) ? value : [value as A],
+    encode: (values) => values
+  })
+
+const EpochSecondsParam = Schema.compose(Schema.NumberFromString, EpochSeconds)
+
+export class EventLogParams extends Schema.Class<EventLogParams>("EventLogParams")({
+  fromTs: Schema.optional(EpochSecondsParam),
+  toTs: Schema.optional(EpochSecondsParam),
+  types: Schema.optional(OneOrMany(EventType)),
+  actor: Schema.optional(Actor),
+  /** Only what concerns one plan: its creation, its submissions, and every event of its runs. */
+  planId: Schema.optional(PlanId)
+}) {}
+
+/**
+ * What METIS can do and has done, read back: the tools it will dispatch to, the event log, and the
+ * gear each skill has earned. Read-only, so watching METIS work never changes what it does.
+ */
+export class InspectApiGroup extends HttpApiGroup.make("inspect")
+  .add(HttpApiEndpoint.get("listTools", "/tools").addSuccess(Schema.Array(ToolSpec)))
+  .add(
+    HttpApiEndpoint.get("readEventLog", "/eventlog")
+      .setUrlParams(EventLogParams)
+      .addSuccess(Schema.Array(Event))
+  )
+  .add(HttpApiEndpoint.get("listTrust", "/trust").addSuccess(Schema.Array(TrustRecord)))
+{}
+
+export class IntentApi extends HttpApi.make("api").add(IntentApiGroup).add(InspectApiGroup) {}

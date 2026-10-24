@@ -34,6 +34,7 @@ import { PostgresConfig } from "./config/Config.js"
 import { Policy } from "./domain/Policy.js"
 import { ToolSpec } from "./domain/ToolSpec.js"
 import { TrustPolicy } from "./domain/Trust.js"
+import * as Console from "./ingress/Console.js"
 import { ApiLive } from "./ingress/IntentApiLive.js"
 import * as InMemoryArtifactStore from "./mneme/InMemoryArtifactStore.js"
 import * as InMemoryEventLogStore from "./mneme/InMemoryEventLogStore.js"
@@ -250,7 +251,7 @@ const announce = (config: AppConfig) =>
     Effect.gen(function*() {
       const registry = yield* ToolRegistry.ToolRegistry
       const specs = yield* registry.all
-      yield* Effect.log(`METIS listening on http://localhost:${config.port}`)
+      yield* Effect.log(`METIS listening on http://localhost:${config.port} (console at /)`)
       yield* Effect.log(`storage: ${config.postgres ? "postgres" : "memory (a restart empties it)"}`)
       yield* Effect.log(
         Option.match(config.restate, {
@@ -284,6 +285,7 @@ const announce = (config: AppConfig) =>
  */
 export const layer = (config: AppConfig, backing = services(config)) =>
   HttpApiBuilder.serve().pipe(
+    Layer.provide(Console.layer),
     Layer.provide(ApiLive),
     Layer.provide(backing),
     Layer.provide(NodeHttpServer.layer(createServer, { port: config.port })),

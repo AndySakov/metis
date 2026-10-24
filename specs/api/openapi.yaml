@@ -262,8 +262,12 @@ paths:
   /eventlog:
     get:
       operationId: readEventLog
-      x-status: planned
+      x-status: implemented
       summary: Query events by time and type
+      description: >
+        Read-only. `types` may be repeated. `planId` narrows the log to one plan: the API's records
+        of it and every event its runs wrote, policy decisions included, which is how a reader sees
+        why a step was gated or denied. `project` is accepted by the store but not yet served here.
       parameters:
         - name: fromTs
           in: query
@@ -280,7 +284,7 @@ paths:
           in: query
           schema:
             $ref: ../common/Actor.schema.json
-        - name: project
+        - name: planId
           in: query
           schema:
             $ref: ../common/Identifier.schema.json
@@ -295,8 +299,11 @@ paths:
   /tools:
     get:
       operationId: listTools
-      x-status: planned
+      x-status: implemented
       summary: List registered tool implementations
+      description: >
+        Only tools whose server answered for them at startup are registered, so this is what the
+        planner can actually target, not every descriptor in specs/tools/.
       responses:
         "200":
           description: OK
@@ -305,6 +312,35 @@ paths:
               schema:
                 type: array
                 items: { $ref: ../ToolSpec.schema.json }
+  /trust:
+    get:
+      operationId: listTrust
+      x-status: implemented
+      summary: The gear each skill has earned
+      description: >
+        Derived from the event log at the moment of the request (ADR-014): every registered skill,
+        and any with history in the log, with both ledgers' scores, the age-weighted evidence each
+        rests on, and the gear they support. A skill with no history is at S0.
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  additionalProperties: false
+                  required: [skill, competence, compliance, gear, updatedAt, competenceSignals, complianceSignals]
+                  properties:
+                    skill: { type: string, minLength: 1 }
+                    competence: { type: number, minimum: 0, maximum: 1 }
+                    compliance: { type: number, minimum: 0, maximum: 1 }
+                    gear: { type: string, enum: [S0, S1, S2, S3, S4] }
+                    updatedAt:
+                      $ref: ../common/Timestamp.schema.json
+                    competenceSignals: { type: number, minimum: 0 }
+                    complianceSignals: { type: number, minimum: 0 }
   /tools/validate:
     post:
       operationId: validateTool

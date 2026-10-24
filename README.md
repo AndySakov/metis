@@ -88,8 +88,14 @@ What exists and works:
 real MCP subprocess, with the whole run correlated in the event log — and covers the paths that
 matter: an approval that genuinely stops execution until granted, a policy denial that produces no
 artifact, and an unresolvable capability that fails cleanly instead of dispatching something else.
-- An HTTP surface of five endpoints, reconciled against the OpenAPI document in CI, status codes
-  included.
+- An HTTP surface of eight endpoints, reconciled against the OpenAPI document in CI, status codes
+  included: the intent and plan endpoints, plus read-only `GET /tools`, `GET /trust` and
+  `GET /eventlog` (filterable to one plan).
+- **A console** at `/` (`src/ingress/console.html`). Type a goal and you see the plan, run it,
+  approve what it stops for, and read what it wrote, with Mermaid diagrams rendered. Beside that
+  are the plan's record (every policy decision and the rule behind it, trust gates, promotions) and
+  each skill's gear and evidence, which move as you use it. It is a plain client of the API, and
+  renders documents as text, since they can quote the open web.
 - **A runnable entrypoint.** `pnpm start` (`src/App.ts`) serves the API over real implementations:
   the live policy in `specs/policy/default.json` (the same file the red-team suite measures), a
   registry holding only the tools their MCP servers actually serve, a planner that plans only
@@ -126,7 +132,7 @@ Seven layers (ADR-000). Marked by what actually exists:
 
 | Layer                     | Contents                                                        | State        |
 | ------------------------- | --------------------------------------------------------------- | ------------ |
-| Interface                 | realtime voice & chat, canvas, command palette                   | not started  |
+| Interface                 | realtime voice & chat, canvas, command palette                   | web console  |
 | Orchestrator              | intent → plan → dispatch → memory writes                         | **built**    |
 | Memory (`mneme`)          | event log, artifact store, external retrieval                    | **built**    |
 | Knowledge Engine          | multi-corpus retrieval, claims/evidence, licensing               | not started  |
@@ -221,6 +227,10 @@ it was applied fails loudly rather than silently diverging.
 ```bash
 ANTHROPIC_API_KEY=... pnpm start     # http://localhost:8787, METIS_PORT to change it
 ```
+
+Open http://localhost:8787/ for the console. Try "Summarize https://en.wikipedia.org/wiki/Metis_(mythology)",
+then a PRD or C4 diagrams, and approve the steps it asks about. Run the same kind of goal a few times
+and watch that skill's gear climb until it stops asking.
 
 - `ANTHROPIC_API_KEY` makes Claude answer the `design.*` capabilities; without it the templates do.
 - `POSTGRES_*` (as for `pnpm migrate`) stores everything in Postgres; without `POSTGRES_DATABASE`

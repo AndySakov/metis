@@ -22,6 +22,23 @@ describe("uuidv7", () => {
     }
   })
 
+  it("sorts in creation order within one millisecond", () => {
+    // The event log orders by time, then id. Two events written in the same millisecond (an
+    // approval and the dispatch it allowed) must read back in the order they happened.
+    const ids = Array.from({ length: 1000 }, () => uuidv7(1_700_000_000_000))
+    expect([...ids].sort()).toEqual(ids)
+    expect(new Set(ids).size).toBe(ids.length)
+  })
+
+  it("keeps order past the counter's limit by moving to the next millisecond", () => {
+    const t = 1_700_000_001_000
+    const ids = Array.from({ length: 6000 }, () => uuidv7(t))
+    expect([...ids].sort()).toEqual(ids)
+    for (const id of ids) expect(() => decode(id)).not.toThrow()
+    const millis = (id: string) => parseInt(id.slice(0, 8) + id.slice(9, 13), 16)
+    expect(millis(ids.at(-1)!) - t).toBeLessThanOrEqual(2)
+  })
+
   it("sorts lexicographically by creation time", () => {
     const ids = [1, 2, 3, 4, 5].map((n) => uuidv7(1_700_000_000_000 + n * 1000))
     expect([...ids].sort()).toEqual(ids)

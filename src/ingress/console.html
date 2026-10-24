@@ -1,0 +1,532 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>METIS Console</title>
+<style>
+  :root {
+    --bg: #f6f5f1; --panel: #ffffff; --ink: #1d1f23; --muted: #6a6f78; --line: #e3e1da;
+    --accent: #3b5bdb; --accent-ink: #ffffff; --ok: #2b8a3e; --warn: #b7791f; --bad: #c92a2a; --skip: #868e96;
+    --chip: #eef0f5; --code: #f1f0eb; --untrusted: #fff4e0; --untrusted-ink: #8a5300;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #15171b; --panel: #1d2026; --ink: #e8e9ec; --muted: #9aa0aa; --line: #2c3038;
+      --accent: #7b93ff; --accent-ink: #0f1115; --ok: #69db7c; --warn: #ffc966; --bad: #ff8787; --skip: #868e96;
+      --chip: #262a32; --code: #23262d; --untrusted: #3a2e12; --untrusted-ink: #ffd27a;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif; }
+  header { padding: 18px 24px 8px; display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  header h1 { margin: 0; font-size: 20px; letter-spacing: 0.04em; }
+  header .tag { color: var(--muted); font-size: 13px; }
+  main { display: grid; grid-template-columns: minmax(0, 1fr) 380px; gap: 16px; padding: 8px 24px 40px; }
+  @media (max-width: 960px) { main { grid-template-columns: minmax(0, 1fr); padding: 8px 16px 32px; } header { padding: 16px 16px 8px; } }
+  section.card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px; margin-bottom: 16px; }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin: 0 0 12px; font-weight: 600; }
+  textarea { width: 100%; min-height: 64px; resize: vertical; font: inherit; color: inherit; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; }
+  select, button { font: inherit; }
+  select { background: var(--bg); color: inherit; border: 1px solid var(--line); border-radius: 8px; padding: 7px 8px; }
+  button { cursor: pointer; border-radius: 8px; border: 1px solid var(--line); background: var(--chip); color: var(--ink); padding: 7px 14px; }
+  button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 600; }
+  button:disabled { opacity: 0.5; cursor: progress; }
+  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 10px; }
+  .grow { flex: 1; }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
+  .chip { font-size: 12.5px; padding: 4px 10px; border-radius: 999px; background: var(--chip); border: 1px solid var(--line); cursor: pointer; color: var(--ink); }
+  .mono, code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12.5px; }
+  .muted { color: var(--muted); }
+  .small { font-size: 13px; }
+  ol.steps { list-style: none; padding: 0; margin: 0; }
+  ol.steps > li { border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; }
+  .step-head { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .num { width: 22px; height: 22px; border-radius: 50%; background: var(--chip); display: inline-grid; place-items: center; font-size: 12px; font-weight: 600; }
+  .cap { background: var(--chip); border-radius: 6px; padding: 1px 7px; }
+  .badge { font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 999px; border: 1px solid currentColor; white-space: nowrap; }
+  .s-completed { color: var(--ok); } .s-awaiting_approval { color: var(--warn); } .s-denied, .s-failed { color: var(--bad); } .s-skipped, .s-planned { color: var(--skip); }
+  .label-untrusted { background: var(--untrusted); color: var(--untrusted-ink); border-radius: 6px; padding: 1px 7px; font-size: 12px; font-weight: 600; }
+  .detail { margin-top: 6px; font-size: 13px; }
+  .input { margin-top: 6px; white-space: pre-wrap; word-break: break-word; color: var(--muted); }
+  details summary { cursor: pointer; color: var(--muted); font-size: 13px; }
+  .doc { border-top: 1px solid var(--line); padding-top: 12px; margin-top: 12px; overflow-wrap: anywhere; }
+  .doc:first-child { border-top: 0; margin-top: 0; padding-top: 0; }
+  .doc h1 { font-size: 22px; } .doc h2 { font-size: 17px; text-transform: none; letter-spacing: 0; color: var(--ink); margin: 18px 0 8px; } .doc h3 { font-size: 15px; }
+  .doc pre { background: var(--code); padding: 10px 12px; border-radius: 8px; overflow-x: auto; }
+  .doc table { border-collapse: collapse; display: block; overflow-x: auto; } .doc th, .doc td { border: 1px solid var(--line); padding: 4px 8px; text-align: left; vertical-align: top; }
+  .doc a { color: var(--accent); }
+  .doc .mermaid { background: var(--panel); text-align: center; }
+  .doc-head { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 4px; }
+  ul.timeline { list-style: none; padding: 0; margin: 0; max-height: 520px; overflow-y: auto; }
+  ul.timeline li { padding: 6px 0 6px 12px; border-left: 2px solid var(--line); font-size: 13px; position: relative; }
+  ul.timeline li::before { content: ""; position: absolute; left: -5px; top: 12px; width: 8px; height: 8px; border-radius: 50%; background: var(--line); }
+  ul.timeline li.t-deny::before, ul.timeline li.t-fail::before { background: var(--bad); }
+  ul.timeline li.t-gate::before { background: var(--warn); }
+  ul.timeline li.t-ok::before { background: var(--ok); }
+  ul.timeline li.t-trust::before { background: var(--accent); }
+  .ttype { font-weight: 600; }
+  table.trust { width: 100%; border-collapse: collapse; font-size: 13px; }
+  table.trust td { padding: 6px 4px; border-top: 1px solid var(--line); vertical-align: middle; }
+  .gear { font-weight: 700; font-size: 12px; padding: 1px 7px; border-radius: 6px; background: var(--chip); }
+  .gear-S1 { background: color-mix(in srgb, var(--accent) 18%, var(--chip)); }
+  .gear-S2, .gear-S3, .gear-S4 { background: var(--accent); color: var(--accent-ink); }
+  .bar { height: 6px; background: var(--chip); border-radius: 3px; overflow: hidden; width: 70px; }
+  .bar > span { display: block; height: 100%; background: var(--accent); }
+  .empty { color: var(--muted); font-size: 13px; }
+  .error { color: var(--bad); font-size: 13px; margin-top: 8px; white-space: pre-wrap; }
+  ul.recent { list-style: none; padding: 0; margin: 0; font-size: 13px; }
+  ul.recent li { padding: 4px 0; border-top: 1px solid var(--line); cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  ul.recent li:first-child { border-top: 0; }
+</style>
+</head>
+<body>
+<header>
+  <h1>METIS</h1>
+  <span class="tag">Ask for something. See the plan, the rule behind every decision, and the trust each skill earns.</span>
+</header>
+<main>
+  <div>
+    <section class="card">
+      <h2>Ask</h2>
+      <textarea id="goal" placeholder="e.g. Summarize https://en.wikipedia.org/wiki/Metis_(mythology)"></textarea>
+      <div class="row">
+        <label class="small muted" for="autonomy">Autonomy</label>
+        <select id="autonomy" title="The gear you ask for. A skill only runs unattended at a gear its trust supports.">
+          <option value="S0">S0 · advise</option>
+          <option value="S1">S1 · draft</option>
+          <option value="S2" selected>S2 · sandbox run</option>
+          <option value="S3">S3 · gated run</option>
+          <option value="S4">S4 · scheduled autonomy</option>
+        </select>
+        <span class="grow"></span>
+        <button class="primary" id="plan">Plan it</button>
+      </div>
+      <div class="chips" id="examples"></div>
+      <p class="small muted" id="writer" hidden></p>
+      <div class="error" id="ask-error" hidden></div>
+    </section>
+
+    <section class="card" id="plan-card" hidden>
+      <h2>Plan</h2>
+      <div class="small muted" id="plan-meta"></div>
+      <ol class="steps" id="steps"></ol>
+      <details id="plan-notes"><summary>Assumptions and risks</summary><div id="notes" class="small"></div></details>
+      <div class="row">
+        <button class="primary" id="run">Run</button>
+        <span class="small muted" id="run-meta"></span>
+      </div>
+      <div class="error" id="run-error" hidden></div>
+    </section>
+
+    <section class="card" id="output-card" hidden>
+      <h2>What it produced</h2>
+      <div id="output"></div>
+    </section>
+  </div>
+
+  <aside>
+    <section class="card">
+      <h2>Why · this plan's record</h2>
+      <ul class="timeline" id="timeline"><li class="empty">Plan something to see each decision and the rule that made it.</li></ul>
+    </section>
+    <section class="card">
+      <h2>Trust · earned per skill</h2>
+      <div id="trust" class="empty">Loading…</div>
+      <p class="small muted">A skill starts at S0, so its first runs ask you first. Approved, clean runs add evidence; idle evidence fades; a policy violation drops it at once.</p>
+    </section>
+    <section class="card">
+      <h2>Recent plans</h2>
+      <ul class="recent" id="recent"></ul>
+    </section>
+    <section class="card">
+      <h2>Can do</h2>
+      <div id="tools" class="small"></div>
+    </section>
+  </aside>
+</main>
+
+<script>
+"use strict";
+const $ = (id) => document.getElementById(id);
+const ACTOR = "user:console";
+const state = { plan: null, approved: new Set(), outcomes: new Map(), why: new Map(), untrusted: new Set(), tools: [] };
+
+// ---- Safe rendering --------------------------------------------------------------------------
+// Everything METIS returns can contain text from the open web, so nothing reaches innerHTML
+// without being escaped first, and only http(s) links survive.
+const esc = (s) => String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+const el = (tag, attrs = {}, ...children) => {
+  const node = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k === "class") node.className = v; else if (k === "text") node.textContent = v; else if (k.startsWith("on")) node.addEventListener(k.slice(2), v); else node.setAttribute(k, v);
+  }
+  for (const c of children) if (c != null) node.append(c);
+  return node;
+};
+
+const inline = (text) => {
+  let s = esc(text);
+  s = s.replace(/`([^`]+)`/g, "<code>$1</code>");
+  s = s.replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+  s = s.replace(/(^|[^*])\*([^*\s][^*]*)\*/g, "$1<em>$2</em>");
+  s = s.replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, (_, label, href) => `<a href="${href}" target="_blank" rel="noopener noreferrer">${label}</a>`);
+  s = s.replace(/(^|[\s(])(https?:\/\/[^\s<)]+)/g, (_, pre, href) => `${pre}<a href="${href}" target="_blank" rel="noopener noreferrer">${href}</a>`);
+  return s;
+};
+
+/** A small Markdown renderer: headings, lists, code fences, tables, paragraphs. Escapes first. */
+const markdown = (source) => {
+  const lines = source.replace(/\r\n/g, "\n").split("\n");
+  const out = [];
+  let i = 0;
+  while (i < lines.length) {
+    const line = lines[i];
+    const fence = /^```\s*([\w-]*)/.exec(line);
+    if (fence) {
+      const body = [];
+      i++;
+      while (i < lines.length && !/^```/.test(lines[i])) body.push(lines[i++]);
+      i++;
+      out.push(fence[1] === "mermaid" ? `<pre class="mermaid">${esc(body.join("\n"))}</pre>` : `<pre><code>${esc(body.join("\n"))}</code></pre>`);
+      continue;
+    }
+    const heading = /^(#{1,4})\s+(.*)$/.exec(line);
+    if (heading) { out.push(`<h${heading[1].length}>${inline(heading[2])}</h${heading[1].length}>`); i++; continue; }
+    if (/^\s*\|.*\|\s*$/.test(line) && i + 1 < lines.length && /^\s*\|[\s:|-]+\|\s*$/.test(lines[i + 1])) {
+      const cells = (l) => l.trim().replace(/^\||\|$/g, "").split("|").map((c) => c.trim());
+      const head = cells(line);
+      i += 2;
+      const rows = [];
+      while (i < lines.length && /^\s*\|.*\|\s*$/.test(lines[i])) rows.push(cells(lines[i++]));
+      out.push(`<table><thead><tr>${head.map((h) => `<th>${inline(h)}</th>`).join("")}</tr></thead><tbody>${rows.map((r) => `<tr>${r.map((c) => `<td>${inline(c)}</td>`).join("")}</tr>`).join("")}</tbody></table>`);
+      continue;
+    }
+    if (/^\s*([-*]|\d+\.)\s+/.test(line)) {
+      const ordered = /^\s*\d+\./.test(line);
+      const items = [];
+      while (i < lines.length && /^\s*([-*]|\d+\.)\s+/.test(lines[i])) items.push(lines[i++].replace(/^\s*([-*]|\d+\.)\s+/, ""));
+      out.push(`<${ordered ? "ol" : "ul"}>${items.map((it) => `<li>${inline(it)}</li>`).join("")}</${ordered ? "ol" : "ul"}>`);
+      continue;
+    }
+    if (line.trim() === "") { i++; continue; }
+    const para = [];
+    while (i < lines.length && lines[i].trim() !== "" && !/^(#{1,4}\s|```|\s*([-*]|\d+\.)\s+)/.test(lines[i])) para.push(lines[i++]);
+    out.push(`<p>${inline(para.join(" "))}</p>`);
+  }
+  return out.join("\n");
+};
+
+// Mermaid renders the C4 diagrams when the browser can reach the CDN; otherwise they stay as text.
+let mermaidReady = null;
+const loadMermaid = () => mermaidReady ??= new Promise((resolve) => {
+  const s = document.createElement("script");
+  s.src = "https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js";
+  s.onload = () => {
+    window.mermaid.initialize({ startOnLoad: false, securityLevel: "strict", theme: matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "default" });
+    resolve(window.mermaid);
+  };
+  s.onerror = () => resolve(null);
+  document.head.append(s);
+});
+const renderDiagrams = async (root) => {
+  const nodes = root.querySelectorAll("pre.mermaid");
+  if (nodes.length === 0) return;
+  const m = await loadMermaid();
+  if (m) { try { await m.run({ nodes }); } catch { /* leave as text */ } }
+};
+
+// ---- API -------------------------------------------------------------------------------------
+const api = async (method, path, body) => {
+  const res = await fetch(path, { method, headers: body ? { "content-type": "application/json" } : {}, body: body ? JSON.stringify(body) : undefined });
+  const text = await res.text();
+  let data;
+  try { data = text ? JSON.parse(text) : null; } catch { data = text; }
+  if (!res.ok) {
+    const message = data && typeof data === "object" ? (data.message ?? data._tag ?? JSON.stringify(data)) : String(data);
+    throw new Error(`${res.status}: ${message}`);
+  }
+  return data;
+};
+
+// ---- Examples ---------------------------------------------------------------------------------
+const EXAMPLES = [
+  { needs: ["research.fetch@0.1", "research.summarize@0.1"], goal: "Summarize https://en.wikipedia.org/wiki/Metis_(mythology)" },
+  { needs: ["design.prd@1.0"], goal: "Draft a PRD for an offline-first notes app" },
+  { needs: ["design.c4@1.0"], goal: "C4 diagrams for an offline-first notes app with sync" },
+  { needs: ["design.api_spec@1.0"], goal: "Write an API spec for a notes app" },
+  { needs: ["build.scaffold@0.1"], goal: "Scaffold a TypeScript project called notes-api" },
+  { needs: [], goal: "Research the state of the art in RAG" }
+];
+const renderExamples = () => {
+  const have = new Set(state.tools.map((t) => t.capability));
+  const box = $("examples");
+  box.replaceChildren(...EXAMPLES.filter((e) => e.needs.every((c) => have.has(c))).map((e) =>
+    el("span", { class: "chip", text: e.goal, title: "Use this goal", onclick: () => { $("goal").value = e.goal; $("goal").focus(); } })
+  ));
+};
+
+const renderWriter = () => {
+  const claude = state.tools.some((t) => t.mcp.server === "metis.model")
+  $("writer").hidden = false;
+  $("writer").textContent = claude
+    ? "Documents are written by Claude (metis.model)."
+    : "Documents come from built-in templates. Set ANTHROPIC_API_KEY and restart METIS to have Claude write them.";
+};
+
+const renderTools = () => {
+  const byCap = new Map();
+  for (const t of state.tools) if (!byCap.has(t.capability)) byCap.set(t.capability, t);
+  const rows = [...byCap.values()].sort((a, b) => a.capability.localeCompare(b.capability)).map((t) =>
+    el("div", {}, el("code", { text: t.capability }), " ", el("span", { class: "muted", text: `via ${t.mcp.server}${t.idempotent ? "" : " · not idempotent, always asks"}` }))
+  );
+  $("tools").replaceChildren(...(rows.length ? rows : [el("span", { class: "empty", text: "No tools registered." })]));
+};
+
+// ---- Trust -----------------------------------------------------------------------------------
+const bar = (value) => el("div", { class: "bar", title: value.toFixed(2) }, el("span", { style: `width:${Math.round(value * 100)}%` }));
+const refreshTrust = async () => {
+  try {
+    const records = await api("GET", "/trust");
+    if (records.length === 0) { $("trust").replaceChildren(el("span", { class: "empty", text: "No skills yet." })); return; }
+    const table = el("table", { class: "trust" },
+      el("tr", { class: "muted small" }, el("td", { text: "skill" }), el("td", { text: "gear" }), el("td", { text: "competence" }), el("td", { text: "compliance" })),
+      ...records.map((r) => el("tr", {},
+        el("td", {}, el("code", { text: r.skill })),
+        el("td", {}, el("span", { class: `gear gear-${r.gear}`, text: r.gear })),
+        el("td", { title: `${r.competenceSignals.toFixed(1)} signals` }, bar(r.competence), el("span", { class: "muted small", text: ` ${r.competenceSignals.toFixed(1)} sig` })),
+        el("td", { title: `${r.complianceSignals.toFixed(1)} signals` }, bar(r.compliance), el("span", { class: "muted small", text: ` ${r.complianceSignals.toFixed(1)} sig` }))
+      ))
+    );
+    $("trust").replaceChildren(table);
+  } catch (e) { $("trust").replaceChildren(el("span", { class: "error", text: e.message })); }
+};
+
+// ---- Plan ------------------------------------------------------------------------------------
+const stepIndex = (id) => state.plan.steps.findIndex((s) => s.id === id);
+const renderPlan = () => {
+  const plan = state.plan;
+  $("plan-card").hidden = false;
+  $("plan-meta").textContent = `${plan.steps.length} step${plan.steps.length === 1 ? "" : "s"} · plan ${plan.id}`;
+  $("steps").replaceChildren(...plan.steps.map((step, i) => {
+    const outcome = state.outcomes.get(step.id);
+    const status = outcome?.status ?? "planned";
+    const head = el("div", { class: "step-head" },
+      el("span", { class: "num", text: String(i + 1) }),
+      el("span", { class: "grow", text: step.description }),
+      step.toolCall ? el("code", { class: "cap", text: step.toolCall.capability }) : el("span", { class: "muted small", text: step.kind }),
+      el("span", { class: `badge s-${status}`, text: status.replace("_", " ") })
+    );
+    const li = el("li", {}, head);
+    if (step.toolCall) {
+      const shown = JSON.stringify(step.toolCall.input);
+      li.append(el("div", { class: "input mono", text: shown.length > 240 ? shown.slice(0, 240) + "…" : shown }));
+      for (const b of step.toolCall.bindings ?? []) {
+        li.append(el("div", { class: "detail muted" }, `${b.to} ← output ${b.from || "(whole)"} of step ${stepIndex(b.fromStep) + 1}, labelled as its source is`));
+      }
+    }
+    if (outcome?.detail) li.append(el("div", { class: "detail", text: outcome.detail }));
+    if (status === "awaiting_approval") {
+      const why = state.why.get(step.id);
+      if (why) li.append(el("div", { class: "detail muted", text: why }));
+      li.append(el("div", { class: "row" }, el("button", { class: "primary", text: "Approve and continue", onclick: () => approve(step.id) })));
+    }
+    return li;
+  }));
+  const notes = [
+    ...plan.assumptions.map((a) => `Assumes: ${a.description}`),
+    ...plan.risks.map((r) => `Risk: ${r.description}`)
+  ];
+  $("notes").replaceChildren(...notes.map((n) => el("div", { text: n })));
+  $("plan-notes").hidden = notes.length === 0;
+  const runnable = plan.steps.some((s) => s.toolCall);
+  $("run").hidden = !runnable;
+};
+
+const createPlan = async () => {
+  const goal = $("goal").value.trim();
+  $("ask-error").hidden = true;
+  if (!goal) return;
+  $("plan").disabled = true;
+  try {
+    const plan = await api("POST", "/intent", { actor: ACTOR, goal, autonomy: $("autonomy").value });
+    remember(plan.id, goal);
+    await openPlan(plan);
+  } catch (e) { $("ask-error").textContent = e.message; $("ask-error").hidden = false; }
+  finally { $("plan").disabled = false; }
+};
+
+const openPlan = async (plan) => {
+  state.plan = plan;
+  state.approved = new Set();
+  state.outcomes = new Map();
+  state.why = new Map();
+  $("output-card").hidden = true;
+  $("output").replaceChildren();
+  $("run-meta").textContent = "";
+  $("run-error").hidden = true;
+  // Only ask for the latest run if the plan has one, rather than provoking a 404.
+  if (await refreshTimeline()) {
+    try {
+      const record = await api("GET", `/plans/${plan.id}/execution`);
+      await applyOutcome(record.steps, record.status);
+    } catch { /* a durable run still in flight */ }
+  }
+  renderPlan();
+};
+
+// ---- Run -------------------------------------------------------------------------------------
+const run = async () => {
+  const plan = state.plan;
+  $("run").disabled = true;
+  $("run-error").hidden = true;
+  try {
+    const result = await api("POST", `/plans/${plan.id}/execute`, { approvedSteps: [...state.approved] });
+    $("run-meta").textContent = result.mode === "restate" ? "durable run (Restate)" : "in-process run (not durable)";
+    if (result.steps) await applyOutcome(result.steps, result.status);
+    else await pollExecution(plan.id);
+  } catch (e) { $("run-error").textContent = e.message; $("run-error").hidden = false; }
+  finally {
+    $("run").disabled = false;
+    renderPlan();
+    await Promise.all([refreshTimeline(), refreshTrust()]);
+  }
+};
+
+const pollExecution = async (planId) => {
+  const started = Date.now() / 1000 - 1;
+  for (let attempt = 0; attempt < 120; attempt++) {
+    try {
+      const record = await api("GET", `/plans/${planId}/execution`);
+      if (record.finishedAt >= started) { await applyOutcome(record.steps, record.status); return; }
+    } catch { /* not yet */ }
+    await new Promise((r) => setTimeout(r, 500));
+  }
+  throw new Error("the durable run has not reported back yet; reopen the plan to check again");
+};
+
+const approve = async (stepId) => {
+  state.approved.add(stepId);
+  await run();
+};
+
+const applyOutcome = async (steps, status) => {
+  state.outcomes = new Map(steps.map((s) => [s.stepId, s]));
+  $("run-meta").textContent = $("run-meta").textContent || `last run: ${status.replace("_", " ")}`;
+  const produced = steps.filter((s) => s.artifactId);
+  if (produced.length === 0) { $("output-card").hidden = true; return; }
+  const docs = await Promise.all(produced.map(async (s) => {
+    const res = await fetch(`/artifacts/${s.artifactId}/content`);
+    return { step: s, text: res.ok ? await res.text() : `(could not read: HTTP ${res.status})` };
+  }));
+  $("output").replaceChildren(...docs.map(({ step, text }) => {
+    const planned = state.plan.steps.find((p) => p.id === step.stepId);
+    const doc = el("div", { class: "doc" });
+    const body = el("div");
+    body.innerHTML = markdown(text);
+    const raw = el("pre", { class: "mono", text, hidden: "" });
+    doc.append(
+      el("div", { class: "doc-head" },
+        el("strong", { class: "grow", text: planned ? planned.description : "Artifact" }),
+        el("span", { class: "label-untrusted", "data-artifact": step.artifactId, ...(state.untrusted.has(step.artifactId) ? {} : { hidden: "" }), text: "contains web content", title: "Written from content read on the web: policy treats it as untrusted" }),
+        el("button", { class: "small", text: "raw", onclick: () => { raw.hidden = !raw.hidden; body.hidden = !body.hidden; } })
+      ),
+      body, raw
+    );
+    return doc;
+  }));
+  $("output-card").hidden = false;
+  await renderDiagrams($("output"));
+};
+
+// ---- Timeline --------------------------------------------------------------------------------
+const basisText = (basis) => basis?._tag === "matched" ? `rule ${basis.ruleId}` : "no rule matched (default)";
+const describe = (e) => {
+  const p = e.payload ?? {};
+  const cap = p.capability ? ` ${p.capability}` : "";
+  const step = p.stepId && state.plan ? ` (step ${stepIndex(p.stepId) + 1})` : "";
+  const tags = p.tags?.length ? ` · labels: ${p.tags.join(", ")}` : "";
+  switch (e.type) {
+    case "PLAN_CREATED": return ["", `Planned ${p.steps} step${p.steps === 1 ? "" : "s"}`];
+    case "PLAN_SUBMITTED": return ["", `Submitted (${p.mode})`];
+    case "PLAN_STARTED": return ["", "Run started"];
+    case "POLICY_EVALUATED": return [p.effect === "deny" ? "t-deny" : p.effect === "require_approval" ? "t-gate" : "", `Policy ${p.effect.replace("_", " ")} at ${p.at.replace("_", " ")}${cap}: ${basisText(p.basis)}${tags}`];
+    case "TRUST_GATE": return ["t-gate", `Trust gate${cap}${step}: asked for ${p.requestedGear}, ${p.blockedBy.join(" and ")} short (needs ${p.required.competence}/${p.required.compliance} on ${p.required.signals} signals)`];
+    case "APPROVAL_REQUESTED": return ["t-gate", `Waiting for your approval${step}${p.basis ? ` · ${basisText(p.basis)}` : ""}${tags}`];
+    case "APPROVAL_GRANTED": return ["t-ok", `Approved${step}`];
+    case "TOOL_STARTED": return ["", `Dispatched to ${p.tool}${step}`];
+    case "TOOL_COMPLETED": return ["t-ok", `Tool finished${cap}${step} in ${p.durationMs} ms`];
+    case "STEP_FAILED": return ["t-fail", `Failed${step}: ${p.reason}`];
+    case "STEP_DENIED": return ["t-deny", `Denied${step}: ${basisText(p.basis)}`];
+    case "ARTIFACT_WRITTEN": return ["t-ok", `Wrote artifact${step}, sha256 ${String(p.checksum).slice(7, 19)}…`];
+    case "ARTIFACT_WRITE_DENIED": return ["t-deny", `Artifact write denied${step}: ${basisText(p.basis)}`];
+    case "VERIFICATION_SAMPLED": return [p.clean ? "t-ok" : "t-fail", `Output sampled against its contract${cap}: ${p.clean ? "clean" : "did not match"}`];
+    case "VERIFICATION_FAILED": return ["t-fail", `Verification failed${step}`];
+    case "DOOM_LOOP_DETECTED": return ["t-gate", `Same call ${p.repeats} times${cap}: asking you`];
+    case "TRUST_PROMOTED": return ["t-trust", `${p.skill} promoted ${p.from} → ${p.to}: ${p.reason}`];
+    case "TRUST_DEMOTED": return ["t-trust", `${p.skill} demoted ${p.from} → ${p.to}: ${p.reason}`];
+    case "PLAN_FINISHED": return [p.status === "completed" ? "t-ok" : p.status === "awaiting_approval" ? "t-gate" : "t-fail", `Run ${p.status.replace("_", " ")}`];
+    case "PLAN_DENIED": return ["t-deny", `Plan denied: ${basisText(p.basis)}`];
+    default: return ["", e.type];
+  }
+};
+
+const refreshTimeline = async () => {
+  if (!state.plan) return;
+  try {
+    const events = await api("GET", `/eventlog?planId=${encodeURIComponent(state.plan.id)}`);
+    // The reason a step is waiting, shown next to its approve button.
+    for (const e of events) {
+      const p = e.payload ?? {};
+      if (e.type === "TRUST_GATE") state.why.set(p.stepId, `Asks because ${p.capability.split("@")[0]} has not earned ${p.requestedGear} yet.`);
+      if (e.type === "APPROVAL_REQUESTED" && !state.why.has(p.stepId) && p.basis?._tag === "matched") state.why.set(p.stepId, `Asks because of ${p.basis.ruleId}.`);
+      if (e.type === "APPROVAL_REQUESTED" && !state.why.has(p.stepId) && state.plan.steps.find((s) => s.id === p.stepId)?.requiresApproval) state.why.set(p.stepId, `Asks because the plan's gear gates every tool step.`);
+    }
+    // Label each artifact written from web content: a write's decision is logged just before it.
+    let pending = [];
+    for (const e of events) {
+      if (e.type === "POLICY_EVALUATED" && e.payload.at === "artifact_write") pending = e.payload.tags ?? [];
+      if (e.type === "ARTIFACT_WRITTEN" && pending.includes("untrusted")) state.untrusted.add(e.payload.artifactId);
+    }
+    for (const badge of document.querySelectorAll("[data-artifact]")) badge.hidden = !state.untrusted.has(badge.dataset.artifact);
+    const items = events.slice(-200).map((e) => {
+      const [cls, text] = describe(e);
+      return el("li", { class: cls }, el("div", { class: "ttype", text }), el("div", { class: "muted", text: new Date(e.ts * 1000).toLocaleTimeString() }));
+    });
+    $("timeline").replaceChildren(...(items.length ? items : [el("li", { class: "empty", text: "Nothing recorded yet." })]));
+    $("timeline").scrollTop = $("timeline").scrollHeight;
+    if (state.plan) renderPlan();
+    return events.some((e) => e.type === "PLAN_FINISHED");
+  } catch (e) { $("timeline").replaceChildren(el("li", { class: "error", text: e.message })); return false; }
+};
+
+// ---- Recent ----------------------------------------------------------------------------------
+const RECENT_KEY = "metis.recent";
+const recent = () => { try { return JSON.parse(localStorage.getItem(RECENT_KEY) ?? "[]"); } catch { return []; } };
+const remember = (id, goal) => {
+  const list = [{ id, goal }, ...recent().filter((r) => r.id !== id)].slice(0, 12);
+  try { localStorage.setItem(RECENT_KEY, JSON.stringify(list)); } catch { /* private window */ }
+  renderRecent();
+};
+const renderRecent = () => {
+  const list = recent();
+  $("recent").replaceChildren(...(list.length ? list.map((r) => el("li", { title: r.goal, text: r.goal, onclick: async () => {
+    try { await openPlan(await api("GET", `/plans/${r.id}`)); } catch (e) { $("ask-error").textContent = `${e.message} (a restart with memory storage forgets plans)`; $("ask-error").hidden = false; }
+  } })) : [el("li", { class: "empty", text: "None yet." })]));
+};
+
+// ---- Start -----------------------------------------------------------------------------------
+$("plan").addEventListener("click", createPlan);
+$("goal").addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) createPlan(); });
+$("run").addEventListener("click", run);
+(async () => {
+  try { state.tools = await api("GET", "/tools"); } catch { state.tools = []; }
+  renderExamples();
+  renderWriter();
+  renderTools();
+  renderRecent();
+  await refreshTrust();
+})();
+</script>
+</body>
+</html>
