@@ -60,10 +60,30 @@ interface Template {
   readonly expects: ReadonlyArray<{ kind: ArtifactExpectation["kind"]; description: string }>
 }
 
+/**
+ * What a document is about, taken from the goal: the text after the request phrase, without a
+ * leading connective or article, first letter capitalised. "Draft a PRD for an offline-first notes
+ * app" is titled "Offline-first notes app". A goal with nothing after the phrase is its own title,
+ * since a guessed title is worse than the user's words.
+ */
+export const subjectOf = (goal: string, request: RegExp): string => {
+  const match = request.exec(goal)
+  if (match === null) return goal
+  const subject = goal
+    .slice(match.index + match[0].length)
+    .replace(/^[\s:,-]*(?:(?:for|of|about|on|covering)\s+)?(?:(?:a|an|the)\s+)?/i, "")
+    .replace(/[\s.!?]+$/, "")
+  return subject === "" ? goal : subject[0]!.toUpperCase() + subject.slice(1)
+}
+
+const PRD_REQUEST = /\bprd\b|product requirements(?: document)?/i
+const C4_REQUEST = /\bc4\b(?: diagrams?)?|architecture diagrams?/i
+const API_REQUEST = /\bapi spec(?:ification)?|\bopenapi\b(?: spec(?:ification)?)?/i
+
 const TEMPLATES: ReadonlyArray<Template> = [
   {
     name: "prd",
-    matches: (goal) => /\bprd\b|product requirements/i.test(goal),
+    matches: (goal) => PRD_REQUEST.test(goal),
     steps: (intent) => [
       {
         kind: "tool",
@@ -75,7 +95,8 @@ const TEMPLATES: ReadonlyArray<Template> = [
         kind: "tool",
         description: "Draft the PRD",
         capability: "design.prd@1.0",
-        input: { title: intent.goal }
+        // The whole goal goes along as context, so trimming it to a title loses nothing.
+        input: { title: subjectOf(intent.goal, PRD_REQUEST), context: intent.goal }
       }
     ],
     assumptions: ["Public web sources are acceptable for this document"],
@@ -84,13 +105,13 @@ const TEMPLATES: ReadonlyArray<Template> = [
   },
   {
     name: "c4",
-    matches: (goal) => /\bc4\b|architecture diagram/i.test(goal),
+    matches: (goal) => C4_REQUEST.test(goal),
     steps: (intent) => [
       {
         kind: "tool",
         description: "Draw the C4 context and container diagrams",
         capability: "design.c4@1.0",
-        input: { title: intent.goal }
+        input: { title: subjectOf(intent.goal, C4_REQUEST), description: intent.goal }
       }
     ],
     assumptions: ["The goal names the system well enough to diagram it"],
@@ -99,13 +120,14 @@ const TEMPLATES: ReadonlyArray<Template> = [
   },
   {
     name: "api_spec",
-    matches: (goal) => /\bapi spec|\bopenapi\b/i.test(goal),
+    matches: (goal) => API_REQUEST.test(goal),
     steps: (intent) => [
       {
         kind: "tool",
         description: "Write the API specification",
+        // The contract has no free-text field, so the title is all the goal it carries.
         capability: "design.api_spec@1.0",
-        input: { title: intent.goal }
+        input: { title: subjectOf(intent.goal, API_REQUEST) }
       }
     ],
     assumptions: ["Endpoints can be inferred from the goal"],

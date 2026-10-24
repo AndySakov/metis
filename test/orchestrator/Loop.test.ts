@@ -155,7 +155,7 @@ describe("the loop runs end to end", () => {
 
     const text = new TextDecoder().decode(stored.right.payload)
     // The content came back over MCP from the separate process.
-    expect(text).toContain("# Draft a PRD for a research summarizer")
+    expect(text).toContain("# Research summarizer")
     expect(text).toContain("## Goals")
 
     // Checksum verified on read, and provenance points at both the plan and the intent (ADR-001).

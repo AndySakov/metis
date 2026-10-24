@@ -187,3 +187,26 @@ describe("planning against what is available", () => {
     expect(plan.risks.map((r) => r.description).join("\n")).not.toContain("Skipped")
   })
 })
+
+describe("a document is titled by its subject, not by the request", () => {
+  const inputOf = async (goal: string) =>
+    (await planFor(goal)).steps.find((s) => s.toolCall?.capability.startsWith("design."))!.toolCall!.input
+
+  it("takes the subject after the request phrase", async () => {
+    expect((await inputOf("Draft a PRD for an offline-first notes app")).title).toBe("Offline-first notes app")
+    expect((await inputOf("C4 diagrams for the billing service")).title).toBe("Billing service")
+    expect((await inputOf("Write an API spec for a notes app")).title).toBe("Notes app")
+    expect((await inputOf("product requirements document about team calendars")).title).toBe("Team calendars")
+  })
+
+  it("keeps the whole goal where the capability's contract has room for it", async () => {
+    const prd = await inputOf("Draft a PRD for an offline-first notes app")
+    expect(prd.context).toBe("Draft a PRD for an offline-first notes app")
+    const c4 = await inputOf("C4 diagrams for the billing service")
+    expect(c4.description).toBe("C4 diagrams for the billing service")
+  })
+
+  it("falls back to the goal when there is no subject to take", async () => {
+    expect((await inputOf("Draft a PRD")).title).toBe("Draft a PRD")
+  })
+})
