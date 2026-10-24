@@ -25,7 +25,6 @@ import { decide } from "../../src/policy/PolicyEngine.js"
 const vector = JSON.parse(
   readFileSync(resolve(__dirname, "../../specs/redteam/attempts.json"), "utf8")
 ) as {
-  policy: unknown
   attempts: Array<{
     name: string
     request: Record<string, unknown>
@@ -34,7 +33,13 @@ const vector = JSON.parse(
   }>
 }
 
-const policy = Schema.decodeUnknownSync(Policy)(vector.policy)
+/**
+ * The live policy, not a copy of it. Measuring a policy kept for the red team would leave the
+ * number unrelated to what METIS actually enforces.
+ */
+const policy = Schema.decodeUnknownSync(Policy)(
+  JSON.parse(readFileSync(resolve(__dirname, "../../specs/policy/default.json"), "utf8"))
+)
 const decodeRequest = Schema.decodeUnknownSync(PolicyRequest)
 
 interface Outcome {

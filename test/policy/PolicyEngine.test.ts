@@ -160,11 +160,9 @@ describe("a policy is decoded strictly", () => {
   })
 
   it("every shipped policy still decodes", () => {
-    const redteam = JSON.parse(
-      readFileSync(resolve(__dirname, "../../specs/redteam/attempts.json"), "utf8")
-    ) as { policy: unknown }
+    const live = JSON.parse(readFileSync(resolve(__dirname, "../../specs/policy/default.json"), "utf8"))
 
-    for (const input of [...vectors.map((vector) => vector.policy), redteam.policy]) {
+    for (const input of [...vectors.map((vector) => vector.policy), live]) {
       expect(Either.isRight(decodeEither(input))).toBe(true)
     }
   })
