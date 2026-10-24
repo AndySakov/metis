@@ -10,7 +10,7 @@
  */
 
 import { Client } from "@modelcontextprotocol/sdk/client/index.js"
-import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js"
+import { getDefaultEnvironment, StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js"
 import { Effect, Layer } from "effect"
 
 import type { ToolSpec } from "../domain/ToolSpec.js"
@@ -20,6 +20,12 @@ import { ToolRunError, ToolRunner } from "./ToolRunner.js"
 export interface ServerCommand {
   readonly command: string
   readonly args: ReadonlyArray<string>
+  /**
+   * Variables added to the server's environment. A server otherwise gets only the MCP SDK's
+   * minimal default environment, so a credential reaches exactly the servers it is listed for and
+   * no other tool process can read it.
+   */
+  readonly env?: Readonly<Record<string, string>>
 }
 
 export type ServerMap = Readonly<Record<string, ServerCommand>>
@@ -77,7 +83,11 @@ export const make = (servers: ServerMap) =>
         yield* Effect.tryPromise({
           try: () =>
             client.connect(
-              new StdioClientTransport({ command: spawn.command, args: [...spawn.args] })
+              new StdioClientTransport({
+                command: spawn.command,
+                args: [...spawn.args],
+                ...(spawn.env !== undefined ? { env: { ...getDefaultEnvironment(), ...spawn.env } } : {})
+              })
             ),
           catch: (cause) => new ToolRunError({ tool: serverId, message: `cannot start server: ${String(cause)}` })
         })
