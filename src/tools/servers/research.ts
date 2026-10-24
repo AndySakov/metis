@@ -7,9 +7,9 @@
  * and their citations are guaranteed to point at text that was actually provided rather than
  * plausibly generated.
  *
- * `research.search@0.1` is deliberately **not** here. It needs a search backend, and implementing
- * it against canned results would put a capability in the registry that does not do what its
- * contract says — worse than leaving it unimplemented, because the planner would then target it.
+ * `search` queries two open, keyless indexes, Wikipedia and arXiv, and says so: it is not a web-wide
+ * search engine, and its results name where they came from. A general web index needs a provider
+ * and a key; until one is chosen, these two are what METIS can search honestly.
  */
 
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js"
@@ -125,6 +125,167 @@ server.registerTool(
     } catch (cause) {
       return { isError: true, content: [{ type: "text" as const, text: `fetch failed: ${String(cause)}` }] }
     }
+  }
+)
+
+/** Where `search` looks. Overridable so tests can stand in for both; never set from a request. */
+const WIKIPEDIA = process.env.METIS_WIKIPEDIA_API ?? "https://en.wikipedia.org/w/api.php"
+const ARXIV = process.env.METIS_ARXIV_API ?? "https://export.arxiv.org/api/query"
+/** Wikipedia asks API clients to identify themselves. */
+const USER_AGENT = "METIS/0.1 (personal research copilot; https://github.com/AndySakov/metis)"
+
+interface Found {
+  readonly url: string
+  readonly title: string
+  readonly snippet: string
+  readonly license?: string
+  readonly date?: string
+}
+
+const decodeEntities = (text: string): string => stripHtml(text)
+
+const wikipedia = async (query: string, limit: number): Promise<Array<Found>> => {
+  const url = new URL(WIKIPEDIA)
+  for (
+    const [key, value] of Object.entries({
+      action: "query",
+      list: "search",
+      srsearch: query,
+      srlimit: String(limit),
+      format: "json",
+      utf8: "1"
+    })
+  ) url.searchParams.set(key, value)
+  const response = await fetch(url, { headers: { "user-agent": USER_AGENT }, signal: AbortSignal.timeout(15_000) })
+  if (!response.ok) throw new Error(`Wikipedia answered HTTP ${response.status}`)
+  const body = await response.json() as { query?: { search?: Array<{ title: string; snippet: string }> } }
+  return (body.query?.search ?? []).map((hit) => ({
+    url: `https://en.wikipedia.org/wiki/${encodeURIComponent(hit.title.replaceAll(" ", "_"))}`,
+    title: hit.title,
+    snippet: decodeEntities(hit.snippet),
+    license: "CC BY-SA 4.0"
+  }))
+}
+
+/** arXiv's query language treats quotes, brackets and colons as syntax, so terms are plain words. */
+const arxivTerms = (query: string): string =>
+  query.replace(/[^\p{L}\p{N}\s-]/gu, " ").split(/\s+/).filter((t) => t !== "").map((t) => `all:${t}`).join(" AND ")
+
+const arxiv = async (query: string, limit: number, from?: string, to?: string): Promise<Array<Found>> => {
+  const terms = arxivTerms(query)
+  if (terms === "") return []
+  const range = from !== undefined || to !== undefined
+    ? ` AND submittedDate:[${(from ?? "1991-01-01").replaceAll("-", "")}0000 TO ${
+      (to ?? "2999-12-31").replaceAll("-", "")
+    }2359]`
+    : ""
+  const url = new URL(ARXIV)
+  url.searchParams.set("search_query", terms + range)
+  url.searchParams.set("start", "0")
+  url.searchParams.set("max_results", String(limit))
+  url.searchParams.set("sortBy", "relevance")
+  const response = await fetch(url, { headers: { "user-agent": USER_AGENT }, signal: AbortSignal.timeout(15_000) })
+  if (!response.ok) throw new Error(`arXiv answered HTTP ${response.status}`)
+  const feed = await response.text()
+  const field = (entry: string, tag: string) =>
+    new RegExp(`<${tag}[^>]*>([\\s\\S]*?)</${tag}>`).exec(entry)?.[1]?.replace(/\s+/g, " ").trim()
+  return [...feed.matchAll(/<entry>([\s\S]*?)<\/entry>/g)].flatMap((match) => {
+    const entry = match[1]!
+    const id = field(entry, "id")
+    const title = field(entry, "title")
+    if (id === undefined || title === undefined) return []
+    const summary = decodeEntities(field(entry, "summary") ?? "")
+    return [{
+      url: id.replace(/^http:/, "https:"),
+      title: decodeEntities(title),
+      snippet: summary.length > 300 ? `${summary.slice(0, 297)}…` : summary,
+      ...(field(entry, "published") !== undefined ? { date: field(entry, "published")!.slice(0, 10) } : {})
+    }]
+  })
+}
+
+const host = (url: string) => new URL(url).hostname
+
+server.registerTool(
+  "search",
+  {
+    title: "Search Wikipedia and arXiv",
+    description: "Search two open indexes, Wikipedia and arXiv, for a query. Not a web-wide search.",
+    inputSchema: {
+      query: z.string().min(1),
+      limit: z.number().int().min(1).max(50).optional(),
+      filters: z.object({
+        from: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+        to: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+        domains: z.array(z.string()).optional(),
+        license: z.string().optional()
+      }).optional()
+    }
+  },
+  async ({ filters = {}, limit = 10, query }) => {
+    const notes: Array<string> = []
+    const wants = (domain: string) =>
+      filters.domains === undefined || filters.domains.some((d) => domain === d || domain.endsWith(`.${d}`))
+    const dated = filters.from !== undefined || filters.to !== undefined
+    // Wikipedia articles have no publication date, so a date range leaves them out rather than guessing.
+    const useWikipedia = wants("en.wikipedia.org") && !dated
+    if (wants("en.wikipedia.org") && dated) notes.push("Wikipedia left out: its articles have no publication date.")
+    const useArxiv = wants("arxiv.org")
+    if (!useWikipedia && !useArxiv && !dated) notes.push("Neither Wikipedia nor arXiv is among the requested domains.")
+
+    const each = Math.max(1, Math.ceil(limit / (useWikipedia && useArxiv ? 2 : 1)))
+    const [wiki, papers] = await Promise.all([
+      useWikipedia ? wikipedia(query, each).then((r) => ({ r }), (e: unknown) => ({ e })) : { r: [] as Array<Found> },
+      useArxiv
+        ? arxiv(query, each, filters.from, filters.to).then((r) => ({ r }), (e: unknown) => ({ e }))
+        : { r: [] as Array<Found> }
+    ])
+    const failed = [["Wikipedia", wiki], ["arXiv", papers]] as const
+    for (const [name, outcome] of failed) {
+      if ("e" in outcome) notes.push(`${name} could not be searched: ${String(outcome.e)}`)
+    }
+    if (
+      failed.every(([, outcome]) => "e" in outcome) || (failed.some(([, o]) => "e" in o) && !useWikipedia !== !useArxiv)
+    ) {
+      return { isError: true, content: [{ type: "text" as const, text: notes.join(" ") }] }
+    }
+
+    // Interleaved by rank, so neither index crowds out the other; score falls with rank.
+    const lists = ["r" in wiki ? wiki.r : [], "r" in papers ? papers.r : []]
+    const merged: Array<Found & { score: number }> = []
+    for (let rank = 0; merged.length < limit && lists.some((list) => rank < list.length); rank++) {
+      for (const list of lists) {
+        const hit = list[rank]
+        if (hit !== undefined && merged.length < limit) {
+          merged.push({ ...hit, score: Number((1 / (rank + 1)).toFixed(3)) })
+        }
+      }
+    }
+    const results = merged.filter((hit) =>
+      wants(host(hit.url)) &&
+      (filters.license === undefined || hit.license === filters.license) &&
+      (filters.from === undefined || (hit.date !== undefined && hit.date >= filters.from)) &&
+      (filters.to === undefined || (hit.date !== undefined && hit.date <= filters.to))
+    )
+
+    const markdown = [
+      `## Sources for "${query}"`,
+      "",
+      "Searched Wikipedia and arXiv only, not the whole web.",
+      ...notes.map((note) => `> ${note}`),
+      "",
+      ...(results.length === 0
+        ? ["Nothing found."]
+        : results.map((hit) =>
+          `- [${hit.title.replaceAll(/[[\]]/g, "")}](${hit.url}) (${
+            host(hit.url) === "arxiv.org" ? `arXiv${hit.date !== undefined ? `, ${hit.date}` : ""}` : "Wikipedia"
+          }): ${hit.snippet}`
+        )),
+      ""
+    ].join("\n")
+
+    const result = { results, markdown }
+    return { content: [{ type: "text" as const, text: JSON.stringify(result) }], structuredContent: result }
   }
 )
 

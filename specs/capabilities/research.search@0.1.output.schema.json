@@ -20,6 +20,10 @@
           "score": { "type": "number" }
         }
       }
+    },
+    "markdown": {
+      "type": "string",
+      "description": "The results as a readable list, naming the indexes searched and any that could not be."
     }
   },
   "required": ["results"]

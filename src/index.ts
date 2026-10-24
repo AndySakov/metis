@@ -554,9 +554,9 @@ export * as model from "./tools/servers/model.js"
  * and their citations are guaranteed to point at text that was actually provided rather than
  * plausibly generated.
  *
- * `research.search@0.1` is deliberately **not** here. It needs a search backend, and implementing
- * it against canned results would put a capability in the registry that does not do what its
- * contract says — worse than leaving it unimplemented, because the planner would then target it.
+ * `search` queries two open, keyless indexes, Wikipedia and arXiv, and says so: it is not a web-wide
+ * search engine, and its results name where they came from. A general web index needs a provider
+ * and a key; until one is chosen, these two are what METIS can search honestly.
  */
 export * as research from "./tools/servers/research.js"
 
