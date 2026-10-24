@@ -17,7 +17,8 @@
  * the compliance ledger.
  */
 
-import { Effect, Layer } from "effect"
+import type { Duration } from "effect"
+import { Effect, Layer, Schedule } from "effect"
 
 import type { Actor, Autonomy, EpochSeconds } from "../domain/Common.js"
 import type { CorrelationId, EventId, EventType } from "../domain/Event.js"
@@ -276,6 +277,83 @@ export const reconcile = (
 
     return derived
   })
+
+/**
+ * One reconciliation at a time in this process. A run finishing and the sweep can both find the
+ * same skill's gear out of date; each reads the recorded gear under this permit, so the second
+ * sees the first one's event and writes nothing rather than the same change twice.
+ */
+const reconciling = Effect.unsafeMakeSemaphore(1)
+
+/** Reconcile a skill against the gear the log last recorded for it, and report the change if any. */
+export const reconcileRecorded = (
+  skill: SkillId,
+  policy: TrustPolicy,
+  correlationId?: CorrelationId
+): Effect.Effect<{ readonly from: Autonomy; readonly to: Autonomy }, never, EventLogStore> =>
+  reconciling.withPermits(1)(
+    Effect.gen(function*() {
+      const log = yield* EventLogStore
+      const from = recordedGear(yield* Effect.orDie(log.read({})), skill)
+      const derived = yield* reconcile(skill, from, policy, correlationId)
+      return { from, to: derived.record.gear }
+    })
+  )
+
+/** Every skill the log holds evidence or a recorded gear for. */
+export const skillsIn = (events: ReadonlyArray<Event>): ReadonlyArray<SkillId> => {
+  const skills = new Set<SkillId>()
+  for (const event of events) {
+    for (const signal of signalsFrom(event)) skills.add(signal.skill)
+    if (event.type === "TRUST_PROMOTED" || event.type === "TRUST_DEMOTED") {
+      const skill = (event.payload as { skill?: unknown } | null)?.skill
+      if (typeof skill === "string") skills.add(skill as SkillId)
+    }
+  }
+  return [...skills].sort()
+}
+
+/**
+ * Record every gear change the log does not yet show, for every skill, and return them.
+ *
+ * Decay moves a skill while nothing runs. Without this, the demotion it earns is written only by
+ * that skill's next run, so the log would say a skill held S2 for weeks after its evidence fell
+ * below the bar. The gate never relied on the record, since every check derives from the log; the
+ * audit trail did.
+ */
+export const sweep = (
+  policy: TrustPolicy
+): Effect.Effect<ReadonlyArray<{ skill: SkillId; from: Autonomy; to: Autonomy }>, never, EventLogStore> =>
+  Effect.gen(function*() {
+    const log = yield* EventLogStore
+    const skills = skillsIn(yield* Effect.orDie(log.read({})))
+    const changes: Array<{ skill: SkillId; from: Autonomy; to: Autonomy }> = []
+    for (const skill of skills) {
+      const { from, to } = yield* reconcileRecorded(skill, policy)
+      if (from !== to) changes.push({ skill, from, to })
+    }
+    return changes
+  })
+
+/**
+ * Sweeps at startup and then every `every`, for as long as the layer is in scope.
+ *
+ * Signal weights change once a day (`signalWeight` counts whole days), so an interval of an hour
+ * writes a demotion within an hour of the evidence falling below the bar.
+ */
+export const sweeper = (policy: TrustPolicy, every: Duration.DurationInput) =>
+  Layer.scopedDiscard(
+    Effect.forkScoped(
+      sweep(policy).pipe(
+        Effect.tap((changes) =>
+          Effect.forEach(changes, ({ from, skill, to }) => Effect.log(`trust: ${skill} ${from} -> ${to} (decay sweep)`))
+        ),
+        // One failed sweep (the database unreachable for a moment) must not end sweeping for good.
+        Effect.catchAllCause((cause) => Effect.logWarning("trust sweep failed; retrying next interval", cause)),
+        Effect.repeat(Schedule.spaced(every))
+      )
+    )
+  )
 
 /**
  * A ledger that answers from the event log at the moment it is asked.

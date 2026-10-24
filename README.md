@@ -31,7 +31,9 @@ What exists and works:
 - A `PolicyEngine` that evaluates at three points and records **which rule matched, or explicitly
   none**, driven by policy vectors in `specs/policy/conformance/`.
 - A `TrustLedger` with independent competence and compliance scores, explicit decay half-lives, and
-  promotion that requires both. Read-only at this stage.
+  promotion that requires both, derived live from the event log. Every gear change is written back
+  as an event: by the run that earned it, or, for a demotion earned by idleness, by an hourly sweep
+  that `pnpm start` runs, so the log shows when a skill lost its gear rather than when it next ran.
 - A **planner** — template-matched and deliberately dumb — that turns an Intent into a structurally
   valid Plan, targeting capabilities and never naming a tool implementation.
 - A **`PolicyGate`** that evaluates and writes every decision to the event log, and a **coverage
