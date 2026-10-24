@@ -114,7 +114,17 @@ export const IntentApiLive = HttpApiBuilder.group(IntentApi, "intent", (handlers
             mode: submission.mode,
             // `direct` completes synchronously and reports its real outcome; `restate` is async and
             // can only say it was accepted.
-            status: submission.report?.status ?? ("accepted" as const)
+            status: submission.report?.status ?? ("accepted" as const),
+            ...(submission.report !== undefined
+              ? {
+                steps: submission.report.steps.map((step) => ({
+                  stepId: step.stepId,
+                  status: step.status,
+                  ...(step.artifactId !== undefined ? { artifactId: step.artifactId } : {}),
+                  ...(step.detail !== undefined ? { detail: step.detail } : {})
+                }))
+              }
+              : {})
           }
         }))
       .handle("getArtifact", ({ path }) =>
@@ -122,6 +132,16 @@ export const IntentApiLive = HttpApiBuilder.group(IntentApi, "intent", (handlers
         artifacts.head(path.id as ArtifactId).pipe(
           Effect.mapError(() => new ArtifactNotFound({ id: path.id as ArtifactId }))
         ) as Effect.Effect<Artifact, ArtifactNotFound>)
+      .handle("getArtifactContent", ({ path }) =>
+        Effect.gen(function*() {
+          const id = path.id as ArtifactId
+          // Existence first, so a missing artifact is a 404. Once it exists, a failed read is a
+          // payload that did not match its checksum: a defect to surface, never bytes to serve and
+          // never a "not found" that would hide the corruption.
+          yield* artifacts.head(id).pipe(Effect.mapError(() => new ArtifactNotFound({ id })))
+          const { payload } = yield* Effect.orDie(artifacts.get(id))
+          return payload
+        }))
   }))
 
 export const ApiLive = HttpApiBuilder.api(IntentApi).pipe(Layer.provide(IntentApiLive))

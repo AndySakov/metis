@@ -38,10 +38,20 @@ export class ExecuteRequest extends Schema.Class<ExecuteRequest>("ExecuteRequest
  * `mode` is not decoration: `direct` means the run is **not** durable, and a caller that cannot
  * tell the two apart cannot know whether its plan survives a restart.
  */
+/** What happened to one step, and the artifact it wrote, if any. */
+export class StepOutcome extends Schema.Class<StepOutcome>("StepOutcome")({
+  stepId: PlanStepId,
+  status: Schema.Literal("completed", "awaiting_approval", "denied", "failed", "skipped"),
+  artifactId: Schema.optional(ArtifactId),
+  detail: Schema.optional(Schema.String)
+}) {}
+
 export class ExecutionAccepted extends Schema.Class<ExecutionAccepted>("ExecutionAccepted")({
   executionId: Schema.String,
   mode: Schema.Literal("restate", "direct"),
-  status: Schema.Literal("accepted", "completed", "awaiting_approval", "denied", "failed")
+  status: Schema.Literal("accepted", "completed", "awaiting_approval", "denied", "failed"),
+  /** Present when the run finished in-process; a `restate` submission has only been accepted. */
+  steps: Schema.optional(Schema.Array(StepOutcome))
 }) {}
 
 /**
@@ -76,6 +86,12 @@ export class IntentApiGroup extends HttpApiGroup.make("intent")
     HttpApiEndpoint.get("getArtifact", "/artifacts/:id")
       .setPath(Schema.Struct({ id: ArtifactId }))
       .addSuccess(Artifact)
+      .addError(ArtifactNotFound)
+  )
+  .add(
+    HttpApiEndpoint.get("getArtifactContent", "/artifacts/:id/content")
+      .setPath(Schema.Struct({ id: ArtifactId }))
+      .addSuccess(HttpApiSchema.Uint8Array())
       .addError(ArtifactNotFound)
   )
 {}

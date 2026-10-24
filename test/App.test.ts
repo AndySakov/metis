@@ -104,6 +104,14 @@ describe("pnpm start", () => {
     const approved = await (await post(`/plans/${plan.id}/execute`, { approvedSteps: [stepId] })).json()
     expect(approved).toMatchObject({ mode: "direct", status: "completed" })
 
+    // The document comes back over HTTP, byte for byte what the model wrote.
+    const artifactId = approved.steps[0].artifactId
+    const content = await fetch(`http://127.0.0.1:${PORT}/artifacts/${artifactId}/content`)
+    expect(content.status).toBe(200)
+    expect(await content.text()).toBe("# Offline-first notes\n\nA PRD.")
+    const metadata = await (await fetch(`http://127.0.0.1:${PORT}/artifacts/${artifactId}`)).json()
+    expect(metadata).toMatchObject({ id: artifactId, kind: "text" })
+
     expect(requests).toHaveLength(1)
     expect(requests[0]!.model).toBe("claude-opus-5-5")
     expect(requests[0]!.messages[0].content).toContain("Draft a PRD for offline-first notes")
