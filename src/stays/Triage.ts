@@ -18,11 +18,16 @@
  * Free of Node APIs, so the MCP server can import it under type stripping.
  */
 
+import type { Answer, Calendar } from "./Availability.ts"
+import { answer } from "./Availability.ts"
+
 export interface UnitProfile {
   readonly id: string
   readonly name: string
   readonly timezone: string
   readonly bedrooms: number
+  /** Where the unit's bookings live, when availability is to be checked. */
+  readonly availability?: { readonly spreadsheetId: string } | undefined
   readonly areas: {
     readonly accept: ReadonlyArray<string>
     readonly borderline: ReadonlyArray<string>
@@ -55,6 +60,8 @@ export interface Triaged extends Message {
   readonly checkOut?: string
   readonly datesStated: boolean
   readonly confidence?: Confidence
+  /** Whether the unit can take the dates asked for; leads with dates, when a sheet is configured. */
+  readonly availability?: Answer
 }
 
 // ---- Language ----------------------------------------------------------------------------------
@@ -431,6 +438,32 @@ export const parseChat = (pasted: string, group?: string): Array<Message> => {
 // ---- Report ------------------------------------------------------------------------------------
 
 const RANK: Record<Confidence, number> = { high: 0, medium: 1, low: 2 }
+/** An unsold slot first: a night already counted on and not yet sold is the lead worth most. */
+const FILLABLE: Record<Answer["verdict"] | "unchecked", number> = {
+  OPEN: 0,
+  FREE: 1,
+  CONTESTED: 2,
+  unchecked: 3,
+  "NO DATA": 4,
+  BOOKED: 5
+}
+
+/** Each dated lead with the unit's availability for its dates; a single night when only arrival was said. */
+export const withAvailability = (triaged: ReadonlyArray<Triaged>, calendar: Calendar): Array<Triaged> =>
+  triaged.map((t) =>
+    t.verdict !== "lead" || t.checkIn === undefined
+      ? t
+      : { ...t, availability: answer(calendar, t.checkIn, t.checkOut ?? addDays(t.checkIn, 1)) }
+  )
+
+const availabilityLine = (lead: Triaged): string =>
+  lead.availability === undefined
+    ? lead.checkIn === undefined ? "Availability: depends on dates." : "Availability: not checked."
+    : `Availability: ${lead.availability.verdict}, ${lead.availability.detail}${
+      lead.availability.nextWindow === undefined
+        ? ""
+        : `; next free ${lead.availability.nextWindow.checkIn} to ${lead.availability.nextWindow.checkOut}`
+    }.`
 
 const stayWindow = (lead: Triaged): string =>
   lead.checkIn === undefined
@@ -440,22 +473,30 @@ const stayWindow = (lead: Triaged): string =>
     : `${lead.checkIn} to ${lead.checkOut}`
 
 /** The sweep as the owner reads it: leads first and actionable, noise as one line of counts. */
-export const report = (triaged: ReadonlyArray<Triaged>, profile: UnitProfile): string => {
+export const report = (
+  triaged: ReadonlyArray<Triaged>,
+  profile: UnitProfile,
+  notes: ReadonlyArray<string> = []
+): string => {
   const leads = triaged
     .filter((t) => t.verdict === "lead")
-    .sort((a, b) => RANK[a.confidence!] - RANK[b.confidence!])
+    .sort((a, b) =>
+      FILLABLE[a.availability?.verdict ?? "unchecked"] - FILLABLE[b.availability?.verdict ?? "unchecked"] ||
+      RANK[a.confidence!] - RANK[b.confidence!]
+    )
   const noise = triaged.filter((t) => t.verdict === "noise")
   const counts = new Map<string, number>()
   for (const n of noise) counts.set(n.reason, (counts.get(n.reason) ?? 0) + 1)
 
-  const lines = [`## Leads for ${profile.name} (${leads.length})`, ""]
+  const lines = [`## Leads for ${profile.name} (${leads.length})`, "", ...notes.map((note) => `> ${note}`)]
+  if (notes.length > 0) lines.push("")
   if (leads.length === 0) lines.push("None in these messages.", "")
   leads.forEach((lead, i) => {
     lines.push(`**${i + 1}. ${stayWindow(lead)}, ${lead.confidence} confidence**`)
     for (const line of lead.text.split("\n")) lines.push(`> ${line}`)
     lines.push(
       [lead.sender, lead.group, lead.at].filter((s) => s !== undefined).join(" · ") || "(no sender)",
-      `${lead.reason}. Availability: not checked.`,
+      `${lead.reason}. ${availabilityLine(lead)}`,
       ""
     )
   })

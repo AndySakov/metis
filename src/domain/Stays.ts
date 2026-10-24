@@ -24,5 +24,8 @@ export class UnitProfile extends Schema.Class<UnitProfile>("UnitProfile")({
     })
   ),
   bedrooms: Schema.Int.pipe(Schema.between(1, 20)),
-  areas: Schema.Struct({ accept: Names, borderline: Names, reject: Names })
+  areas: Schema.Struct({ accept: Names, borderline: Names, reject: Names }),
+  availability: Schema.optional(
+    Schema.Struct({ spreadsheetId: Schema.String.pipe(Schema.pattern(/^[A-Za-z0-9_-]+$/)) })
+  )
 }) {}

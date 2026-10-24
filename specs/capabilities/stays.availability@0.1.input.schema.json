@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schema.metis.dev/capabilities/stays.availability@0.1.input.schema.json",
+  "title": "stays.availability@0.1 input",
+  "description": "A stay to check: explicit dates, or words read the way triage reads a lead (\"15 to 18 November\", \"this weekend\", \"kesho\").",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "checkIn": {
+      "type": "string",
+      "format": "date"
+    },
+    "checkOut": {
+      "type": "string",
+      "format": "date"
+    },
+    "when": {
+      "type": "string",
+      "minLength": 1
+    },
+    "now": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "examples": [
+    {
+      "checkIn": "2026-11-15",
+      "checkOut": "2026-11-18"
+    },
+    {
+      "when": "this weekend"
+    }
+  ]
+}

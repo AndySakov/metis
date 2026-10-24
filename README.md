@@ -21,7 +21,7 @@ multi-user seams left open but not built.
 What exists and works:
 
 - Contract schemas in `specs/` — Intent, IntentDraft, Plan, Artifact, Event, ToolSpec, shared types,
-  18 capability contracts, 26 example tool descriptors.
+  19 capability contracts, 27 example tool descriptors.
 - Effect Schema domain types in `src/domain/` that decode those contracts, with branded identifiers
   and tagged errors.
 - A PostgreSQL schema in `migrations/`, with domain constraints and a checksum-verifying migration
@@ -77,6 +77,13 @@ What exists and works:
   drive-time catchment, and resolves "leo", "kesho" and "tarehe 15 mpaka 18" in the unit's own
   time zone. Deterministic, held by conformance vectors in `specs/stays/conformance/`, the first
   of them the owner's own worked examples. The pasted chat is labelled `untrusted`.
+- **Availability from the booking sheet** (`stays.availability`, `src/stays/Availability.ts`).
+  Each dated lead is checked against the unit's Google Sheet: OPEN (an unsold slot carried for
+  projection, ranked first), FREE, CONTESTED (overlaps a hot lead), BOOKED (with the next free
+  window) or NO DATA (past the last month tab). A row's status is its Confirmed cell's colour, and
+  dates written month-first in one tab and day-first in another are settled by the sheet's own
+  night count. "Is the unit free this weekend?" asks it directly. The sheet is read by a
+  service account with a read-only scope.
 - **A project scaffolder that writes to disk.** `build.scaffold` (`src/tools/servers/build.ts`)
   creates a `node-ts` or `python` project under `METIS_WORKSPACE` and nowhere else: the name must
   be one safe path segment, and it never writes over an existing directory. It is declared
@@ -114,7 +121,7 @@ artifact, and an unresolvable capability that fails cleanly instead of dispatchi
 
 What does **not** exist yet, despite being described in `docs/`:
 
-- Seven of the eighteen capabilities remain descriptors: `run.notebook`, `graph.link`, `vector.upsert`, and the four `agent.*` ones, which need real browser and device control. Implementing any of them against canned
+- Seven of the nineteen capabilities remain descriptors: `run.notebook`, `graph.link`, `vector.upsert`, and the four `agent.*` ones, which need real browser and device control. Implementing any of them against canned
   responses would be worse than leaving them out — the registry would claim a capability that does
   not do what its contract says.
 - The monorepo layout, `examples/`, voice, device control, the Adaptive Agent Foundry.
@@ -268,6 +275,11 @@ and watch that skill's gear climb until it stops asking.
 - `METIS_STAYS_PROFILE` points `stays.triage` at your unit (`specs/stays/UnitProfile.schema.json`);
   without it the repository's example Westlands 1-bed is used. Keep a real unit's profile out of
   the repository.
+- `METIS_GOOGLE_CREDENTIALS` lets the stays server read the unit's booking sheet: create a service
+  account in Google Cloud with the Sheets API enabled, download its JSON key, share the sheet with
+  the account's email as a viewer, and put the sheet's id (from its URL) in the profile as
+  `availability.spreadsheetId`. `METIS_STAYS_AVAILABILITY_SNAPSHOT` reads a saved
+  `spreadsheets.get` response instead.
 - `METIS_WORKSPACE` lets `build.scaffold` create projects in that directory ("Scaffold a
   TypeScript project called notes-api"). Without it the server that writes to disk is not started.
 - `GET /plans/{id}/execution` reports a plan's latest run from the event log, in either mode. A

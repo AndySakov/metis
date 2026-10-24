@@ -340,3 +340,22 @@ describe("a leads goal triages what was pasted with it", () => {
     )
   })
 })
+
+describe("an availability question checks the booking sheet", () => {
+  it("hands the question's words to stays.availability", async () => {
+    const plan = await planFor("Is the unit free from 15 to 18 November?")
+    expect(plan.steps.map((s) => s.toolCall)).toEqual([
+      expect.objectContaining({
+        capability: "stays.availability@0.1",
+        input: { when: "Is the unit free from 15 to 18 November?" }
+      })
+    ])
+  })
+
+  it("leaves documents and lead sweeps to their own templates", async () => {
+    expect((await planFor("Draft a PRD for a free notes app")).steps.at(-1)!.toolCall!.capability).toBe(
+      "design.prd@1.0"
+    )
+    expect((await planFor("Any leads available today?")).steps.map((s) => s.kind)).toEqual(["ask"])
+  })
+})
