@@ -67,7 +67,8 @@ describe("the planner produces valid plans", () => {
       "Research the state of the art in RAG",
       "C4 diagrams for a notes app",
       "Write an API spec for a notes app",
-      "Scaffold a TypeScript project called notes-api"
+      "Scaffold a TypeScript project called notes-api",
+      "Summarize https://example.com/notes"
     ]
     for (const goal of goals) {
       for (const step of (await planFor(goal)).steps) {
@@ -252,5 +253,49 @@ describe("a scaffold goal plans a project the tool will accept", () => {
   it("leaves a document request about scaffolding to the document template", async () => {
     expect((await planFor("Draft a PRD for a scaffold generator")).steps.map((s) => s.toolCall?.capability))
       .toEqual(["research.search@0.1", "design.prd@1.0"])
+  })
+})
+
+describe("a summarize goal with a URL chains a fetch into a summary", () => {
+  it("binds the fetched text into the summary's input", async () => {
+    const plan = await planFor("Summarize https://example.com/posts/offline-first.")
+    expect(plan.steps.map((s) => s.toolCall?.capability)).toEqual(["research.fetch@0.1", "research.summarize@0.1"])
+    expect(plan.steps[0]!.toolCall!.input).toEqual({ url: "https://example.com/posts/offline-first" })
+    expect(plan.steps[1]!.toolCall!.input).toEqual({ chunks: [{ source: "https://example.com/posts/offline-first" }] })
+    expect(plan.steps[1]!.toolCall!.bindings).toEqual([
+      { to: "/chunks/0/text", fromStep: plan.steps[0]!.id, from: "/text" }
+    ])
+  })
+
+  it("takes the URL whole, keeping brackets it opened and dropping the sentence's", () => {
+    expect(Planner.urlIn("Summarize https://en.wikipedia.org/wiki/Metis_(mythology).")).toBe(
+      "https://en.wikipedia.org/wiki/Metis_(mythology)"
+    )
+    expect(Planner.urlIn("(summarize https://example.com/a)")).toBe("https://example.com/a")
+    expect(Planner.urlIn("tl;dr https://example.com/x?y=1, please!")).toBe("https://example.com/x?y=1")
+    expect(Planner.urlIn("summarize this")).toBeUndefined()
+  })
+
+  it("wins over the document templates when the goal points at a page", async () => {
+    expect((await planFor("Give me a summary of the PRD at https://example.com/prd")).steps[0]!.toolCall!.capability)
+      .toBe("research.fetch@0.1")
+  })
+
+  it("is not used without a URL", async () => {
+    expect((await planFor("Summarize the state of the art in RAG")).steps.map((s) => s.toolCall?.capability))
+      .toEqual(["research.search@0.1"])
+  })
+
+  it("leaves out the summary too when the fetch cannot run, and says why", async () => {
+    const plan = await Effect.runPromise(
+      Effect.gen(function*() {
+        const planner = yield* Planner.Planner
+        return yield* planner.plan(intent("Summarize https://example.com/notes", "S2"))
+      }).pipe(Effect.provide(Planner.layerFor((capability) => capability === "research.summarize@0.1")))
+    )
+    expect(plan.steps.map((s) => s.kind)).toEqual(["ask"])
+    const risks = plan.risks.map((r) => r.description).join("\n")
+    expect(risks).toContain("research.fetch@0.1 has no registered implementation")
+    expect(risks).toContain(`"Summarize what was fetched": it needs the output of "Fetch the page"`)
   })
 })

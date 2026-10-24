@@ -109,6 +109,14 @@ export * as Ids from "./domain/Ids.js"
 export * as Intent from "./domain/Intent.js"
 
 /**
+ * JSON Pointer (RFC 6901): how a plan names a place inside a tool's input or output.
+ *
+ * `""` is the whole document; otherwise each `/`-separated token is a key or an array index, with
+ * `~1` standing for `/` and `~0` for `~`.
+ */
+export * as JsonPointer from "./domain/JsonPointer.js"
+
+/**
  * The plan a request turns into: an ordered list of steps, plus what the planner assumed, what it
  * thinks could go wrong, and what it expects to produce.
  */

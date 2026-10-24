@@ -154,6 +154,12 @@ Stated plainly rather than implied away. These are open, not managed.
   written at the next startup, stamped then. Reconciliation is serialised within one process, so a
   run and the sweep never write the same change twice; two processes sharing one Postgres log
   could. The gate is never late, since every check derives from the log; only the record is.
+- **Labels follow content through a run, not into storage.** A value bound from a `public.web`
+  step reaches policy as `untrusted` at every later step and at the artifact write, but the
+  artifact is stored without the label, so content read back later would arrive clean. Nothing
+  reads artifacts back into a plan yet; the label has to be stored before anything does.
+- **An approver sees a bound step's labels, not its resolved input.** `APPROVAL_REQUESTED` names
+  the tags a bound value brought, but the value itself is only known at dispatch and is not shown.
 - **Memory writes are gated, not labelled.** Untrusted input to a tool declaring `memory.write`
   needs approval, but nothing stores the `untrusted` tag with the record, so an approved write is
   read back later as ordinary memory. The memory server is not built yet; when it lands, the tag

@@ -36,6 +36,12 @@ What exists and works:
   that `pnpm start` runs, so the log shows when a skill lost its gear rather than when it next ran.
 - A **planner** — template-matched and deliberately dumb — that turns an Intent into a structurally
   valid Plan, targeting capabilities and never naming a tool implementation.
+- **Steps that chain.** A tool call can bind part of its input to an earlier step's output
+  (`ToolCall.bindings`, JSON Pointers on both sides), so "Summarize https://..." fetches the page
+  and summarizes what it fetched. The value carries its labels: anything a `public.web` tool
+  returns is `untrusted`, and policy sees that at every later step it reaches. A fetch steered by
+  a fetched page is denied by `deny.untrusted_egress` in the running loop, not only in the red-team
+  suite. A binding that could never resolve is rejected when the plan is decoded.
 - A **`PolicyGate`** that evaluates and writes every decision to the event log, and a **coverage
   report** computing the unmatched fraction, dead rules and vacuous rules from that log.
 - A **tool registry** resolving a capability id to an implementation, rejecting descriptors that

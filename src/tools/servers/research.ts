@@ -35,17 +35,39 @@ const BLOCKED_HOST = /^(localhost|127\.|0\.0\.0\.0|10\.|192\.168\.|169\.254\.|17
 
 const stripHtml = (html: string): string =>
   html
-    // Script and style bodies are not content, and leaving them in would poison a summary.
-    .replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi, " ")
-    .replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, " ")
-    .replace(/<[^>]+>/g, " ")
+    // Script and style bodies are not content, and leaving them in would poison a summary. Nor
+    // are footnote markers, which would otherwise end up mid-sentence as "[3]".
+    .replace(/<!--[\s\S]*?-->/g, " ")
+    .replace(/<(script|style|noscript|sup)\b[^>]*>[\s\S]*?<\/\1>/gi, " ")
+    // Block elements separate words; inline ones (links, emphasis) sit inside them and must not
+    // leave a space before the punctuation that follows.
+    .replace(
+      /<\/?(?:p|div|br|li|ul|ol|h[1-6]|tr|td|th|table|section|article|header|footer|nav|blockquote)\b[^>]*>/gi,
+      " "
+    )
+    .replace(/<[^>]+>/g, "")
     .replace(/&nbsp;/g, " ")
-    .replace(/&amp;/g, "&")
+    .replace(/&#(\d+);/g, (_, code) => String.fromCodePoint(Number(code)))
+    .replace(/&#x([0-9a-f]+);/gi, (_, code) => String.fromCodePoint(parseInt(code, 16)))
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
     .replace(/&quot;/g, "\"")
+    .replace(/&#39;|&apos;/g, "'")
+    .replace(/&amp;/g, "&")
     .replace(/\s+/g, " ")
     .trim()
+
+/**
+ * The readable text of a page: its paragraphs, one per line, when it has enough of them to be an
+ * article, otherwise everything. Menus, headers and footers are rarely in `<p>`, so on most pages
+ * this is the difference between the article and the article buried in its navigation.
+ */
+export const readableText = (html: string): string => {
+  const paragraphs = [...html.matchAll(/<p\b[^>]*>([\s\S]*?)<\/p>/gi)]
+    .map((match) => stripHtml(match[1]!))
+    .filter((text) => text.length > 0)
+  return paragraphs.join("").length >= 500 ? paragraphs.join("\n") : stripHtml(html)
+}
 
 server.registerTool(
   "fetch",
@@ -92,7 +114,7 @@ server.registerTool(
       const body = await response.text()
       const titleMatch = /<title[^>]*>([\s\S]*?)<\/title>/i.exec(body)
       const result = {
-        text: stripHtml(body),
+        text: readableText(body),
         metadata: titleMatch?.[1] !== undefined ? { title: stripHtml(titleMatch[1]) } : {}
       }
 
@@ -106,12 +128,18 @@ server.registerTool(
   }
 )
 
-/** Splits on sentence boundaries, keeping the terminator. */
+/** Splits on sentence boundaries and line breaks, keeping the terminator. */
 const sentences = (text: string): Array<string> =>
   text
-    .split(/(?<=[.!?])\s+/)
+    .split(/(?<=[.!?])\s+|\n+/)
     .map((s) => s.trim())
     .filter((s) => s.length > 0)
+
+/** A sentence worth quoting: long enough to say something, short enough to read, and prose. */
+const quotable = (sentence: string): boolean => {
+  const words = sentence.split(/\s+/).length
+  return words >= 8 && words <= 60 && /[.!?]["')\]]?$/.test(sentence) && /[a-z]/.test(sentence)
+}
 
 server.registerTool(
   "summarize",
@@ -138,16 +166,26 @@ server.registerTool(
       }
     }
 
+    // Earlier sentences count for more: most writing states its point first, and a summary built
+    // only on vocabulary overlap picks whatever repeats the subject's name most.
+    let position = 0
     const scored = chunks.flatMap((chunk) =>
-      sentences(chunk.text).map((sentence) => {
+      sentences(chunk.text).filter(quotable).map((sentence) => {
         const words = sentence.toLowerCase().match(/[a-z0-9']+/g) ?? []
-        const score = words.reduce((sum, word) => sum + (frequency.get(word) ?? 0), 0) /
+        const overlap = words.reduce((sum, word) => sum + (frequency.get(word) ?? 0), 0) /
           Math.max(1, words.length)
-        return { sentence, score, source: chunk.source }
+        return { sentence, score: overlap * (1 + 2 / (1 + position / 3)), order: position++, source: chunk.source }
       })
     )
 
-    const top = scored.slice().sort((a, b) => b.score - a.score).slice(0, 5)
+    // The best five, each said once, in the order the source said them.
+    const seen = new Set<string>()
+    const top = scored
+      .slice()
+      .sort((a, b) => b.score - a.score)
+      .filter((entry) => !seen.has(entry.sentence) && seen.add(entry.sentence))
+      .slice(0, 5)
+      .sort((a, b) => a.order - b.order)
     const citations = Array.from(
       new Map(
         chunks
@@ -157,7 +195,15 @@ server.registerTool(
     )
 
     const result = {
-      markdown: ["## Summary", "", ...top.map((entry) => `- ${entry.sentence}`), ""].join("\n"),
+      markdown: [
+        "## Summary",
+        "",
+        ...(top.length > 0
+          ? top.map((entry) => `- ${entry.sentence}`)
+          : ["Nothing in the text reads as a full sentence, so there is nothing to quote."]),
+        ...(citations.length > 0 ? ["", `Source: ${citations.map((c) => c.url).join(", ")}`] : []),
+        ""
+      ].join("\n"),
       citations
     }
 

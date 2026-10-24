@@ -16,8 +16,9 @@ import { Context, Effect, Layer } from "effect"
 import type { Autonomy, CapabilityId, EpochSeconds } from "../domain/Common.js"
 import { uuidv7 } from "../domain/Ids.js"
 import type { Intent } from "../domain/Intent.js"
+import type { JsonPointer } from "../domain/JsonPointer.js"
 import type { ArtifactExpectationId, AssumptionId, PlanId, PlanStepId, RiskId } from "../domain/Plan.js"
-import { ArtifactExpectation, Assumption, Plan, PlanStep, Risk, ToolCall } from "../domain/Plan.js"
+import { ArtifactExpectation, Assumption, InputBinding, Plan, PlanStep, Risk, ToolCall } from "../domain/Plan.js"
 
 /**
  * Whether a step needs a human before it runs, given the gear (ADR-002).
@@ -49,6 +50,8 @@ interface StepTemplate {
   readonly description: string
   readonly capability?: string
   readonly input?: Record<string, unknown>
+  /** Input filled from an earlier step of the same template, named by its index there. */
+  readonly bindings?: ReadonlyArray<{ readonly to: string; readonly fromStep: number; readonly from: string }>
 }
 
 interface Template {
@@ -97,7 +100,45 @@ export const projectNameOf = (goal: string): string => {
   return (/^[a-z]/.test(slug) ? slug : `app-${slug}`).slice(0, 63).replace(/-+$/, "")
 }
 
+/**
+ * The first http(s) URL in a goal, without punctuation that ends the sentence around it. A closing
+ * bracket is kept when the URL opened it, as in `https://en.wikipedia.org/wiki/Metis_(mythology)`.
+ */
+export const urlIn = (goal: string): string | undefined => {
+  let url = /\bhttps?:\/\/[^\s<>"'`]+/i.exec(goal)?.[0]
+  if (url === undefined) return undefined
+  for (;;) {
+    const last = url.at(-1)!
+    const unbalanced = (open: string, close: string) =>
+      last === close && url!.split(close).length > url!.split(open).length
+    if (/[.,;:!?]/.test(last) || unbalanced("(", ")") || unbalanced("[", "]")) url = url.slice(0, -1)
+    else return url
+  }
+}
+
 const TEMPLATES: ReadonlyArray<Template> = [
+  {
+    // First, so "summarize the PRD at https://..." reads the page rather than drafting a new PRD.
+    name: "summarize_url",
+    matches: (goal) => /\b(?:summari[sz]e|summary of|tl;?dr|digest)\b/i.test(goal) && urlIn(goal) !== undefined,
+    steps: (intent) => {
+      const url = urlIn(intent.goal)!
+      return [
+        { kind: "tool", description: "Fetch the page", capability: "research.fetch@0.1", input: { url } },
+        {
+          kind: "tool",
+          description: "Summarize what was fetched",
+          capability: "research.summarize@0.1",
+          input: { chunks: [{ source: url }] },
+          // The page text is only known once it is fetched; it arrives tagged as web content.
+          bindings: [{ to: "/chunks/0/text", fromStep: 0, from: "/text" }]
+        }
+      ]
+    },
+    assumptions: ["The page can be read without signing in"],
+    risks: ["The page is untrusted: the summary repeats what it says, not what is true"],
+    expects: [{ kind: "text", description: "The page, and a summary of it" }]
+  },
   {
     name: "prd",
     matches: (goal) => PRD_REQUEST.test(goal),
@@ -222,17 +263,34 @@ export const makeFor = (available: (capability: string) => boolean) =>
         const matched = templateFor(intent.goal)
 
         const proposed = matched.steps(intent)
-        const runnable = proposed.filter((step) => step.capability === undefined || available(step.capability))
-        const skipped = proposed
-          .filter((step) => step.capability !== undefined && !available(step.capability))
-          .map((step) => `Skipped "${step.description}": ${step.capability} has no registered implementation`)
+        // A step is left out if its capability is not available, or if a step it takes input from
+        // was left out: it could only ever fail for want of that input.
+        const kept: Array<boolean> = []
+        const skipped: Array<string> = []
+        for (const [index, step] of proposed.entries()) {
+          const missing = step.capability !== undefined && !available(step.capability)
+          const orphaned = (step.bindings ?? []).find((binding) => kept[binding.fromStep] !== true)
+          kept[index] = !missing && orphaned === undefined
+          if (missing) {
+            skipped.push(`Skipped "${step.description}": ${step.capability} has no registered implementation`)
+          } else if (orphaned !== undefined) {
+            skipped.push(
+              `Skipped "${step.description}": it needs the output of "${
+                proposed[orphaned.fromStep]!.description
+              }", which was skipped`
+            )
+          }
+        }
+        const runnable = proposed.flatMap((step, index) => kept[index] ? [{ step, index }] : [])
 
         const template = runnable.length > 0 ? matched : CLARIFY
         const risks = [...template.risks, ...skipped]
 
-        const steps = (runnable.length > 0 ? runnable : CLARIFY.steps(intent)).map((step, index) =>
+        const chosen = runnable.length > 0 ? runnable : CLARIFY.steps(intent).map((step, index) => ({ step, index }))
+        const ids = new Map(chosen.map(({ index }, position) => [index, uuidv7(millis + position) as PlanStepId]))
+        const steps = chosen.map(({ index, step }) =>
           new PlanStep({
-            id: uuidv7(millis + index) as PlanStepId,
+            id: ids.get(index)!,
             kind: step.kind,
             description: step.description,
             requiresApproval: stepRequiresApproval(step.kind, intent.autonomy),
@@ -240,7 +298,18 @@ export const makeFor = (available: (capability: string) => boolean) =>
               ? {
                 toolCall: new ToolCall({
                   capability: step.capability as CapabilityId,
-                  input: step.input ?? {}
+                  input: step.input ?? {},
+                  ...(step.bindings !== undefined
+                    ? {
+                      bindings: step.bindings.map((binding) =>
+                        new InputBinding({
+                          to: binding.to as JsonPointer,
+                          fromStep: ids.get(binding.fromStep)!,
+                          from: binding.from as JsonPointer
+                        })
+                      )
+                    }
+                    : {})
                   // `tool` is deliberately absent: ADR-017 requires the planner to target a
                   // capability and never name an implementation. The registry fills it at dispatch.
                 })
