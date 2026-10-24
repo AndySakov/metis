@@ -45,7 +45,8 @@ beforeAll(async () => {
     port: PORT,
     anthropicApiKey: Option.some(Redacted.make("test-key")),
     anthropicBaseUrl: Option.some(`http://127.0.0.1:${(api.address() as AddressInfo).port}`),
-    postgres: false
+    postgres: false,
+    restate: Option.none()
   }
   // One `backing` value for both, so the test reads the very event log the server writes to.
   const backing = App.services(config)
@@ -147,6 +148,27 @@ describe("pnpm start", () => {
       .filter((p) => p.skill === "design.c4")
     expect(promotions.map((p) => `${p.from}->${p.to}`)).toEqual(["S0->S1", "S1->S2"])
   }, 120_000)
+
+  it("reports a plan's latest run from the event log, whichever path ran it", async () => {
+    const plan = await (await post("/intent", {
+      actor: "user:andysakov",
+      goal: "Write an API spec for a notes app",
+      autonomy: "S2"
+    })).json()
+
+    // Never run: there is nothing to report yet.
+    expect((await fetch(`http://127.0.0.1:${PORT}/plans/${plan.id}/execution`)).status).toBe(404)
+
+    await post(`/plans/${plan.id}/execute`, {})
+    const waiting = await (await fetch(`http://127.0.0.1:${PORT}/plans/${plan.id}/execution`)).json()
+    expect(waiting).toMatchObject({ status: "awaiting_approval", steps: [{ status: "awaiting_approval" }] })
+
+    await post(`/plans/${plan.id}/execute`, { approvedSteps: [plan.steps[0].id] })
+    const done = await (await fetch(`http://127.0.0.1:${PORT}/plans/${plan.id}/execution`)).json()
+    expect(done.status).toBe("completed")
+    const content = await fetch(`http://127.0.0.1:${PORT}/artifacts/${done.steps[0].artifactId}/content`)
+    expect(content.status).toBe(200)
+  }, 60_000)
 
   it("answers a missing plan with the 404 the spec declares", async () => {
     const response = await fetch(`http://127.0.0.1:${PORT}/plans/01890a5d-0000-7000-8000-000000000000`)

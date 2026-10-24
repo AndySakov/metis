@@ -153,11 +153,10 @@ Stated plainly rather than implied away. These are open, not managed.
   read back later as ordinary memory. The memory server is not built yet; when it lands, the tag
   has to be persisted and put back on the content when it is retrieved.
 - **Durability depends on which execution mode was used.** `restate` is durable; `direct` is not,
-  and killing the process loses the run. The API reports the mode on every submission, so the
-  distinction is visible — but any claim that "plans survive restarts" is only true of the durable
-  path, and deployments that omit the Restate layer get the direct one.
-- **The trust ledger is read-only.** It enforces the two-ledger promotion rule but nothing updates
-  the scores, so no skill can currently be promoted or demoted by evidence.
+  and killing the process loses the run. `pnpm start` uses Restate only when `RESTATE_INGRESS_URL`
+  is set, and the API reports the mode on every submission. A durable run also needs Postgres: with
+  memory storage Restate resumes the workflow after a restart, but its plan and record are gone,
+  and startup warns about exactly that combination.
 - **Sampling bounds frequency, not severity.** Random verification of executed actions can tell you
   how often things go wrong. It will not reliably catch a single rare catastrophic action. Do not
   conflate the two in code or in any claim made about the system.
