@@ -1,0 +1,598 @@
+{
+  "description": "Availability read from a short-let's booking sheet, in the Google Sheets API's own spreadsheets.get shape. A row's status is its Confirmed cell's colour (green confirmed, amber hot lead, red open slot); tabs disagree on date format and the Number of Nights column settles it.",
+  "snapshot": {
+    "sheets": [
+      {
+        "properties": {
+          "title": "May 2026"
+        },
+        "data": [
+          {
+            "rowData": [
+              {
+                "values": [
+                  {
+                    "formattedValue": "Bookings"
+                  }
+                ]
+              },
+              {
+                "values": [
+                  {
+                    "formattedValue": "Check In Date"
+                  },
+                  {
+                    "formattedValue": "Check Out Date"
+                  },
+                  {
+                    "formattedValue": "Nightly Rate"
+                  },
+                  {
+                    "formattedValue": "Number of Nights"
+                  },
+                  {
+                    "formattedValue": "Total"
+                  },
+                  {
+                    "formattedValue": "Channel"
+                  },
+                  {
+                    "formattedValue": "Paid"
+                  },
+                  {
+                    "formattedValue": "Confirmed"
+                  }
+                ]
+              },
+              {
+                "values": [
+                  {
+                    "formattedValue": "17/05/2026"
+                  },
+                  {
+                    "formattedValue": "20/05/2026"
+                  },
+                  {
+                    "formattedValue": "Ksh9,000.00"
+                  },
+                  {
+                    "formattedValue": "3"
+                  },
+                  {
+                    "formattedValue": "Ksh"
+                  },
+                  {
+                    "formattedValue": "Airbnb"
+                  },
+                  {
+                    "formattedValue": "",
+                    "effectiveFormat": {
+                      "backgroundColor": {
+                        "red": 1,
+                        "green": 1,
+                        "blue": 1
+                      }
+                    }
+                  },
+                  {
+                    "formattedValue": ""
+                  }
+                ]
+              },
+              {
+                "values": [
+                  {
+                    "formattedValue": "Total"
+                  },
+                  {
+                    "formattedValue": ""
+                  },
+                  {
+                    "formattedValue": ""
+                  },
+                  {
+                    "formattedValue": "13"
+                  }
+                ]
+              },
+              {
+                "values": []
+              },
+              {
+                "values": [
+                  {
+                    "formattedValue": "Expenditure"
+                  }
+                ]
+              },
+              {
+                "values": [
+                  {
+                    "formattedValue": "Rent"
+                  },
+                  {
+                    "formattedValue": "Ksh60,000.00"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "properties": {
+          "title": "June 2026"
+        },
+        "data": [
+          {
+            "rowData": [
+              {
+                "values": [
+                  {
+                    "formattedValue": "Bookings"
+                  }
+                ]
+              },
+              {
+                "values": [
+                  {
+                    "formattedValue": "Check In Date"
+                  },
+                  {
+                    "formattedValue": "Check Out Date"
+                  },
+                  {
+                    "formattedValue": "Nightly Rate"
+                  },
+                  {
+                    "formattedValue": "Number of Nights"
+                  },
+                  {
+                    "formattedValue": "Total"
+                  },
+                  {
+                    "formattedValue": "Channel"
+                  },
+                  {
+                    "formattedValue": "Paid"
+                  },
+                  {
+                    "formattedValue": "Confirmed"
+                  }
+                ]
+              },
+              {
+                "values": [
+                  {
+                    "formattedValue": "6/4/2026"
+                  },
+                  {
+                    "formattedValue": "6/7/2026"
+                  },
+                  {
+                    "formattedValue": "Ksh9,000.00"
+                  },
+                  {
+                    "formattedValue": "3"
+                  },
+                  {
+                    "formattedValue": "Ksh"
+                  },
+                  {
+                    "formattedValue": "Direct"
+                  },
+                  {
+                    "formattedValue": "",
+                    "effectiveFormat": {
+                      "backgroundColor": {
+                        "red": 1,
+                        "green": 1,
+                        "blue": 1
+                      }
+                    }
+                  },
+                  {
+                    "formattedValue": ""
+                  }
+                ]
+              },
+              {
+                "values": [
+                  {
+                    "formattedValue": "Total"
+                  },
+                  {
+                    "formattedValue": ""
+                  },
+                  {
+                    "formattedValue": ""
+                  },
+                  {
+                    "formattedValue": "13"
+                  }
+                ]
+              },
+              {
+                "values": []
+              },
+              {
+                "values": [
+                  {
+                    "formattedValue": "Expenditure"
+                  }
+                ]
+              },
+              {
+                "values": [
+                  {
+                    "formattedValue": "Rent"
+                  },
+                  {
+                    "formattedValue": "Ksh60,000.00"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "properties": {
+          "title": "August 2026"
+        },
+        "data": [
+          {
+            "rowData": [
+              {
+                "values": [
+                  {
+                    "formattedValue": "Bookings"
+                  }
+                ]
+              },
+              {
+                "values": [
+                  {
+                    "formattedValue": "Check In Date"
+                  },
+                  {
+                    "formattedValue": "Check Out Date"
+                  },
+                  {
+                    "formattedValue": "Nightly Rate"
+                  },
+                  {
+                    "formattedValue": "Number of Nights"
+                  },
+                  {
+                    "formattedValue": "Total"
+                  },
+                  {
+                    "formattedValue": "Channel"
+                  },
+                  {
+                    "formattedValue": "Paid"
+                  },
+                  {
+                    "formattedValue": "Confirmed"
+                  }
+                ]
+              },
+              {
+                "values": [
+                  {
+                    "formattedValue": "07/31/2026"
+                  },
+                  {
+                    "formattedValue": "08/02/2026"
+                  },
+                  {
+                    "formattedValue": "Ksh9,000.00"
+                  },
+                  {
+                    "formattedValue": "2"
+                  },
+                  {
+                    "formattedValue": "Ksh"
+                  },
+                  {
+                    "formattedValue": "Imani"
+                  },
+                  {
+                    "formattedValue": "",
+                    "effectiveFormat": {
+                      "backgroundColor": {
+                        "red": 1,
+                        "green": 1,
+                        "blue": 1
+                      }
+                    }
+                  },
+                  {
+                    "formattedValue": "Yes",
+                    "effectiveFormat": {
+                      "backgroundColor": {
+                        "red": 0.2039,
+                        "green": 0.6588,
+                        "blue": 0.3255
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "values": [
+                  {
+                    "formattedValue": "08/10/2026"
+                  },
+                  {
+                    "formattedValue": "08/13/2026"
+                  },
+                  {
+                    "formattedValue": "Ksh9,000.00"
+                  },
+                  {
+                    "formattedValue": "3"
+                  },
+                  {
+                    "formattedValue": "Ksh"
+                  },
+                  {
+                    "formattedValue": ""
+                  },
+                  {
+                    "formattedValue": "",
+                    "effectiveFormat": {
+                      "backgroundColor": {
+                        "red": 1,
+                        "green": 1,
+                        "blue": 1
+                      }
+                    }
+                  },
+                  {
+                    "formattedValue": "Yes",
+                    "effectiveFormat": {
+                      "backgroundColor": {
+                        "red": 0.9176,
+                        "green": 0.2627,
+                        "blue": 0.2078
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "values": [
+                  {
+                    "formattedValue": "08/15/2026"
+                  },
+                  {
+                    "formattedValue": "08/18/2026"
+                  },
+                  {
+                    "formattedValue": "Ksh9,000.00"
+                  },
+                  {
+                    "formattedValue": "3"
+                  },
+                  {
+                    "formattedValue": "Ksh"
+                  },
+                  {
+                    "formattedValue": "Lead: Kevin"
+                  },
+                  {
+                    "formattedValue": "",
+                    "effectiveFormat": {
+                      "backgroundColor": {
+                        "red": 1,
+                        "green": 1,
+                        "blue": 1
+                      }
+                    }
+                  },
+                  {
+                    "formattedValue": "Yes",
+                    "effectiveFormat": {
+                      "backgroundColor": {
+                        "red": 0.9843,
+                        "green": 0.7372,
+                        "blue": 0.0156
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "values": [
+                  {
+                    "formattedValue": "08/20/2026"
+                  },
+                  {
+                    "formattedValue": "08/25/2026"
+                  },
+                  {
+                    "formattedValue": "Ksh9,000.00"
+                  },
+                  {
+                    "formattedValue": "5"
+                  },
+                  {
+                    "formattedValue": "Ksh"
+                  },
+                  {
+                    "formattedValue": "Airbnb"
+                  },
+                  {
+                    "formattedValue": "",
+                    "effectiveFormat": {
+                      "backgroundColor": {
+                        "red": 1,
+                        "green": 1,
+                        "blue": 1
+                      }
+                    }
+                  },
+                  {
+                    "formattedValue": "Yes",
+                    "effectiveFormat": {
+                      "backgroundColor": {
+                        "red": 0.2039,
+                        "green": 0.6588,
+                        "blue": 0.3255
+                      }
+                    }
+                  }
+                ]
+              },
+              {
+                "values": [
+                  {
+                    "formattedValue": "Total"
+                  },
+                  {
+                    "formattedValue": ""
+                  },
+                  {
+                    "formattedValue": ""
+                  },
+                  {
+                    "formattedValue": "13"
+                  }
+                ]
+              },
+              {
+                "values": []
+              },
+              {
+                "values": [
+                  {
+                    "formattedValue": "Expenditure"
+                  }
+                ]
+              },
+              {
+                "values": [
+                  {
+                    "formattedValue": "Rent"
+                  },
+                  {
+                    "formattedValue": "Ksh60,000.00"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "properties": {
+          "title": "Summary"
+        },
+        "data": [
+          {
+            "rowData": [
+              {
+                "values": [
+                  {
+                    "formattedValue": "Occupancy"
+                  },
+                  {
+                    "formattedValue": "62%"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "cases": [
+    {
+      "name": "a red row is an open slot to fill, not a booking",
+      "checkIn": "2026-08-10",
+      "checkOut": "2026-08-12",
+      "expect": {
+        "verdict": "OPEN"
+      }
+    },
+    {
+      "name": "nothing in the sheet on these nights",
+      "checkIn": "2026-08-03",
+      "checkOut": "2026-08-05",
+      "expect": {
+        "verdict": "FREE"
+      }
+    },
+    {
+      "name": "an amber hot lead holds, but is still sellable",
+      "checkIn": "2026-08-16",
+      "checkOut": "2026-08-17",
+      "expect": {
+        "verdict": "CONTESTED"
+      }
+    },
+    {
+      "name": "a green booking blocks, and the next window is offered",
+      "checkIn": "2026-08-21",
+      "checkOut": "2026-08-23",
+      "expect": {
+        "verdict": "BOOKED",
+        "nextWindow": {
+          "checkIn": "2026-08-25",
+          "checkOut": "2026-08-27"
+        }
+      }
+    },
+    {
+      "name": "check-out day can be let again",
+      "checkIn": "2026-08-25",
+      "checkOut": "2026-08-27",
+      "expect": {
+        "verdict": "FREE"
+      }
+    },
+    {
+      "name": "a stay ending the morning after the last tab is covered",
+      "checkIn": "2026-08-30",
+      "checkOut": "2026-09-01",
+      "expect": {
+        "verdict": "FREE"
+      }
+    },
+    {
+      "name": "past the last month tab is not free, it is unknown",
+      "checkIn": "2026-09-02",
+      "checkOut": "2026-09-04",
+      "expect": {
+        "verdict": "NO DATA"
+      }
+    },
+    {
+      "name": "a day-first tab, read by its night count",
+      "checkIn": "2026-05-18",
+      "checkOut": "2026-05-19",
+      "expect": {
+        "verdict": "BOOKED"
+      }
+    },
+    {
+      "name": "a month-first tab without leading zeros",
+      "checkIn": "2026-06-05",
+      "checkOut": "2026-06-06",
+      "expect": {
+        "verdict": "BOOKED"
+      }
+    },
+    {
+      "name": "a booking from the previous month's last day",
+      "checkIn": "2026-07-31",
+      "checkOut": "2026-08-01",
+      "expect": {
+        "verdict": "BOOKED"
+      }
+    }
+  ]
+}

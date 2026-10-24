@@ -218,6 +218,23 @@ const TEMPLATES: ReadonlyArray<Template> = [
     expects: [{ kind: "text", description: "The files created" }]
   },
   {
+    // After the document templates, so "a PRD for a free notes app" is still a PRD.
+    name: "availability",
+    matches: (goal) => /\b(free|available|availability|vacant|booked)\b/i.test(goal) && !/\bleads?\b/i.test(goal),
+    steps: (intent) => [
+      {
+        kind: "tool",
+        description: "Check the booking sheet for those dates",
+        capability: "stays.availability@0.1",
+        // The dates are read by the unit's server, in the unit's time zone, the way triage reads them.
+        input: { when: intent.goal }
+      }
+    ],
+    assumptions: ["The booking sheet is up to date"],
+    risks: ["A hot lead in the sheet may still convert: CONTESTED dates are not promised"],
+    expects: [{ kind: "text", description: "Whether the unit can take the stay, and when it could if not" }]
+  },
+  {
     // After the document and scaffold templates, so "a PRD for a leads dashboard" is still a PRD.
     name: "triage_leads",
     matches: (goal) => /\b(leads?|triage|enquir(?:y|ies)|sweep)\b/i.test(goal),

@@ -449,6 +449,42 @@ export * as TrustUpdater from "./policy/TrustUpdater.js"
 export * as Verification from "./policy/Verification.js"
 
 /**
+ * Availability for a short-let unit, read from its booking sheet: one tab per month, each opening
+ * with a "Bookings" block.
+ *
+ * Two things about that sheet decide every answer, and both are easy to get wrong:
+ *
+ * - **A row's status is a cell colour, not a value.** The Confirmed cell's background says what the
+ *   row is: green, a confirmed booking that blocks its nights; amber, a hot lead that may convert,
+ *   held but still sellable to a firmer booking; red, an *open* slot the owner is carrying for
+ *   projection, which is unsold inventory and the reason triage exists. Reading red rows as
+ *   bookings makes an empty month look sold out. Paid is the fallback; a row with no colour at all
+ *   (older tabs) is settled history, so confirmed.
+ * - **The tabs disagree on date format** (MM/DD in some months, DD/MM in others). Every reading of
+ *   a date pair is tried, and the sheet's own Number of Nights column picks the right one, with the
+ *   tab's month as the tie-break. What stays ambiguous is reported, not guessed.
+ *
+ * Check-out day is not occupied: a booking from the 10th to the 13th holds the nights of the 10th,
+ * 11th and 12th. Past the last month tab the sheet says nothing, which is not the same as free.
+ *
+ * Reads the Sheets API's `spreadsheets.get` response with grid data, as it comes. Free of Node APIs.
+ */
+export * as Availability from "./stays/Availability.js"
+
+/**
+ * Reading a unit's booking sheet from Google Sheets, as a service account.
+ *
+ * Read-only by construction: the token asked for carries only the `spreadsheets.readonly` scope, so
+ * nothing here could write to the sheet even if asked. The owner shares the sheet with the service
+ * account's email and points `METIS_GOOGLE_CREDENTIALS` at its key file; the key reaches only the
+ * `metis.stays` process.
+ *
+ * Only the month tabs near now are fetched, and only the two cell fields availability reads (the
+ * value and the background colour), so a sheet with years of history stays a small request.
+ */
+export * as Sheets from "./stays/Sheets.js"
+
+/**
  * Lead triage for a short-let: which messages in a pasted group chat are people looking for a place
  * to stay that this unit could fill, and when.
  *
@@ -594,12 +630,17 @@ export * as research from "./tools/servers/research.js"
  * An MCP server for the short-let: `stays.*` capabilities over one unit's profile.
  *
  * `triage` reads a pasted group chat and says which messages are people looking for a place this
- * unit could fill. The rules are in `src/stays/Triage.ts` and held by conformance vectors; this
- * server only parses the paste, applies them, and writes the report.
+ * unit could fill; `availability` says whether the unit can take a stay. The rules are in
+ * `src/stays/` and held by conformance vectors; this server parses, applies them, and reports.
  *
  * The unit is described by a profile (`specs/stays/UnitProfile.schema.json`) read once at startup
  * from `METIS_STAYS_PROFILE`, or the example Westlands 1-bed in the repository when unset. A
  * malformed profile stops the server, rather than producing confident verdicts against nonsense.
+ *
+ * Availability comes from the unit's booking sheet, read fresh for each call: with
+ * `METIS_GOOGLE_CREDENTIALS` and the profile's `availability.spreadsheetId`, from Google Sheets, or
+ * from a saved snapshot of it at `METIS_STAYS_AVAILABILITY_SNAPSHOT`. Without either, triage says
+ * "not checked" rather than guessing, and `availability` is a tool error.
  */
 export * as stays from "./tools/servers/stays.js"
 

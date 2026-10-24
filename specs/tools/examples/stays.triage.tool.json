@@ -15,7 +15,9 @@
   "outputSchema": {
     "$ref": "../../capabilities/stays.triage@0.1.output.schema.json"
   },
-  "authScopes": [],
+  "authScopes": [
+    "google.sheets.read"
+  ],
   "tests": [
     {
       "name": "minimal",

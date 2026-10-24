@@ -65,6 +65,19 @@
           }
         }
       }
+    },
+    "availability": {
+      "description": "Where the unit's bookings live, so triage can say whether a lead's dates are free. A Google Sheet with one tab per month, each opening with a Bookings block whose Confirmed cell colour gives each row's status. Read with a service account the sheet is shared with (METIS_GOOGLE_CREDENTIALS), read-only.",
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "spreadsheetId"
+      ],
+      "properties": {
+        "spreadsheetId": {
+          "$ref": "#/$defs/SpreadsheetId"
+        }
+      }
     }
   },
   "$defs": {
@@ -72,6 +85,12 @@
       "description": "A hand-authored slug naming the unit, readable in reports. Not a UUIDv7: it is chosen by the owner, not generated.",
       "type": "string",
       "pattern": "^[a-z0-9][a-z0-9-]*$"
+    },
+    "SpreadsheetId": {
+      "description": "Google's identifier for the sheet, from its URL. Not a METIS identity, so not a UUIDv7.",
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^[A-Za-z0-9_-]+$"
     }
   },
   "examples": [
