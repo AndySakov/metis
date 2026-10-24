@@ -17,16 +17,16 @@
  * the compliance ledger.
  */
 
-import { Effect } from "effect"
+import { Effect, Layer } from "effect"
 
 import type { Actor, Autonomy, EpochSeconds } from "../domain/Common.js"
-import type { EventId, EventType } from "../domain/Event.js"
+import type { CorrelationId, EventId, EventType } from "../domain/Event.js"
 import { Event } from "../domain/Event.js"
 import { uuidv7 } from "../domain/Ids.js"
 import type { Score, SkillId, TrustPolicy } from "../domain/Trust.js"
 import { TrustRecord } from "../domain/Trust.js"
 import { EventLogStore } from "../mneme/EventLogStore.js"
-import { gearRank, highestPermittedGear } from "./TrustLedger.js"
+import { gearRank, highestPermittedGear, permits, TrustLedger } from "./TrustLedger.js"
 
 /**
  * The floor a compliance event drops the ledger to.
@@ -147,7 +147,15 @@ export const derive = (
     ? 0
     : compliancePositive / complianceTotal) as Score
 
-  const record = new TrustRecord({ skill, competence, compliance, gear: "S0", updatedAt: now })
+  const record = new TrustRecord({
+    skill,
+    competence,
+    compliance,
+    gear: "S0",
+    updatedAt: now,
+    competenceSignals: competenceTotal,
+    complianceSignals: complianceTotal
+  })
 
   // The gear a skill holds is a consequence of its ledgers, never set independently.
   return {
@@ -183,7 +191,9 @@ export const deriveFromLog = (
 export const reconcile = (
   skill: SkillId,
   previousGear: Autonomy,
-  policy: TrustPolicy
+  policy: TrustPolicy,
+  /** The run that moved the gear, so its promotion is part of that run's record (ADR-009). */
+  correlationId?: CorrelationId
 ): Effect.Effect<DerivedTrust, never, EventLogStore> =>
   Effect.gen(function*() {
     const log = yield* EventLogStore
@@ -202,6 +212,7 @@ export const reconcile = (
           ts: Math.floor(millis / 1000) as EpochSeconds,
           type: (promoted ? "TRUST_PROMOTED" : "TRUST_DEMOTED") as EventType,
           actor: "metis" as Actor,
+          ...(correlationId !== undefined ? { correlationId } : {}),
           payload: {
             skill,
             from: previousGear,
@@ -224,3 +235,33 @@ export const reconcile = (
 
     return derived
   })
+
+/**
+ * A ledger that answers from the event log at the moment it is asked.
+ *
+ * `TrustLedger.layer` holds records fixed when it was built, so a skill's standing could not move
+ * while METIS ran: an approval granted at noon earned nothing until a restart. Deriving on every
+ * check means the gear a step is judged against reflects everything recorded up to that check,
+ * including earlier steps of the same run. It costs a read of the log per check, which a single
+ * user's log affords.
+ */
+export const ledgerFromLog = (policy: TrustPolicy) =>
+  Layer.effect(
+    TrustLedger,
+    Effect.gen(function*() {
+      const log = yield* EventLogStore
+      const current = (skill: SkillId) =>
+        Effect.gen(function*() {
+          const events = yield* Effect.orDie(log.read({}))
+          const millis = yield* Effect.clockWith((clock) => clock.currentTimeMillis)
+          const now = Math.floor(millis / 1000) as EpochSeconds
+          return { record: derive(events, skill, policy, now).record, now }
+        })
+
+      return TrustLedger.of({
+        get: (skill) => Effect.map(current(skill), ({ record }) => record),
+        permits: (skill, gear) => Effect.map(current(skill), ({ now, record }) => permits(record, policy, gear, now)),
+        policy: Effect.succeed(policy)
+      })
+    })
+  )

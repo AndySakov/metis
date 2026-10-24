@@ -20,6 +20,7 @@ import * as Coverage from "../../src/policy/Coverage.js"
 import * as PolicyEngine from "../../src/policy/PolicyEngine.js"
 import * as PolicyGate from "../../src/policy/PolicyGate.js"
 import * as TrustLedger from "../../src/policy/TrustLedger.js"
+import { derive } from "../../src/policy/TrustUpdater.js"
 import * as Verification from "../../src/policy/Verification.js"
 import * as McpToolRunner from "../../src/tools/McpToolRunner.js"
 import * as ToolRegistry from "../../src/tools/ToolRegistry.js"
@@ -58,10 +59,10 @@ const permissive = policyFrom({ version: "loop-1", defaultEffect: "allow", rules
 const trustPolicy = Schema.decodeUnknownSync(TrustPolicy)({
   decay: { competenceHalfLifeSeconds: 30 * 86400, complianceHalfLifeSeconds: 14 * 86400 },
   thresholds: [
-    { gear: "S1", minCompetence: 0.2, minCompliance: 0.2 },
-    { gear: "S2", minCompetence: 0.5, minCompliance: 0.5 },
-    { gear: "S3", minCompetence: 0.7, minCompliance: 0.8 },
-    { gear: "S4", minCompetence: 0.8, minCompliance: 0.95 }
+    { gear: "S1", minCompetence: 0.2, minCompliance: 0.2, minSignals: 0 },
+    { gear: "S2", minCompetence: 0.5, minCompliance: 0.5, minSignals: 0 },
+    { gear: "S3", minCompetence: 0.7, minCompliance: 0.8, minSignals: 0 },
+    { gear: "S4", minCompetence: 0.8, minCompliance: 0.95, minSignals: 0 }
   ]
 })
 
@@ -465,4 +466,38 @@ describe("a repeated identical call trips the circuit breaker", () => {
     expect(tripped.payload.capability).toBe("design.prd@1.0")
     expect(tripped.payload.repeats).toBe(3)
   })
+})
+
+describe("a run's outcome reaches the skill's competence ledger", () => {
+  const competence = (events: ReadonlyArray<any>) =>
+    derive(events, "design.prd" as SkillId, trustPolicy, Math.floor(Date.now() / 1000) as never).record
+
+  it("an approval granted counts for the skill that was approved", async () => {
+    const { events } = await runLoop("Draft a PRD", "S3", permissive, true)
+    // APPROVAL_GRANTED and TOOL_COMPLETED, both credited to design.prd.
+    expect(competence(events).competenceSignals).toBe(2)
+  }, 30_000)
+
+  it("a tool that fails counts against the skill that failed", async () => {
+    const events = await Effect.runPromise(
+      Effect.scoped(
+        Effect.gen(function*() {
+          const planner = yield* Planner.Planner
+          const intent = intentFor("Draft a PRD", "S2")
+          const full = yield* planner.plan(intent)
+          const step = full.steps.find((s) => s.toolCall?.capability === "design.prd@1.0")!
+          // An input the tool's own schema rejects: the call reaches the tool and fails there.
+          const broken = { ...step, toolCall: { ...step.toolCall!, input: {} } }
+          yield* Executor.execute(intent, { ...full, steps: [broken] } as typeof full)
+          const log = yield* EventLogStore
+          return yield* Effect.orDie(log.read({}))
+        })
+      ).pipe(Effect.provide(stack(permissive))) as Effect.Effect<any>
+    )
+
+    expect(events.map((e: { type: string }) => e.type)).toContain("STEP_FAILED")
+    const record = competence(events)
+    expect(record.competenceSignals).toBe(1)
+    expect(record.competence).toBe(0)
+  }, 30_000)
 })

@@ -144,6 +144,10 @@ Stated plainly rather than implied away. These are open, not managed.
   seen; the registry only requires declared scopes for http-transport tools. Every current
   descriptor that can reach an arbitrary host declares the scope, so this is a property to keep,
   not a hole today. `metis.model` reaches one fixed host and declares `model.anthropic` instead.
+- **Live trust does not decay.** `derive` stamps a record with the current time and ignores event
+  timestamps, so a signal from months ago counts as much as one from today. The decay half-lives in
+  the trust policy apply only to a record carried forward, which the live ledger never does. A
+  skill that earned S2 and then went unused keeps it until new evidence moves it.
 - **Durability depends on which execution mode was used.** `restate` is durable; `direct` is not,
   and killing the process loses the run. The API reports the mode on every submission, so the
   distinction is visible — but any claim that "plans survive restarts" is only true of the durable

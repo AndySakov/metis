@@ -20,10 +20,10 @@ const DAY = 86_400
 const policy = Schema.decodeUnknownSync(TrustPolicy)({
   decay: { competenceHalfLifeSeconds: 30 * DAY, complianceHalfLifeSeconds: 14 * DAY },
   thresholds: [
-    { gear: "S1", minCompetence: 0.2, minCompliance: 0.2 },
-    { gear: "S2", minCompetence: 0.5, minCompliance: 0.5 },
-    { gear: "S3", minCompetence: 0.7, minCompliance: 0.8 },
-    { gear: "S4", minCompetence: 0.8, minCompliance: 0.95 }
+    { gear: "S1", minCompetence: 0.2, minCompliance: 0.2, minSignals: 0 },
+    { gear: "S2", minCompetence: 0.5, minCompliance: 0.5, minSignals: 0 },
+    { gear: "S3", minCompetence: 0.7, minCompliance: 0.8, minSignals: 0 },
+    { gear: "S4", minCompetence: 0.8, minCompliance: 0.95, minSignals: 0 }
   ]
 })
 
@@ -279,5 +279,49 @@ describe("sample results feed the compliance ledger (ADR-014 §4)", () => {
   it("ignores a sample event with no verdict", () => {
     const malformed = event("VERIFICATION_SAMPLED", {})
     expect(at([malformed]).complianceSignals).toBe(0)
+  })
+})
+
+describe("promotion needs evidence, not just a perfect ratio", () => {
+  // The thresholds `pnpm start` runs with (src/App.ts).
+  const live = Schema.decodeUnknownSync(TrustPolicy)({
+    decay: { competenceHalfLifeSeconds: 30 * DAY, complianceHalfLifeSeconds: 14 * DAY },
+    thresholds: [
+      { gear: "S1", minCompetence: 0.2, minCompliance: 0.2, minSignals: 2 },
+      { gear: "S2", minCompetence: 0.5, minCompliance: 0.5, minSignals: 5 },
+      { gear: "S3", minCompetence: 0.7, minCompliance: 0.8, minSignals: 15 },
+      { gear: "S4", minCompetence: 0.8, minCompliance: 0.95, minSignals: 40 }
+    ]
+  })
+
+  /** What one approved, completed run of a skill writes to the log. */
+  const approvedRun = () => [
+    event("APPROVAL_GRANTED", {}),
+    completed(),
+    cleanEvaluation(),
+    cleanEvaluation()
+  ]
+
+  const derived = (events: ReadonlyArray<Event>) => derive(events, SKILL, live, 1_700_000_000 as EpochSeconds)
+
+  it("one approved run does not reach S4, or even S2", () => {
+    // Both ratios are a perfect 1.0 after one run. Without an evidence bar that alone would clear
+    // every threshold, and a skill seen once would run unattended on a schedule.
+    const trust = derived(approvedRun())
+    expect(trust.record.competence).toBe(1)
+    expect(trust.record.compliance).toBe(1)
+    expect(trust.record.gear).toBe("S1")
+  })
+
+  it("three approved runs earn S2, and the record carries the evidence it stands on", () => {
+    const trust = derived([...approvedRun(), ...approvedRun(), ...approvedRun()])
+    expect(trust.record.gear).toBe("S2")
+    expect(trust.record.competenceSignals).toBe(6)
+    expect(trust.record.complianceSignals).toBe(6)
+  })
+
+  it("S4 needs forty signals in each ledger, however clean", () => {
+    expect(derived(Array.from({ length: 19 }, approvedRun).flat()).record.gear).toBe("S3")
+    expect(derived(Array.from({ length: 20 }, approvedRun).flat()).record.gear).toBe("S4")
   })
 })

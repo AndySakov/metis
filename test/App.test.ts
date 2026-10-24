@@ -121,6 +121,33 @@ describe("pnpm start", () => {
     expect(written.length).toBeGreaterThan(0)
   }, 60_000)
 
+  it("earns autonomy from the event log as it runs: three approved runs, then S2 unattended", async () => {
+    // A skill no other test touches, so its evidence starts at zero.
+    const run = async (approve: boolean) => {
+      const plan = await (await post("/intent", {
+        actor: "user:andysakov",
+        goal: "C4 diagrams for an offline-first notes app",
+        autonomy: "S2"
+      })).json()
+      const first = await (await post(`/plans/${plan.id}/execute`, {})).json()
+      if (!approve) return first.status
+      expect(first.status, "a skill short of S2's evidence still asks").toBe("awaiting_approval")
+      return (await (await post(`/plans/${plan.id}/execute`, { approvedSteps: [plan.steps[0].id] })).json()).status
+    }
+
+    for (let i = 0; i < 3; i++) expect(await run(true)).toBe("completed")
+
+    // Six signals in each ledger now, against S2's five: no approval asked, no restart needed.
+    expect(await run(false)).toBe("completed")
+
+    const events = await runtime.runPromise(Effect.flatMap(EventLogStore, (log) => Effect.orDie(log.read({}))))
+    const promotions = events
+      .filter((e) => e.type === "TRUST_PROMOTED")
+      .map((e) => e.payload as { skill: string; from: string; to: string })
+      .filter((p) => p.skill === "design.c4")
+    expect(promotions.map((p) => `${p.from}->${p.to}`)).toEqual(["S0->S1", "S1->S2"])
+  }, 120_000)
+
   it("answers a missing plan with the 404 the spec declares", async () => {
     const response = await fetch(`http://127.0.0.1:${PORT}/plans/01890a5d-0000-7000-8000-000000000000`)
     expect(response.status).toBe(404)

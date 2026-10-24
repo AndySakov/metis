@@ -33,7 +33,7 @@ import { EventLogStore } from "../mneme/EventLogStore.js"
 import { checksumOf } from "../mneme/InMemoryArtifactStore.js"
 import { PolicyGate } from "../policy/PolicyGate.js"
 import { TrustLedger } from "../policy/TrustLedger.js"
-import { skillOf } from "../policy/TrustUpdater.js"
+import { reconcile, skillOf } from "../policy/TrustUpdater.js"
 import type { Sampler } from "../policy/Verification.js"
 import { verify } from "../policy/Verification.js"
 import { ToolRegistry } from "../tools/ToolRegistry.js"
@@ -177,6 +177,13 @@ export const execute = (
 
     yield* emit("PLAN_STARTED", { planId: plan.id, intentId: plan.intentId, steps: plan.steps.length })
 
+    // Each skill's gear before the run, so a run that moves one can say from where (ADR-014).
+    const skills = [
+      ...new Set(plan.steps.flatMap((step) => step.toolCall === undefined ? [] : [skillOf(step.toolCall.capability)]))
+    ]
+    const gearsBefore = yield* Effect.forEach(skills, (skill) =>
+      Effect.map(trust.get(skill), (record) => [skill, record.gear] as const))
+
     let halted = false
     let finalStatus: ExecutionStatus = "completed"
 
@@ -201,6 +208,13 @@ export const execute = (
           ? "denied"
           : "failed"
       }
+    }
+
+    // Promotions and demotions are written as they happen, with their justification. A gear that
+    // changed silently would be a ramp nobody could audit.
+    const trustPolicy = yield* trust.policy
+    for (const [skill, before] of gearsBefore) {
+      yield* reconcile(skill, before, trustPolicy, correlationId)
     }
 
     yield* emit("PLAN_FINISHED", { planId: plan.id, status: finalStatus })
@@ -228,7 +242,9 @@ export const execute = (
               actor: intent.actor,
               autonomy: intent.autonomy,
               capability: step.toolCall.capability,
-              tags: intent.inputs.flatMap((input) => input.tags),
+              tags: intent.inputs.flatMap((input) =>
+                input.tags
+              ),
               registered: false
             }),
             correlationId
@@ -313,7 +329,8 @@ export const execute = (
           return { stepId: step.id, status: "awaiting_approval" as const }
         }
         if (needsApproval) {
-          yield* emit("APPROVAL_GRANTED", { stepId: step.id })
+          // The capability is what credits the approval to the skill's competence ledger.
+          yield* emit("APPROVAL_GRANTED", { stepId: step.id, capability: step.toolCall.capability })
         }
 
         yield* emit("TOOL_STARTED", {
@@ -324,7 +341,13 @@ export const execute = (
 
         const ran = yield* Effect.either(runner.run(spec, step.toolCall.input))
         if (ran._tag === "Left") {
-          yield* emit("STEP_FAILED", { stepId: step.id, reason: ran.left.message })
+          // The tool itself failed, so the failure counts against its skill. A registry miss or a
+          // storage failure is not the skill's doing, and those STEP_FAILED events name none.
+          yield* emit("STEP_FAILED", {
+            stepId: step.id,
+            capability: step.toolCall.capability,
+            reason: ran.left.message
+          })
           return { stepId: step.id, status: "failed" as const, detail: ran.left.message }
         }
 

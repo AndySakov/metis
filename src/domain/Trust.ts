@@ -49,7 +49,13 @@ export class TrustDecay extends Schema.Class<TrustDecay>("TrustDecay")({
 export class GearThreshold extends Schema.Class<GearThreshold>("GearThreshold")({
   gear: Autonomy,
   minCompetence: Score,
-  minCompliance: Score
+  minCompliance: Score,
+  /**
+   * Signals each ledger must rest on. A ratio over two signals is as perfect as one over two
+   * hundred, so without this a skill seen once could clear every gear. Required, with no default:
+   * a policy that omitted it would quietly mean "no evidence needed".
+   */
+  minSignals: Schema.Int.pipe(Schema.nonNegative())
 }) {}
 
 export class TrustPolicy extends Schema.Class<TrustPolicy>("TrustPolicy")({
@@ -70,5 +76,8 @@ export class TrustRecord extends Schema.Class<TrustRecord>("TrustRecord")({
   /** Policy evaluations survived, gates cleared without override, verified-clean samples. */
   compliance: Score,
   gear: Autonomy,
-  updatedAt: EpochSeconds
+  updatedAt: EpochSeconds,
+  /** How many signals each score rests on. Absent means none, which no evidence bar accepts. */
+  competenceSignals: Schema.optionalWith(Schema.Int.pipe(Schema.nonNegative()), { default: () => 0 }),
+  complianceSignals: Schema.optionalWith(Schema.Int.pipe(Schema.nonNegative()), { default: () => 0 })
 }) {}
