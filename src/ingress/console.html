@@ -93,8 +93,8 @@
       <h2>Ask</h2>
       <textarea id="goal" placeholder="e.g. Summarize https://en.wikipedia.org/wiki/Metis_(mythology)"></textarea>
       <details id="paste-box">
-        <summary>Paste text with it (a group chat, an ad): sent as untrusted</summary>
-        <textarea id="pasted" placeholder="Paste a WhatsApp export or copied messages here"></textarea>
+        <summary>Paste text with it: sent as untrusted</summary>
+        <textarea id="pasted" placeholder="Paste text for METIS to work on: a message, a chat export, a document"></textarea>
       </details>
       <div class="row">
         <label class="small muted" for="autonomy">Autonomy</label>
@@ -262,25 +262,7 @@ const EXAMPLES = [
   { needs: ["design.c4@1.0"], goal: "C4 diagrams for an offline-first notes app with sync" },
   { needs: ["design.api_spec@1.0"], goal: "Write an API spec for a notes app" },
   { needs: ["build.scaffold@0.1"], goal: "Scaffold a TypeScript project called notes-api" },
-  { needs: ["research.search@0.1"], goal: "Research the state of the art in RAG" },
-  { needs: ["stays.availability@0.1"], goal: "Is the unit free this weekend?" },
-  {
-    needs: ["stays.reply@0.1"],
-    goal: "Draft a reply to this enquiry",
-    pasted: "Naomba 1 bedroom Westlands tarehe 15 mpaka 18, budget 9k"
-  },
-  {
-    needs: ["stays.triage@0.1"],
-    goal: "Any leads in this group chat?",
-    pasted: [
-      "[10/08/2026, 01:12:33] Wanjiru: Nahitaji keja ya one bedroom Westlands usiku wa leo, budget 7k",
-      "[10/08/2026, 01:20:10] Host Ke: 1 BEDROOM WESTLANDS ✅ Furnished ✅ Ksh7000/night 📞 0712345678",
-      "[10/08/2026, 07:45:02] Brian: Any bnb 2 bedroom Kilimani this weekend?",
-      "[10/08/2026, 08:03:51] Agent Mary: Client anataka one bedroom around Parklands, 3 nights from Friday",
-      "[10/08/2026, 08:30:15] Otieno: Who has a place in Kasarani for the weekend?",
-      "[10/08/2026, 09:02:40] Njeri: Nauliza, kuna mtu ana one bedroom karibu na Sarit? 20-22"
-    ].join("\n")
-  }
+  { needs: ["research.search@0.1"], goal: "Research the state of the art in RAG" }
 ];
 const renderExamples = () => {
   const have = new Set(state.tools.map((t) => t.capability));

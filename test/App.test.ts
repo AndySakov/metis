@@ -314,51 +314,6 @@ describe("pnpm start", () => {
     expect(App.modelCliOf({ cli: "ollama", model: Option.some("llama3.3"), env: [] })).toHaveProperty("name", "ollama")
   })
 
-  it("triages a pasted group chat, and policy sees the paste as untrusted", async () => {
-    const plan = await (await post("/intent", {
-      actor: "user:andysakov",
-      goal: "Any leads in this group chat?",
-      autonomy: "S2",
-      inputs: [{
-        name: "pasted",
-        value: "[10/08/2026, 01:12:33] Wanjiru: Anyone with a 1br in Westlands tonight?\n" +
-          "[10/08/2026, 01:20:10] Host: 1 BEDROOM WESTLANDS ✅ Ksh7000/night",
-        tags: ["untrusted", "pasted"]
-      }]
-    })).json()
-    expect(plan.steps.map((s: any) => s.toolCall?.capability)).toEqual(["stays.triage@0.1"])
-
-    const done = await (await post(`/plans/${plan.id}/execute`, { approvedSteps: [plan.steps[0].id] })).json()
-    expect(done.status).toBe("completed")
-    const leads = await (await fetch(`http://127.0.0.1:${PORT}/artifacts/${done.steps[0].artifactId}/content`)).text()
-    expect(leads).toContain("(1)")
-    expect(leads).toContain("Wanjiru")
-
-    const events = await (await fetch(`http://127.0.0.1:${PORT}/eventlog?planId=${plan.id}&types=POLICY_EVALUATED`))
-      .json()
-    const dispatch = events.find((e: any) => e.payload.at === "tool_dispatch")
-    expect(dispatch.payload.tags).toEqual(["untrusted", "pasted"])
-  }, 30_000)
-
-  it("drafts a reply to a pasted enquiry, in its language, and sends nothing", async () => {
-    const plan = await (await post("/intent", {
-      actor: "user:andysakov",
-      goal: "Draft a reply to this enquiry",
-      autonomy: "S2",
-      inputs: [{
-        name: "pasted",
-        value: "Naomba 1 bedroom Westlands tarehe 15 mpaka 18",
-        tags: ["untrusted", "pasted"]
-      }]
-    })).json()
-    expect(plan.steps.map((s: any) => s.toolCall?.capability)).toEqual(["stays.reply@0.1"])
-
-    const done = await (await post(`/plans/${plan.id}/execute`, { approvedSteps: [plan.steps[0].id] })).json()
-    const reply = await (await fetch(`http://127.0.0.1:${PORT}/artifacts/${done.steps[0].artifactId}/content`)).text()
-    expect(reply).toContain("Habari! Nina 1-bedroom Westlands")
-    expect(reply).toContain("Fill before sending: [nightly rate], [photos link].")
-  }, 30_000)
-
   it("answers a missing plan with the 404 the spec declares", async () => {
     const response = await fetch(`http://127.0.0.1:${PORT}/plans/01890a5d-0000-7000-8000-000000000000`)
     expect(response.status).toBe(404)

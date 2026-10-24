@@ -10,7 +10,6 @@ import { Intent, IntentDraft } from "../../src/domain/Intent.js"
 import { Pack } from "../../src/domain/Pack.js"
 import { Plan } from "../../src/domain/Plan.js"
 import { Policy, PolicyDecision } from "../../src/domain/Policy.js"
-import { UnitProfile } from "../../src/domain/Stays.js"
 import { Isolation, isolationRank, ToolSpec } from "../../src/domain/ToolSpec.js"
 
 /**
@@ -58,8 +57,7 @@ describe("spec examples decode with the schemas the code actually uses", () => {
     { file: "Event.schema.json", schema: Event },
     { file: "policy/Policy.schema.json", schema: Policy },
     { file: "policy/PolicyDecision.schema.json", schema: PolicyDecision },
-    { file: "packs/Pack.schema.json", schema: Pack },
-    { file: "stays/UnitProfile.schema.json", schema: UnitProfile }
+    { file: "packs/Pack.schema.json", schema: Pack }
   ] as const
 
   for (const { file, schema } of cases) {

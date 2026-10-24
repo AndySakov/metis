@@ -103,7 +103,7 @@ export const projectNameOf = (goal: string): string => {
 
 /**
  * Text the user pasted alongside the goal, from the intent input named `pasted`. Where it came
- * from is whatever its tags say; the console tags it `untrusted`, since a group chat is anyone's.
+ * from is whatever its tags say; the console tags it `untrusted`, since a paste is anyone's words.
  */
 export const pastedOf = (intent: Intent): string | undefined => {
   const value = intent.inputs.find((input) => input.name === "pasted")?.value
@@ -217,64 +217,6 @@ const TEMPLATES: ReadonlyArray<Template> = [
     assumptions: ["The workspace is where the project should live"],
     risks: ["The project name is derived from the goal and may need renaming"],
     expects: [{ kind: "text", description: "The files created" }]
-  },
-  {
-    // Before the lead sweep, so "reply to this lead" drafts a reply rather than triaging.
-    name: "reply_lead",
-    matches: (goal) => /\b(reply|respond|answer)\b/i.test(goal) && !/\b(prd|c4|api spec)\b/i.test(goal),
-    steps: (intent) => {
-      const pasted = pastedOf(intent)
-      return pasted === undefined
-        ? [{ kind: "ask", description: "Paste the enquiry to reply to" }]
-        : [{
-          kind: "tool",
-          description: "Draft a first reply: the listing and price first, one question last",
-          capability: "stays.reply@0.1",
-          input: { message: pasted }
-        }]
-    },
-    assumptions: ["The unit profile's listing facts are current"],
-    risks: ["A draft only: check the placeholders and dates, then send it yourself"],
-    expects: [{ kind: "text", description: "A reply ready to paste" }]
-  },
-  {
-    // After the document templates, so "a PRD for a free notes app" is still a PRD.
-    name: "availability",
-    matches: (goal) => /\b(free|available|availability|vacant|booked)\b/i.test(goal) && !/\bleads?\b/i.test(goal),
-    steps: (intent) => [
-      {
-        kind: "tool",
-        description: "Check the booking sheet for those dates",
-        capability: "stays.availability@0.1",
-        // The dates are read by the unit's server, in the unit's time zone, the way triage reads them.
-        input: { when: intent.goal }
-      }
-    ],
-    assumptions: ["The booking sheet is up to date"],
-    risks: ["A hot lead in the sheet may still convert: CONTESTED dates are not promised"],
-    expects: [{ kind: "text", description: "Whether the unit can take the stay, and when it could if not" }]
-  },
-  {
-    // After the document and scaffold templates, so "a PRD for a leads dashboard" is still a PRD.
-    name: "triage_leads",
-    matches: (goal) => /\b(leads?|triage|enquir(?:y|ies)|sweep)\b/i.test(goal),
-    steps: (intent) => {
-      const pasted = pastedOf(intent)
-      return pasted === undefined
-        ? [{
-          kind: "ask",
-          description: "Paste the group chat to triage: export it from WhatsApp, or copy the messages"
-        }]
-        : [{
-          kind: "tool",
-          description: "Triage the pasted messages for leads",
-          capability: "stays.triage@0.1",
-          input: { messages: pasted }
-        }]
-    },
-    assumptions: ["The pasted messages are recent enough that relative dates mean what they say today"],
-    risks: ["Pasted messages are untrusted text: they are classified, never followed"],
-    expects: [{ kind: "text", description: "Leads, best first, and what was dropped" }]
   }
 ]
 

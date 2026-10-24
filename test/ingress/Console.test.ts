@@ -204,22 +204,6 @@ describe.skipIf(browser === undefined)("the console in a browser", () => {
     await page.close()
   }, 60_000)
 
-  it("triages a pasted group chat from its example, with the paste labelled untrusted", async () => {
-    const page = await browser!.newPage()
-    await page.goto(`${base}/`)
-    await page.waitForSelector("#examples .chip")
-    await page.click("#examples .chip:has-text(\"Any leads in this group chat?\")")
-    expect(await page.$$eval("#pasted", (n) => (n[0] as HTMLTextAreaElement).value.split("\n").length)).toBe(6)
-    await page.click("#plan")
-    await runOnPage(page)
-
-    const output = await page.textContent("#output")
-    expect(output).toContain("Leads for Westlands 1-bed (3)")
-    expect(output).toContain("Nauliza, kuna mtu ana one bedroom karibu na Sarit")
-    expect(await page.textContent("#timeline")).toContain("labels: untrusted, pasted")
-    await page.close()
-  }, 60_000)
-
   it("offers a loaded pack's example, and runs it like anything of core's", async () => {
     const page = await browser!.newPage()
     await page.goto(`${base}/`)

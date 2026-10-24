@@ -147,15 +147,6 @@ export * as Plan from "./domain/Plan.js"
 export * as Policy from "./domain/Policy.js"
 
 /**
- * Short-let domain types: the unit a lead is triaged against.
- *
- * Mirrors `specs/stays/UnitProfile.schema.json`. The triage engine (`src/stays/Triage.ts`) takes
- * the decoded value; it is decoded here first so a malformed profile fails at startup, not as a
- * wrong verdict on a real lead.
- */
-export * as Stays from "./domain/Stays.js"
-
-/**
  * The MCP binding (ADR-017).
  *
  * Names the server logically and the tool within it. Connection details — command line, URL,
@@ -481,79 +472,6 @@ export * as TrustUpdater from "./policy/TrustUpdater.js"
 export * as Verification from "./policy/Verification.js"
 
 /**
- * Availability for a short-let unit, read from its booking sheet: one tab per month, each opening
- * with a "Bookings" block.
- *
- * Two things about that sheet decide every answer, and both are easy to get wrong:
- *
- * - **A row's status is a cell colour, not a value.** The Confirmed cell's background says what the
- *   row is: green, a confirmed booking that blocks its nights; amber, a hot lead that may convert,
- *   held but still sellable to a firmer booking; red, an *open* slot the owner is carrying for
- *   projection, which is unsold inventory and the reason triage exists. Reading red rows as
- *   bookings makes an empty month look sold out. Paid is the fallback; a row with no colour at all
- *   (older tabs) is settled history, so confirmed.
- * - **The tabs disagree on date format** (MM/DD in some months, DD/MM in others). Every reading of
- *   a date pair is tried, and the sheet's own Number of Nights column picks the right one, with the
- *   tab's month as the tie-break. What stays ambiguous is reported, not guessed.
- *
- * Check-out day is not occupied: a booking from the 10th to the 13th holds the nights of the 10th,
- * 11th and 12th. Past the last month tab the sheet says nothing, which is not the same as free.
- *
- * Reads the Sheets API's `spreadsheets.get` response with grid data, as it comes. Free of Node APIs.
- */
-export * as Availability from "./stays/Availability.js"
-
-/**
- * A first reply to a booking lead, drafted for the owner to send.
- *
- * Three lessons decide its shape. In August, most chased leads died on an unanswered message from
- * the host, usually a qualifying question sent as the opener ("What's the budget?"); the people
- * posting are fielding several hosts at once, and whoever sends the place and the price first
- * wins. So the draft opens with the listing and the price for the nights asked, and keeps one
- * question for the end, one that moves toward a booking. And a wrong price or a promised amenity
- * costs a review, so the draft states only what the unit's profile records: a missing fact is a
- * visible `[placeholder]`, listed for the owner to fill, never a guess.
- *
- * It answers in the lead's language, English or Swahili, and is a draft only: nothing here sends.
- * Free of Node APIs, like the rest of `src/stays/`.
- */
-export * as Reply from "./stays/Reply.js"
-
-/**
- * Reading a unit's booking sheet from Google Sheets, as a service account.
- *
- * Read-only by construction: the token asked for carries only the `spreadsheets.readonly` scope, so
- * nothing here could write to the sheet even if asked. The owner shares the sheet with the service
- * account's email and points `METIS_GOOGLE_CREDENTIALS` at its key file; the key reaches only the
- * `metis.stays` process.
- *
- * Only the month tabs near now are fetched, and only the two cell fields availability reads (the
- * value and the background colour), so a sheet with years of history stays a small request.
- */
-export * as Sheets from "./stays/Sheets.js"
-
-/**
- * Lead triage for a short-let: which messages in a pasted group chat are people looking for a place
- * to stay that this unit could fill, and when.
- *
- * Deterministic on purpose. The groups it reads are ~99% hosts advertising, the cost of a missed
- * lead is a booking, and the cost of a false one is a wasted glance, so the rules below are the
- * ones learned from sweeping them, written as code that conformance vectors can hold still:
- *
- * 1. **Direction before anything else.** A perfect advert for the right unit is still noise. Verbs
- *    of seeking win over a number; a phone number, a nightly price or a rate card mean supply.
- * 2. **What is sought must be a place to stay.** The same groups trade cars and cleaners.
- * 3. **Unit.** The unit's bedroom count or unstated matches; a studio or bedsitter is a weak match;
- *    more bedrooms is not.
- * 4. **Location** from the unit's measured catchment. Nothing named is still a lead; any named area
- *    in range makes it one; only named-and-far rejects.
- * 5. **Dates** resolved against today *in the unit's time zone*, never invented.
- *
- * Free of Node APIs, so the MCP server can import it under type stripping.
- */
-export * as Triage from "./stays/Triage.js"
-
-/**
  * Reading a tool descriptor from disk, with the schemas it points at.
  *
  * A descriptor names its capability's input and output schemas by `$ref`, relative to the
@@ -684,24 +602,6 @@ export * as model from "./tools/servers/model.js"
  * and a key; until one is chosen, these two are what METIS can search honestly.
  */
 export * as research from "./tools/servers/research.js"
-
-/**
- * An MCP server for the short-let: `stays.*` capabilities over one unit's profile.
- *
- * `triage` reads a pasted group chat and says which messages are people looking for a place this
- * unit could fill; `availability` says whether the unit can take a stay. The rules are in
- * `src/stays/` and held by conformance vectors; this server parses, applies them, and reports.
- *
- * The unit is described by a profile (`specs/stays/UnitProfile.schema.json`) read once at startup
- * from `METIS_STAYS_PROFILE`, or the example Westlands 1-bed in the repository when unset. A
- * malformed profile stops the server, rather than producing confident verdicts against nonsense.
- *
- * Availability comes from the unit's booking sheet, read fresh for each call: with
- * `METIS_GOOGLE_CREDENTIALS` and the profile's `availability.spreadsheetId`, from Google Sheets, or
- * from a saved snapshot of it at `METIS_STAYS_AVAILABILITY_SNAPSHOT`. Without either, triage says
- * "not checked" rather than guessing, and `availability` is a tool error.
- */
-export * as stays from "./tools/servers/stays.js"
 
 /**
  * An MCP server exposing the `transform.*` capabilities.
