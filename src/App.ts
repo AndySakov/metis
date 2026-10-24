@@ -217,22 +217,6 @@ export const serversFor = (config: AppConfig): ServerMap => ({
     ? { "metis.build": { ...node("build.ts"), env: { METIS_WORKSPACE: resolve(config.workspace.value) } } }
     : {}),
   "metis.design": node("design.ts"),
-  // The short-let unit's profile stays on this machine; without one, the repository's example.
-  // The Google key that reads its booking sheet reaches this server and no other.
-  "metis.stays": {
-    ...node("stays.ts"),
-    env: Object.fromEntries(
-      [
-        ["METIS_STAYS_PROFILE", true],
-        ["METIS_GOOGLE_CREDENTIALS", true],
-        ["METIS_STAYS_AVAILABILITY_SNAPSHOT", true],
-        ["METIS_SHEETS_API", false]
-      ].flatMap(([name, isPath]) => {
-        const value = process.env[name as string]
-        return value === undefined || value === "" ? [] : [[name, isPath ? resolve(value) : value]]
-      })
-    )
-  },
   "metis.research": {
     ...node("research.ts"),
     // Where `research.search` sends its queries, when something other than Wikipedia and arXiv

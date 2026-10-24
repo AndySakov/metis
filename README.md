@@ -21,7 +21,7 @@ multi-user seams left open but not built.
 What exists and works:
 
 - Contract schemas in `specs/` — Intent, IntentDraft, Plan, Artifact, Event, ToolSpec, Pack,
-  shared types, 20 capability contracts, 28 example tool descriptors.
+  shared types, 17 capability contracts, 25 example tool descriptors.
 - Effect Schema domain types in `src/domain/` that decode those contracts, with branded identifiers
   and tagged errors.
 - A PostgreSQL schema in `migrations/`, with domain constraints and a checksum-verifying migration
@@ -70,27 +70,6 @@ What exists and works:
   those: it is not a web-wide search. `research.fetch` does real HTTP and refuses loopback, private
   and link-local hosts; `research.summarize` is extractive, so a citation always points at text
   that was genuinely supplied.
-- **Lead triage for a short-let** (`stays.triage`, `src/stays/Triage.ts`). Paste a WhatsApp
-  group export and METIS returns the messages that are someone *looking* for a place the unit
-  could fill, best first. It reads direction before anything else, since these groups are almost
-  all hosts advertising. It understands English, Swahili and Sheng, takes the unit's measured
-  drive-time catchment, and resolves "leo", "kesho" and "tarehe 15 mpaka 18" in the unit's own
-  time zone. Deterministic, held by conformance vectors in `specs/stays/conformance/`, the first
-  of them the owner's own worked examples. The pasted chat is labelled `untrusted`.
-- **Availability from the booking sheet** (`stays.availability`, `src/stays/Availability.ts`).
-  Each dated lead is checked against the unit's Google Sheet: OPEN (an unsold slot carried for
-  projection, ranked first), FREE, CONTESTED (overlaps a hot lead), BOOKED (with the next free
-  window) or NO DATA (past the last month tab). A row's status is its Confirmed cell's colour, and
-  dates written month-first in one tab and day-first in another are settled by the sheet's own
-  night count. "Is the unit free this weekend?" asks it directly. The sheet is read by a
-  service account with a read-only scope.
-- **Reply drafts** (`stays.reply`, `src/stays/Reply.ts`). Every lead in a sweep comes with a
-  first reply, and "Draft a reply to this enquiry" answers one pasted message. The draft opens
-  with the listing and the price for the nights asked and ends on one question that moves toward
-  a booking; when the dates are taken it offers the next free window. It answers in the lead's
-  language (English or Swahili) and states only what the unit profile's `listing` records: a
-  missing price or photo link is a visible `[placeholder]`, and dates nobody checked are flagged
-  to confirm. Drafts only: nothing in METIS sends a message.
 - **A project scaffolder that writes to disk.** `build.scaffold` (`src/tools/servers/build.ts`)
   creates a `node-ts` or `python` project under `METIS_WORKSPACE` and nowhere else: the name must
   be one safe path segment, and it never writes over an existing directory. It is declared
@@ -141,7 +120,7 @@ artifact, and an unresolvable capability that fails cleanly instead of dispatchi
 
 What does **not** exist yet, despite being described in `docs/`:
 
-- Seven of the twenty capabilities remain descriptors: `run.notebook`, `graph.link`, `vector.upsert`, and the four `agent.*` ones, which need real browser and device control. Implementing any of them against canned
+- Seven of the seventeen capabilities remain descriptors: `run.notebook`, `graph.link`, `vector.upsert`, and the four `agent.*` ones, which need real browser and device control. Implementing any of them against canned
   responses would be worse than leaving them out — the registry would claim a capability that does
   not do what its contract says.
 - The monorepo layout, `examples/`, voice, device control, the Adaptive Agent Foundry.
@@ -295,14 +274,6 @@ and watch that skill's gear climb until it stops asking.
   run parks on an approval and survives a restart. Pair it with Postgres, or the plans and record a
   resumed run needs are gone. Without it, plans run in-process (`mode: "direct"`), which is not
   durable. `node_modules/.bin/restate-server` is a Restate server to point it at.
-- `METIS_STAYS_PROFILE` points `stays.triage` at your unit (`specs/stays/UnitProfile.schema.json`);
-  without it the repository's example Westlands 1-bed is used. Keep a real unit's profile out of
-  the repository.
-- `METIS_GOOGLE_CREDENTIALS` lets the stays server read the unit's booking sheet: create a service
-  account in Google Cloud with the Sheets API enabled, download its JSON key, share the sheet with
-  the account's email as a viewer, and put the sheet's id (from its URL) in the profile as
-  `availability.spreadsheetId`. `METIS_STAYS_AVAILABILITY_SNAPSHOT` reads a saved
-  `spreadsheets.get` response instead.
 - `METIS_PACKS` loads packs, as a comma-separated list of their directories
   (`METIS_PACKS=packs/redact`). `GET /packs` lists what was loaded, and the console offers each
   pack's examples. Installing a pack runs its servers, so load only packs you trust.
