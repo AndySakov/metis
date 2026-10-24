@@ -34,10 +34,10 @@
         "when": { "at": "tool_dispatch", "nonIdempotent": true }
       },
       {
-        "id": "approve.untrusted_egress",
-        "description": "A network request steered by untrusted content needs a human to read it first, at every gear. Keyed on the declared scope rather than a namespace, so it covers every tool that can reach the open web.",
+        "id": "deny.untrusted_egress",
+        "description": "A network request steered by untrusted content is refused, at every gear. Keyed on the declared scope rather than a namespace, so it covers every tool that can reach the open web.",
         "priority": 10,
-        "effect": "require_approval",
+        "effect": "deny",
         "when": { "at": "tool_dispatch", "scopes": ["public.web"], "tags": ["untrusted"] }
       }
     ]

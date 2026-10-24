@@ -1,6 +1,6 @@
 {
   "name": "untrusted content reaching the network",
-  "description": "A tool that declares the `public.web` scope can send a request to a host someone else runs, and the URL of a GET is enough to carry data to that host. When the dispatch carries untrusted input, the URL may have been chosen by whoever wrote that input. The rule keys on the declared scope rather than on a capability namespace, so it covers every egress-capable tool, including `research.*`, which the `agent.*` rule does not reach.\n\nIt requires approval rather than denying. A fetch named by untrusted text is sometimes exactly what the user wants, and a human reading the URL can tell the two apart where a rule cannot. A deny written for a narrower case still outranks it, which the last case pins.\n\nThis is also the first vector to exercise the `scopes` condition.",
+  "description": "A tool that declares the `public.web` scope can send a request to a host someone else runs, and the URL of a GET is enough to carry data to that host. When the dispatch carries untrusted input, the URL may have been chosen by whoever wrote that input. The rule keys on the declared scope rather than on a capability namespace, so it covers every egress-capable tool, including `research.*`, which the `agent.*` rule does not reach.\n\nIt denies rather than asking: an approval prompt is a human reading a URL an attacker chose, and a gate people learn to click through. It sits at priority 10, below the priority-0 denies, so a narrower deny still decides when both match (the last case pins that), and an explicit allow for a known-good host can be written above it as an exception.\n\nThis is also the first vector to exercise the `scopes` condition.",
   "policy": {
     "version": "egress-1",
     "defaultEffect": "allow",
@@ -13,34 +13,34 @@
         "when": { "capabilities": ["agent.*"], "tags": ["untrusted"] }
       },
       {
-        "id": "approve.untrusted_egress",
-        "description": "A network request steered by untrusted content needs a human to read it first, at every gear.",
+        "id": "deny.untrusted_egress",
+        "description": "A network request steered by untrusted content is refused, at every gear.",
         "priority": 10,
-        "effect": "require_approval",
+        "effect": "deny",
         "when": { "at": "tool_dispatch", "scopes": ["public.web"], "tags": ["untrusted"] }
       }
     ]
   },
   "cases": [
     {
-      "name": "untrusted input to a fetch needs approval at S4",
+      "name": "untrusted input to a fetch is denied at S4",
       "request": { "at": "tool_dispatch", "actor": "metis", "autonomy": "S4", "capability": "research.fetch@0.1", "registered": true, "scopes": ["public.web"], "tags": ["untrusted", "web"], "idempotent": true },
-      "expect": { "effect": "require_approval", "basis": "matched", "ruleId": "approve.untrusted_egress" }
+      "expect": { "effect": "deny", "basis": "matched", "ruleId": "deny.untrusted_egress" }
     },
     {
-      "name": "untrusted input to a fetch needs approval at S0",
+      "name": "untrusted input to a fetch is denied at S0",
       "request": { "at": "tool_dispatch", "actor": "metis", "autonomy": "S0", "capability": "research.fetch@0.1", "registered": true, "scopes": ["public.web"], "tags": ["untrusted"], "idempotent": true },
-      "expect": { "effect": "require_approval", "basis": "matched", "ruleId": "approve.untrusted_egress" }
+      "expect": { "effect": "deny", "basis": "matched", "ruleId": "deny.untrusted_egress" }
     },
     {
       "name": "the rule is keyed on the scope, so a search is covered too",
       "request": { "at": "tool_dispatch", "actor": "metis", "autonomy": "S4", "capability": "research.search@0.1", "registered": true, "scopes": ["public.web"], "tags": ["untrusted"], "idempotent": true },
-      "expect": { "effect": "require_approval", "basis": "matched", "ruleId": "approve.untrusted_egress" }
+      "expect": { "effect": "deny", "basis": "matched", "ruleId": "deny.untrusted_egress" }
     },
     {
       "name": "one matching scope among several is enough",
       "request": { "at": "tool_dispatch", "actor": "metis", "autonomy": "S4", "capability": "research.fetch@0.1", "registered": true, "scopes": ["memory.read", "public.web"], "tags": ["untrusted"], "idempotent": true },
-      "expect": { "effect": "require_approval", "basis": "matched", "ruleId": "approve.untrusted_egress" }
+      "expect": { "effect": "deny", "basis": "matched", "ruleId": "deny.untrusted_egress" }
     },
     {
       "name": "a fetch with no untrusted input is not gated",
@@ -53,13 +53,13 @@
       "expect": { "effect": "allow", "basis": "unmatched" }
     },
     {
-      "name": "the agent deny still outranks the egress approval",
+      "name": "the narrower agent deny decides; the egress deny is still recorded",
       "request": { "at": "tool_dispatch", "actor": "metis", "autonomy": "S2", "capability": "agent.web_navigate@1.0", "registered": true, "scopes": ["public.web"], "tags": ["untrusted"], "idempotent": true },
       "expect": {
         "effect": "deny",
         "basis": "matched",
         "ruleId": "deny.untrusted_to_agent",
-        "consideredRuleIds": ["deny.untrusted_to_agent", "approve.untrusted_egress"]
+        "consideredRuleIds": ["deny.untrusted_to_agent", "deny.untrusted_egress"]
       }
     }
   ]

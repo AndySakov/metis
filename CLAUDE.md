@@ -86,8 +86,8 @@ contained while touching it.
 2. **The red team has no known escape, which is a reason to write more attempts.** The suite
    reports eight attempts, eight caught by rule, none by luck, none through. The last two escapes
    are closed: a dispatch to an unregistered capability (the `unregistered` condition, filled by
-   the executor from the registry lookup) and untrusted content steering `research.fetch` (an
-   approval rule keyed on the `public.web` scope, not on a namespace). Zero through means the
+   the executor from the registry lookup) and untrusted content steering `research.fetch` (a deny
+   rule keyed on the `public.web` scope, not on a namespace). Zero through means the
    suite ran out of known attempts, not that the policy is complete. When a new one gets through,
    add it with `expectedToGetThrough: true` rather than leaving it out.
 3. **Tool sandboxing.** Isolation is still process-level only. ADR-020's policy half is in: the
