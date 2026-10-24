@@ -81,7 +81,8 @@ artifact, and an unresolvable capability that fails cleanly instead of dispatchi
 - **A runnable entrypoint.** `pnpm start` (`src/App.ts`) serves the API over real implementations:
   the live policy in `specs/policy/default.json` (the same file the red-team suite measures), a
   registry holding only the tools their MCP servers actually serve, a planner that plans only
-  those, and trust derived from the event log at startup. See "Running it" below.
+  those, and trust derived live from the event log, so autonomy earned while it runs takes effect
+  at once. See "Running it" below.
 - A test suite that fails when a spec and the code disagree.
 
 What does **not** exist yet, despite being described in `docs/`:
@@ -226,8 +227,12 @@ curl -s -X POST localhost:8787/plans/<plan id>/execute -H 'content-type: applica
 curl -s localhost:8787/artifacts/<artifact id>/content    # the document itself
 ```
 
-A skill with no history is at S0, so the first run of every tool step waits for approval until the
-event log shows it has earned more.
+A skill with no history is at S0, so every tool step asks for approval at first. Trust is derived
+live from the event log, and a gear needs both a score and enough evidence behind it in each
+ledger: an approved, completed run adds about two signals to each, so a skill runs unattended at
+S2 after three such runs. S4 needs forty signals in each ledger, so at least twenty runs, and more
+once runs stop needing approval, since an unattended run adds no approval signal. Each promotion or demotion is written to the
+log as `TRUST_PROMOTED` or `TRUST_DEMOTED`, with its justification.
 
 **Definition of done for any change:** typecheck passes, lint passes, tests pass, and any spec the
 change touches is updated in the same commit.

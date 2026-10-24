@@ -1,12 +1,10 @@
 /**
  * The trust ledger (ADR-014).
  *
- * Read-only at this stage, per REBUILD-PLAN Stage 1: it can report a skill's standing and answer
- * whether a gear is permitted, but nothing updates the scores yet. Stage 4 wires the compliance
- * ledger to real policy evaluations and the competence ledger to approvals and edit ratios.
- *
- * The promotion rules are implemented now rather than later because they are the part worth being
- * careful about, and because a gear check in the execution path needs something to call.
+ * Reports a skill's standing and answers whether a gear is permitted. The promotion rules live
+ * here: both ledgers must clear a gear's score, and each must rest on the gear's minimum number of
+ * signals. `make` answers over fixed records; `TrustUpdater.ledgerFromLog` answers from the event
+ * log at the moment it is asked, which is what `pnpm start` runs.
  */
 
 import { Context, Effect, Layer } from "effect"
@@ -38,7 +36,10 @@ export const asOf = (record: TrustRecord, policy: TrustPolicy, now: EpochSeconds
     competence: decayed(record.competence, elapsed, policy.decay.competenceHalfLifeSeconds) as Score,
     compliance: decayed(record.compliance, elapsed, policy.decay.complianceHalfLifeSeconds) as Score,
     gear: record.gear,
-    updatedAt: now
+    updatedAt: now,
+    // Decay ages the scores, not the evidence: the signals were still observed.
+    competenceSignals: record.competenceSignals,
+    complianceSignals: record.complianceSignals
   })
 }
 
@@ -46,8 +47,13 @@ export interface GearVerdict {
   readonly permitted: boolean
   /** Which ledger blocked it — the useful half of the answer. */
   readonly blockedBy: ReadonlyArray<"competence" | "compliance">
-  readonly required: { readonly competence: number; readonly compliance: number }
-  readonly actual: { readonly competence: number; readonly compliance: number }
+  readonly required: { readonly competence: number; readonly compliance: number; readonly signals: number }
+  readonly actual: {
+    readonly competence: number
+    readonly compliance: number
+    readonly competenceSignals: number
+    readonly complianceSignals: number
+  }
 }
 
 /**
@@ -70,13 +76,24 @@ export const permits = (
 
   const required = {
     competence: threshold?.minCompetence ?? 0,
-    compliance: threshold?.minCompliance ?? 0
+    compliance: threshold?.minCompliance ?? 0,
+    signals: threshold?.minSignals ?? 0
   }
-  const actual = { competence: current.competence, compliance: current.compliance }
+  const actual = {
+    competence: current.competence,
+    compliance: current.compliance,
+    competenceSignals: record.competenceSignals,
+    complianceSignals: record.complianceSignals
+  }
 
+  // A ledger blocks when its score is too low or rests on too little evidence.
   const blockedBy: Array<"competence" | "compliance"> = []
-  if (actual.competence < required.competence) blockedBy.push("competence")
-  if (actual.compliance < required.compliance) blockedBy.push("compliance")
+  if (actual.competence < required.competence || actual.competenceSignals < required.signals) {
+    blockedBy.push("competence")
+  }
+  if (actual.compliance < required.compliance || actual.complianceSignals < required.signals) {
+    blockedBy.push("compliance")
+  }
 
   return { permitted: blockedBy.length === 0, blockedBy, required, actual }
 }

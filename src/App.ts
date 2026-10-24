@@ -42,8 +42,7 @@ import * as PlanExecution from "./orchestrator/PlanExecution.js"
 import * as Planner from "./orchestrator/Planner.js"
 import * as PolicyEngine from "./policy/PolicyEngine.js"
 import * as PolicyGate from "./policy/PolicyGate.js"
-import * as TrustLedger from "./policy/TrustLedger.js"
-import { deriveFromLog, skillOf } from "./policy/TrustUpdater.js"
+import { ledgerFromLog } from "./policy/TrustUpdater.js"
 import * as Verification from "./policy/Verification.js"
 import type { ServerMap } from "./tools/McpToolRunner.js"
 import * as McpToolRunner from "./tools/McpToolRunner.js"
@@ -76,16 +75,18 @@ export const AppConfig: Config.Config<AppConfig> = Config.all({
 })
 
 /**
- * Thresholds a skill's two ledgers must clear for each gear (ADR-014). A skill with no history is
- * at S0, so every tool step asks for approval until the log shows it has earned more.
+ * What a skill must show to hold each gear (ADR-014): a score in both ledgers, each resting on at
+ * least `minSignals` signals. An approved, completed run adds about two signals to each ledger, so
+ * S2 takes three such runs and S4 at least twenty. A skill with no history is at S0, and
+ * every tool step asks for approval until the log shows it has earned more.
  */
 export const TRUST_POLICY = Schema.decodeUnknownSync(TrustPolicy)({
   decay: { competenceHalfLifeSeconds: 30 * 86400, complianceHalfLifeSeconds: 14 * 86400 },
   thresholds: [
-    { gear: "S1", minCompetence: 0.2, minCompliance: 0.2 },
-    { gear: "S2", minCompetence: 0.5, minCompliance: 0.5 },
-    { gear: "S3", minCompetence: 0.7, minCompliance: 0.8 },
-    { gear: "S4", minCompetence: 0.8, minCompliance: 0.95 }
+    { gear: "S1", minCompetence: 0.2, minCompliance: 0.2, minSignals: 2 },
+    { gear: "S2", minCompetence: 0.5, minCompliance: 0.5, minSignals: 5 },
+    { gear: "S3", minCompetence: 0.7, minCompliance: 0.8, minSignals: 15 },
+    { gear: "S4", minCompetence: 0.8, minCompliance: 0.95, minSignals: 40 }
   ]
 })
 
@@ -173,17 +174,6 @@ const stores = (config: AppConfig) =>
     )
     : Layer.mergeAll(InMemoryEventLogStore.layer, InMemoryArtifactStore.layer, InMemoryPlanStore.layer)
 
-/** Trust as the event log has it at startup, for every skill the registry can run. */
-const trustFromLog = Layer.effect(
-  TrustLedger.TrustLedger,
-  Effect.gen(function*() {
-    const registry = yield* ToolRegistry.ToolRegistry
-    const skills = [...new Set((yield* registry.all).map((spec) => skillOf(spec.capability)))]
-    const records = yield* Effect.forEach(skills, (skill) => deriveFromLog(skill, TRUST_POLICY))
-    return TrustLedger.make(TRUST_POLICY, records.map((derived) => derived.record))
-  })
-)
-
 const plannerFromRegistry = Layer.effect(
   Planner.Planner,
   Effect.gen(function*() {
@@ -208,7 +198,9 @@ export const services = (config: AppConfig) => {
     PolicyEngine.layer(livePolicy()),
     Verification.randomSampler(VERIFICATION_RATE)
   )
-  const middle = Layer.mergeAll(PolicyGate.layer, trustFromLog, plannerFromRegistry).pipe(Layer.provideMerge(base))
+  const middle = Layer.mergeAll(PolicyGate.layer, ledgerFromLog(TRUST_POLICY), plannerFromRegistry).pipe(
+    Layer.provideMerge(base)
+  )
   return PlanExecution.directLayer.pipe(Layer.provideMerge(middle))
 }
 

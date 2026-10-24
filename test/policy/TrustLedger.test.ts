@@ -18,10 +18,10 @@ const DAY = 86_400
 const policy = Schema.decodeUnknownSync(TrustPolicy)({
   decay: { competenceHalfLifeSeconds: 30 * DAY, complianceHalfLifeSeconds: 14 * DAY },
   thresholds: [
-    { gear: "S1", minCompetence: 0.2, minCompliance: 0.2 },
-    { gear: "S2", minCompetence: 0.5, minCompliance: 0.5 },
-    { gear: "S3", minCompetence: 0.7, minCompliance: 0.8 },
-    { gear: "S4", minCompetence: 0.8, minCompliance: 0.95 }
+    { gear: "S1", minCompetence: 0.2, minCompliance: 0.2, minSignals: 0 },
+    { gear: "S2", minCompetence: 0.5, minCompliance: 0.5, minSignals: 0 },
+    { gear: "S3", minCompetence: 0.7, minCompliance: 0.8, minSignals: 0 },
+    { gear: "S4", minCompetence: 0.8, minCompliance: 0.95, minSignals: 0 }
   ]
 })
 
@@ -119,5 +119,33 @@ describe("the ledger as a service", () => {
     )
 
     expect(verdict.permitted).toBe(true)
+  })
+})
+
+describe("a score is not enough without the evidence behind it", () => {
+  const demanding = Schema.decodeUnknownSync(TrustPolicy)({
+    decay: { competenceHalfLifeSeconds: 30 * DAY, complianceHalfLifeSeconds: 14 * DAY },
+    thresholds: [{ gear: "S2", minCompetence: 0.5, minCompliance: 0.5, minSignals: 5 }]
+  })
+
+  const withSignals = (competenceSignals: number, complianceSignals: number) =>
+    new TrustRecord({ ...record(1, 1), competenceSignals, complianceSignals })
+
+  it("refuses a perfect score resting on too few signals, and names the ledger short of them", () => {
+    const verdict = TrustLedger.permits(withSignals(5, 3), demanding, "S2", 0 as EpochSeconds)
+
+    expect(verdict.permitted).toBe(false)
+    expect(verdict.blockedBy).toEqual(["compliance"])
+    expect(verdict.required.signals).toBe(5)
+    expect(verdict.actual).toMatchObject({ competenceSignals: 5, complianceSignals: 3 })
+  })
+
+  it("permits once both ledgers have the evidence", () => {
+    expect(TrustLedger.permits(withSignals(5, 5), demanding, "S2", 0 as EpochSeconds).permitted).toBe(true)
+  })
+
+  it("a record that does not say how much evidence it has is read as having none", () => {
+    expect(TrustLedger.permits(record(1, 1), demanding, "S2", 0 as EpochSeconds).blockedBy)
+      .toEqual(["competence", "compliance"])
   })
 })

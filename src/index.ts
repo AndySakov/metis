@@ -373,12 +373,10 @@ export * as PolicyGate from "./policy/PolicyGate.js"
 /**
  * The trust ledger (ADR-014).
  *
- * Read-only at this stage, per REBUILD-PLAN Stage 1: it can report a skill's standing and answer
- * whether a gear is permitted, but nothing updates the scores yet. Stage 4 wires the compliance
- * ledger to real policy evaluations and the competence ledger to approvals and edit ratios.
- *
- * The promotion rules are implemented now rather than later because they are the part worth being
- * careful about, and because a gear check in the execution path needs something to call.
+ * Reports a skill's standing and answers whether a gear is permitted. The promotion rules live
+ * here: both ledgers must clear a gear's score, and each must rest on the gear's minimum number of
+ * signals. `make` answers over fixed records; `TrustUpdater.ledgerFromLog` answers from the event
+ * log at the moment it is asked, which is what `pnpm start` runs.
  */
 export * as TrustLedger from "./policy/TrustLedger.js"
 

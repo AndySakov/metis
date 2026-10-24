@@ -144,6 +144,10 @@ Stated plainly rather than implied away. These are open, not managed.
   seen; the registry only requires declared scopes for http-transport tools. Every current
   descriptor that can reach an arbitrary host declares the scope, so this is a property to keep,
   not a hole today. `metis.model` reaches one fixed host and declares `model.anthropic` instead.
+- **Live trust does not decay.** `derive` stamps a record with the current time and ignores event
+  timestamps, so a signal from months ago counts as much as one from today. The decay half-lives in
+  the trust policy apply only to a record carried forward, which the live ledger never does. A
+  skill that earned S2 and then went unused keeps it until new evidence moves it.
 - **Memory writes are gated, not labelled.** Untrusted input to a tool declaring `memory.write`
   needs approval, but nothing stores the `untrusted` tag with the record, so an approved write is
   read back later as ordinary memory. The memory server is not built yet; when it lands, the tag
