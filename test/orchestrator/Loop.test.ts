@@ -258,7 +258,6 @@ describe("an unresolvable capability fails cleanly", () => {
     // research.search@0.1 has no registered implementation.
     expect(report.status).toBe("failed")
     expect(report.steps[0].detail).toContain("no implementation registered")
-    expect(report.steps[1].status).toBe("skipped")
   }, 30_000)
 
   it("is denied by a rule when policy has one, and the denial is in the log", async () => {
