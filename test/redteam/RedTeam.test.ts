@@ -1,5 +1,5 @@
-import { readFileSync } from "node:fs"
-import { resolve } from "node:path"
+import { readdirSync, readFileSync } from "node:fs"
+import { join, resolve } from "node:path"
 
 import { describe, expect, it } from "@effect/vitest"
 import { Schema } from "effect"
@@ -18,7 +18,8 @@ import { decide } from "../../src/policy/PolicyEngine.js"
  * report would look identical in both cases.
  *
  * This suite is deliberately not exhaustive and cannot be. Rules only catch what they were written
- * for, and one attempt here is expected to get through precisely so the number stays honest.
+ * for, so an attempt that gets through is recorded as a gap rather than removed, and a run with
+ * none through means the suite has run out of known attempts, not that the policy is complete.
  */
 
 const vector = JSON.parse(
@@ -74,6 +75,26 @@ describe("red team", () => {
       expect(outcome.effect, `must not be ${attempt.mustNotBe}`).not.toBe(attempt.mustNotBe)
       // Stopped is not enough — it has to be stopped *for a reason*.
       expect(outcome.stoppedByRule, "must be stopped by a matching rule, not by luck").toBe(true)
+    })
+  }
+})
+
+describe("the attempts describe the registry truthfully", () => {
+  // `registered` is what the executor would send. An attempt that claims a registered capability is
+  // unregistered, or the reverse, tests a request the system can never make.
+  const examples = resolve(__dirname, "../../specs/tools/examples")
+  const registered = new Set(
+    readdirSync(examples)
+      .filter((file) => file.endsWith(".json"))
+      .map((file) => (JSON.parse(readFileSync(join(examples, file), "utf8")) as { capability: string }).capability)
+  )
+
+  for (const attempt of vector.attempts) {
+    const capability = attempt.request.capability
+    if (typeof capability !== "string") continue
+
+    it(attempt.name, () => {
+      expect(attempt.request.registered, `${capability} registration`).toBe(registered.has(capability))
     })
   }
 })

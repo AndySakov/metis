@@ -55,6 +55,10 @@
         "nonIdempotent": {
           "description": "Fires when the tool is not declared idempotent. Absent information counts as non-idempotent: ADR-016 requires an explicit declaration, and the safe reading of silence is the one that cannot replay a side effect.",
           "type": "boolean"
+        },
+        "unregistered": {
+          "description": "Fires when the request names a capability the registry does not hold, so no reviewed descriptor stands behind it. Unstated registration counts as unregistered, for the same reason unstated idempotency counts as non-idempotent. A request naming no capability never matches.",
+          "type": "boolean"
         }
       }
     },
