@@ -2,7 +2,7 @@ import { readdirSync, readFileSync } from "node:fs"
 import { join, resolve } from "node:path"
 
 import { describe, expect, it } from "@effect/vitest"
-import { Effect, Schema } from "effect"
+import { Effect, Either, Schema } from "effect"
 
 import type { EpochSeconds } from "../../src/domain/Common.js"
 import { Policy, PolicyRequest } from "../../src/domain/Policy.js"
@@ -123,6 +123,50 @@ describe("the decision always says why (ADR-014)", () => {
       0 as EpochSeconds
     )
     expect(decision.consideredRuleIds).toEqual(["approve.expensive", "allow.research_reads"])
+  })
+})
+
+describe("a policy is decoded strictly", () => {
+  const decodeEither = Schema.decodeUnknownEither(Policy)
+
+  const withRule = (rule: Record<string, unknown>, top: Record<string, unknown> = {}) => ({
+    version: "strict-1",
+    rules: [{ id: "allow.dispatch", description: "d", priority: 0, effect: "allow", ...rule }],
+    ...top
+  })
+
+  const rejects = (input: unknown, key: string) => {
+    const result = decodeEither(input)
+    expect(Either.isLeft(result), "decodes").toBe(true)
+    if (Either.isLeft(result)) expect(result.left.message).toContain(key)
+  }
+
+  // An ignored key widens the rule it was written in. These used to decode with the key dropped,
+  // leaving an `allow` that matched every dispatch.
+  it("rejects an unknown condition key", () => {
+    rejects(withRule({ when: { at: "tool_dispatch", tagz: ["untrusted"] } }), "tagz")
+  })
+
+  it("rejects a condition from a version this engine does not know", () => {
+    rejects(withRule({ when: { at: "tool_dispatch", futureCondition: true } }), "futureCondition")
+  })
+
+  it("rejects an unknown key on a rule", () => {
+    rejects(withRule({ when: {}, unless: { tags: ["trusted"] } }), "unless")
+  })
+
+  it("rejects an unknown key on the policy", () => {
+    rejects(withRule({ when: {} }, { defaultEfect: "deny" }), "defaultEfect")
+  })
+
+  it("every shipped policy still decodes", () => {
+    const redteam = JSON.parse(
+      readFileSync(resolve(__dirname, "../../specs/redteam/attempts.json"), "utf8")
+    ) as { policy: unknown }
+
+    for (const input of [...vectors.map((vector) => vector.policy), redteam.policy]) {
+      expect(Either.isRight(decodeEither(input))).toBe(true)
+    }
   })
 })
 
