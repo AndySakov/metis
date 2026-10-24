@@ -83,16 +83,19 @@ contained while touching it.
    `agent.*` ones need real browser and device control. Implement them against real backends or not
    at all — a registry entry that does not do what its contract says is worse than an absent one,
    because the planner will target it.
-2. **The red team's two escapes are memory poisoning.** The suite reports twelve attempts, ten
-   caught by rule, none by luck, two through: untrusted content written into long-term memory by
-   `vector.upsert` and by `graph.link`. Both untrusted-content rules are keyed on something a memory
-   write lacks (the `agent.*` namespace, the `public.web` scope), and nothing carries the `untrusted`
-   tag into what is stored, so a later plan gets open-web text back as ordinary memory. The two are
-   kept separate so that a fix naming one capability id visibly leaves the other open. Both tools
-   are descriptor-only, so close the gap before the memory server lands. Earlier escapes are closed:
-   an unregistered capability (the `unregistered` condition) and untrusted content steering
-   `research.fetch` (a deny rule on the `public.web` scope). When a new attempt gets through,
-   add it with `expectedToGetThrough: true` rather than leaving it out.
+2. **The red team has no known escape, which is a reason to write more attempts.** The suite
+   reports twelve attempts, twelve caught by rule, none by luck, none through. The last escapes
+   closed were memory poisoning: untrusted content written into long-term memory by
+   `vector.upsert` or `graph.link`. Both now declare a `memory.write` scope, and
+   `approve.untrusted_memory_write` asks a human before untrusted input reaches a tool with that
+   scope (vectors in `specs/policy/conformance/memory.json`). It asks rather than denies, unlike
+   egress: nothing leaves the machine, and a deny would stop METIS remembering anything it read on
+   the web. What is still open is the other half: nothing stores the `untrusted` tag with the
+   record, so an approved write still comes back as ordinary memory. Fix that when the memory
+   server lands. Earlier escapes: an unregistered capability (the `unregistered` condition) and
+   untrusted content steering `research.fetch` (a deny rule on the `public.web` scope). Zero
+   through means the suite ran out of known attempts, not that the policy is complete. When a new
+   one gets through, add it with `expectedToGetThrough: true` rather than leaving it out.
 3. **Tool sandboxing.** Isolation is still process-level only. ADR-020's policy half is in: the
    `none < process < container < wasm` ladder is the `ToolSpec.isolation` type, the executor puts
    the resolved tier on every `PolicyRequest`, and `isolationBelow` lets a rule require a minimum,

@@ -1,0 +1,61 @@
+{
+  "name": "untrusted content reaching long-term memory",
+  "description": "A tool that declares the `memory.write` scope persists what it is given, and a later plan reads it back. When the dispatch carries untrusted input, what is stored may have been written by whoever wrote that input, and nothing yet carries the `untrusted` tag into the stored record, so the later read sees ordinary memory. The rule keys on the declared scope rather than on a capability id, so `vector.upsert` and `graph.link` are covered by one rule and a future memory writer is covered by declaring the scope.\n\nIt asks rather than denies, unlike the egress rule. Nothing leaves the machine and a bad record can be found and removed afterwards, whereas an egress is gone once sent; and a deny would stop METIS remembering anything it read on the web. When the memory layer stores the tag with the record, this gate can be revisited. It sits at priority 10 beside the egress deny, so a tool declaring both scopes is denied by the fail-safe tie-break (the last case pins that).",
+  "policy": {
+    "version": "memory-1",
+    "defaultEffect": "allow",
+    "rules": [
+      {
+        "id": "deny.untrusted_egress",
+        "description": "A network request steered by untrusted content is refused, at every gear.",
+        "priority": 10,
+        "effect": "deny",
+        "when": { "at": "tool_dispatch", "scopes": ["public.web"], "tags": ["untrusted"] }
+      },
+      {
+        "id": "approve.untrusted_memory_write",
+        "description": "Untrusted content written into long-term memory needs a human to read it first, at every gear.",
+        "priority": 10,
+        "effect": "require_approval",
+        "when": { "at": "tool_dispatch", "scopes": ["memory.write"], "tags": ["untrusted"] }
+      }
+    ]
+  },
+  "cases": [
+    {
+      "name": "an untrusted vector write needs approval at S4",
+      "request": { "at": "tool_dispatch", "actor": "metis", "autonomy": "S4", "capability": "vector.upsert@0.1", "registered": true, "scopes": ["memory.write"], "tags": ["untrusted", "web"], "idempotent": true },
+      "expect": { "effect": "require_approval", "basis": "matched", "ruleId": "approve.untrusted_memory_write" }
+    },
+    {
+      "name": "an untrusted vector write needs approval at S0",
+      "request": { "at": "tool_dispatch", "actor": "metis", "autonomy": "S0", "capability": "vector.upsert@0.1", "registered": true, "scopes": ["memory.write"], "tags": ["untrusted"], "idempotent": true },
+      "expect": { "effect": "require_approval", "basis": "matched", "ruleId": "approve.untrusted_memory_write" }
+    },
+    {
+      "name": "the rule is keyed on the scope, so a graph link is covered too",
+      "request": { "at": "tool_dispatch", "actor": "metis", "autonomy": "S4", "capability": "graph.link@0.1", "registered": true, "scopes": ["memory.write"], "tags": ["untrusted"], "idempotent": true },
+      "expect": { "effect": "require_approval", "basis": "matched", "ruleId": "approve.untrusted_memory_write" }
+    },
+    {
+      "name": "a memory write with no untrusted input is not gated",
+      "request": { "at": "tool_dispatch", "actor": "metis", "autonomy": "S4", "capability": "vector.upsert@0.1", "registered": true, "scopes": ["memory.write"], "tags": ["web"], "idempotent": true },
+      "expect": { "effect": "allow", "basis": "unmatched" }
+    },
+    {
+      "name": "untrusted input to a tool that writes no memory is not gated",
+      "request": { "at": "tool_dispatch", "actor": "metis", "autonomy": "S4", "capability": "transform.extract@0.1", "registered": true, "tags": ["untrusted"], "idempotent": true },
+      "expect": { "effect": "allow", "basis": "unmatched" }
+    },
+    {
+      "name": "a tool declaring both scopes is denied, not merely gated",
+      "request": { "at": "tool_dispatch", "actor": "metis", "autonomy": "S4", "capability": "research.fetch@0.1", "registered": true, "scopes": ["public.web", "memory.write"], "tags": ["untrusted"], "idempotent": true },
+      "expect": {
+        "effect": "deny",
+        "basis": "matched",
+        "ruleId": "deny.untrusted_egress",
+        "consideredRuleIds": ["deny.untrusted_egress", "approve.untrusted_memory_write"]
+      }
+    }
+  ]
+}
