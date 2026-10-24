@@ -299,3 +299,44 @@ describe("a summarize goal with a URL chains a fetch into a summary", () => {
     expect(risks).toContain(`"Summarize what was fetched": it needs the output of "Fetch the page"`)
   })
 })
+
+describe("a leads goal triages what was pasted with it", () => {
+  const withPaste = (goal: string, pasted?: string) =>
+    Effect.runPromise(
+      Effect.gen(function*() {
+        const planner = yield* Planner.Planner
+        return yield* planner.plan(
+          Schema.decodeUnknownSync(Intent)({
+            id: "01890a5d-ac96-774b-bcce-b302099a8057",
+            ts: 1735872000,
+            actor: "user:andysakov",
+            goal,
+            autonomy: "S2",
+            inputs: pasted === undefined ? [] : [{ name: "pasted", value: pasted, tags: ["untrusted", "pasted"] }]
+          })
+        )
+      }).pipe(Effect.provide(Planner.layer))
+    )
+
+  it("plans stays.triage over the pasted chat", async () => {
+    const plan = await withPaste("Any leads in this group chat?", "Anyone with a 1br in Westlands?")
+    expect(plan.steps.map((s) => s.toolCall)).toEqual([
+      expect.objectContaining({
+        capability: "stays.triage@0.1",
+        input: { messages: "Anyone with a 1br in Westlands?" }
+      })
+    ])
+  })
+
+  it("asks for the chat when nothing was pasted", async () => {
+    const plan = await withPaste("Any leads today?")
+    expect(plan.steps.map((s) => s.kind)).toEqual(["ask"])
+    expect(plan.steps[0]!.description).toContain("Paste the group chat")
+  })
+
+  it("leaves a document about leads to the document template", async () => {
+    expect((await withPaste("Draft a PRD for a leads dashboard")).steps.at(-1)!.toolCall!.capability).toBe(
+      "design.prd@1.0"
+    )
+  })
+})

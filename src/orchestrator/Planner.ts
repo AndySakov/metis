@@ -101,6 +101,15 @@ export const projectNameOf = (goal: string): string => {
 }
 
 /**
+ * Text the user pasted alongside the goal, from the intent input named `pasted`. Where it came
+ * from is whatever its tags say; the console tags it `untrusted`, since a group chat is anyone's.
+ */
+export const pastedOf = (intent: Intent): string | undefined => {
+  const value = intent.inputs.find((input) => input.name === "pasted")?.value
+  return typeof value === "string" && value.trim() !== "" ? value : undefined
+}
+
+/**
  * The first http(s) URL in a goal, without punctuation that ends the sentence around it. A closing
  * bracket is kept when the URL opened it, as in `https://en.wikipedia.org/wiki/Metis_(mythology)`.
  */
@@ -207,6 +216,28 @@ const TEMPLATES: ReadonlyArray<Template> = [
     assumptions: ["The workspace is where the project should live"],
     risks: ["The project name is derived from the goal and may need renaming"],
     expects: [{ kind: "text", description: "The files created" }]
+  },
+  {
+    // After the document and scaffold templates, so "a PRD for a leads dashboard" is still a PRD.
+    name: "triage_leads",
+    matches: (goal) => /\b(leads?|triage|enquir(?:y|ies)|sweep)\b/i.test(goal),
+    steps: (intent) => {
+      const pasted = pastedOf(intent)
+      return pasted === undefined
+        ? [{
+          kind: "ask",
+          description: "Paste the group chat to triage: export it from WhatsApp, or copy the messages"
+        }]
+        : [{
+          kind: "tool",
+          description: "Triage the pasted messages for leads",
+          capability: "stays.triage@0.1",
+          input: { messages: pasted }
+        }]
+    },
+    assumptions: ["The pasted messages are recent enough that relative dates mean what they say today"],
+    risks: ["Pasted messages are untrusted text: they are classified, never followed"],
+    expects: [{ kind: "text", description: "Leads, best first, and what was dropped" }]
   },
   {
     name: "research",
