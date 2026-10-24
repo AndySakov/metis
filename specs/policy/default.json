@@ -1,0 +1,48 @@
+{
+  "version": "default-1",
+  "defaultEffect": "allow",
+  "rules": [
+    {
+      "id": "deny.untrusted_to_agent",
+      "description": "Content fetched from the open web must not drive a browser or a device.",
+      "priority": 0,
+      "effect": "deny",
+      "when": { "capabilities": ["agent.*"], "tags": ["untrusted"] }
+    },
+    {
+      "id": "deny.undeclared_device_scope",
+      "description": "A tool may not reach a device without the scope for it.",
+      "priority": 0,
+      "effect": "deny",
+      "when": { "scopes": ["device.local", "device.avd"] }
+    },
+    {
+      "id": "deny.unregistered_capability",
+      "description": "A dispatch to a capability the registry does not hold has no reviewed descriptor behind it, so no other rule can be trusted to have anticipated it.",
+      "priority": 0,
+      "effect": "deny",
+      "when": { "at": "tool_dispatch", "unregistered": true }
+    },
+    {
+      "id": "approve.non_idempotent",
+      "description": "A tool that cannot be safely replayed needs a human first.",
+      "priority": 10,
+      "effect": "require_approval",
+      "when": { "at": "tool_dispatch", "nonIdempotent": true }
+    },
+    {
+      "id": "deny.untrusted_egress",
+      "description": "A network request steered by untrusted content is refused, at every gear. Keyed on the declared scope rather than a namespace, so it covers every tool that can reach the open web.",
+      "priority": 10,
+      "effect": "deny",
+      "when": { "at": "tool_dispatch", "scopes": ["public.web"], "tags": ["untrusted"] }
+    },
+    {
+      "id": "approve.untrusted_memory_write",
+      "description": "Untrusted content written into long-term memory needs a human to read it first, at every gear. Keyed on the declared scope rather than a capability id, so it covers every tool that persists memory.",
+      "priority": 10,
+      "effect": "require_approval",
+      "when": { "at": "tool_dispatch", "scopes": ["memory.write"], "tags": ["untrusted"] }
+    }
+  ]
+}

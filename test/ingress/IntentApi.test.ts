@@ -148,7 +148,7 @@ describe("POST /intent", () => {
     expect(plan.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/)
     expect(plan.intentId).toMatch(/-7[0-9a-f]{3}-/)
     expect(plan.createdAt).toBeGreaterThan(0)
-    expect(plan.steps.length).toBe(3)
+    expect(plan.steps.length).toBe(2)
 
     // And it round-trips the canonical schema after crossing the wire.
     expect(() => Schema.decodeUnknownSync(Plan)(Schema.encodeSync(Plan)(plan))).not.toThrow()
@@ -225,8 +225,9 @@ describe("GET /plans/:id", () => {
       }) as Effect.Effect<any>
     )
 
-    expect(fetched.steps.length).toBe(3)
+    expect(fetched.steps.length).toBe(2)
     expect(missing._tag).toBe("Left")
+    expect(missing.left._tag).toBe("PlanNotFound")
   }, 20_000)
 })
 
@@ -247,7 +248,7 @@ describe("the wire contract, independent of the typed client", () => {
 
     expect(response.status).toBe(201)
     const plan = await response.json() as { steps: Array<unknown> }
-    expect(plan.steps.length).toBe(3)
+    expect(plan.steps.length).toBe(2)
   }, 20_000)
 
   it("defaults autonomy to S0 when omitted — the gear that cannot cause a side effect", async () => {
@@ -297,6 +298,24 @@ describe("POST /plans/:id/execute", () => {
     expect(submission.status).toBeDefined()
   }, 20_000)
 
+  it("reports what happened to each step when the run finished in-process", async () => {
+    const plan = await (await fetch(`http://127.0.0.1:${PORT}/intent`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ actor: "user:andysakov", goal: "Draft a PRD", autonomy: "S2" })
+    })).json() as { id: string; steps: Array<{ id: string }> }
+
+    const submission = await (await fetch(`http://127.0.0.1:${PORT}/plans/${plan.id}/execute`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({})
+    })).json() as { steps?: Array<{ stepId: string; status: string }> }
+
+    // No tools are registered here, so the first step fails and the rest are skipped.
+    expect(submission.steps?.map((step) => step.stepId)).toEqual(plan.steps.map((step) => step.id))
+    expect(submission.steps?.[0]?.status).toBe("failed")
+  }, 20_000)
+
   it("404s a plan that does not exist", async () => {
     const executed = await fetch(
       `http://127.0.0.1:${PORT}/plans/01890a5d-0000-7000-8000-000000000000/execute`,
@@ -306,7 +325,7 @@ describe("POST /plans/:id/execute", () => {
         body: JSON.stringify({})
       }
     )
-    expect(executed.status).toBeGreaterThanOrEqual(400)
+    expect(executed.status).toBe(404)
   }, 20_000)
 
   it("records the submission in the event log", async () => {
@@ -333,5 +352,13 @@ describe("POST /plans/:id/execute", () => {
     const submitted = events.find((e) => e.type === "PLAN_SUBMITTED")
     expect(submitted, "submission must be auditable").toBeDefined()
     expect((submitted!.payload as { mode: string }).mode).toBe("direct")
+  }, 20_000)
+})
+
+describe("GET /artifacts/:id/content", () => {
+  it("404s an artifact that does not exist, as the metadata endpoint does", async () => {
+    const missing = "01890a5d-0000-7000-8000-000000000000"
+    expect((await fetch(`http://127.0.0.1:${PORT}/artifacts/${missing}/content`)).status).toBe(404)
+    expect((await fetch(`http://127.0.0.1:${PORT}/artifacts/${missing}`)).status).toBe(404)
   }, 20_000)
 })

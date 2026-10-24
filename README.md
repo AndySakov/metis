@@ -76,7 +76,12 @@ What exists and works:
 real MCP subprocess, with the whole run correlated in the event log — and covers the paths that
 matter: an approval that genuinely stops execution until granted, a policy denial that produces no
 artifact, and an unresolvable capability that fails cleanly instead of dispatching something else.
-- An HTTP surface declaration for three endpoints, reconciled against the OpenAPI document in CI.
+- An HTTP surface of five endpoints, reconciled against the OpenAPI document in CI, status codes
+  included.
+- **A runnable entrypoint.** `pnpm start` (`src/App.ts`) serves the API over real implementations:
+  the live policy in `specs/policy/default.json` (the same file the red-team suite measures), a
+  registry holding only the tools their MCP servers actually serve, a planner that plans only
+  those, and trust derived from the event log at startup. See "Running it" below.
 - A test suite that fails when a spec and the code disagree.
 
 What does **not** exist yet, despite being described in `docs/`:
@@ -86,7 +91,6 @@ What does **not** exist yet, despite being described in `docs/`:
   ones, which need real browser and device control. Implementing any of them against canned
   responses would be worse than leaving them out — the registry would claim a capability that does
   not do what its contract says.
-- The monorepo layout, `examples/`, voice, device control, the Adaptive Agent Foundry.
 - The monorepo layout, `examples/`, voice, device control, the Adaptive Agent Foundry.
 
 ---
@@ -199,6 +203,31 @@ POSTGRES_DATABASE=metis pnpm migrate
 
 `pnpm migrate` is safe to re-run: applied migrations are skipped, and one whose file changed after
 it was applied fails loudly rather than silently diverging.
+
+## Running it
+
+```bash
+ANTHROPIC_API_KEY=... pnpm start     # http://localhost:8787, METIS_PORT to change it
+```
+
+- `ANTHROPIC_API_KEY` makes Claude answer the `design.*` capabilities; without it the templates do.
+- `POSTGRES_*` (as for `pnpm migrate`) stores everything in Postgres; without `POSTGRES_DATABASE`
+  everything is in memory and a restart empties it.
+- Execution runs in-process (`mode: "direct"`), which is not durable. The Restate path is built
+  and tested but not wired into `pnpm start` yet.
+
+```bash
+curl -s -X POST localhost:8787/intent -H 'content-type: application/json' \
+  -d '{"actor":"user:andysakov","goal":"Draft a PRD for an offline-first notes app","autonomy":"S2"}'
+# -> a plan; then, naming the step to approve:
+curl -s -X POST localhost:8787/plans/<plan id>/execute -H 'content-type: application/json' \
+  -d '{"approvedSteps":["<step id>"]}'
+# -> {"status":"completed","steps":[{"stepId":"...","status":"completed","artifactId":"<id>"}],...}
+curl -s localhost:8787/artifacts/<artifact id>/content    # the document itself
+```
+
+A skill with no history is at S0, so the first run of every tool step waits for approval until the
+event log shows it has earned more.
 
 **Definition of done for any change:** typecheck passes, lint passes, tests pass, and any spec the
 change touches is updated in the same commit.

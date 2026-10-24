@@ -73,12 +73,6 @@ const TEMPLATES: ReadonlyArray<Template> = [
       },
       {
         kind: "tool",
-        description: "Summarise the findings with citations",
-        capability: "research.summarize@0.1",
-        input: { query: intent.goal }
-      },
-      {
-        kind: "tool",
         description: "Draft the PRD",
         capability: "design.prd@1.0",
         input: { title: intent.goal }
@@ -89,6 +83,36 @@ const TEMPLATES: ReadonlyArray<Template> = [
     expects: [{ kind: "text", description: "PRD markdown" }]
   },
   {
+    name: "c4",
+    matches: (goal) => /\bc4\b|architecture diagram/i.test(goal),
+    steps: (intent) => [
+      {
+        kind: "tool",
+        description: "Draw the C4 context and container diagrams",
+        capability: "design.c4@1.0",
+        input: { title: intent.goal }
+      }
+    ],
+    assumptions: ["The goal names the system well enough to diagram it"],
+    risks: ["Containers are inferred from the goal alone and may not match the real system"],
+    expects: [{ kind: "text", description: "C4 diagrams as Mermaid" }]
+  },
+  {
+    name: "api_spec",
+    matches: (goal) => /\bapi spec|\bopenapi\b/i.test(goal),
+    steps: (intent) => [
+      {
+        kind: "tool",
+        description: "Write the API specification",
+        capability: "design.api_spec@1.0",
+        input: { title: intent.goal }
+      }
+    ],
+    assumptions: ["Endpoints can be inferred from the goal"],
+    risks: ["Endpoints are inferred, not supplied, and need review"],
+    expects: [{ kind: "text", description: "OpenAPI document" }]
+  },
+  {
     name: "research",
     matches: (goal) => /research|survey|literature|compare|state of the art/i.test(goal),
     steps: (intent) => [
@@ -96,12 +120,6 @@ const TEMPLATES: ReadonlyArray<Template> = [
         kind: "tool",
         description: "Search for sources",
         capability: "research.search@0.1",
-        input: { query: intent.goal }
-      },
-      {
-        kind: "tool",
-        description: "Summarise the findings with citations",
-        capability: "research.summarize@0.1",
         input: { query: intent.goal }
       }
     ],
@@ -132,54 +150,76 @@ export class Planner extends Context.Tag("orchestrator/Planner")<Planner, {
   readonly plan: (intent: Intent) => Effect.Effect<Plan>
 }>() {}
 
-export const make = Planner.of({
-  plan: (intent) =>
-    Effect.gen(function*() {
-      const millis = yield* Effect.clockWith((clock) => clock.currentTimeMillis)
-      const now = Math.floor(millis / 1000) as EpochSeconds
-      const template = templateFor(intent.goal)
+/**
+ * A planner that plans only what can run.
+ *
+ * A step naming a capability `available` rejects is left out and recorded as a risk on the plan,
+ * so the gap is visible to whoever reads the plan rather than surfacing as a failed step halfway
+ * through executing it. If that leaves nothing to run, the plan asks instead, carrying the same
+ * risks. `available` answers for capability ids only: the planner still never names a tool.
+ */
+export const makeFor = (available: (capability: string) => boolean) =>
+  Planner.of({
+    plan: (intent) =>
+      Effect.gen(function*() {
+        const millis = yield* Effect.clockWith((clock) => clock.currentTimeMillis)
+        const now = Math.floor(millis / 1000) as EpochSeconds
+        const matched = templateFor(intent.goal)
 
-      const steps = template.steps(intent).map((step, index) =>
-        new PlanStep({
-          id: uuidv7(millis + index) as PlanStepId,
-          kind: step.kind,
-          description: step.description,
-          requiresApproval: stepRequiresApproval(step.kind, intent.autonomy),
-          ...(step.capability !== undefined
-            ? {
-              toolCall: new ToolCall({
-                capability: step.capability as CapabilityId,
-                input: step.input ?? {}
-                // `tool` is deliberately absent: ADR-017 requires the planner to target a
-                // capability and never name an implementation. The registry fills it at dispatch.
-              })
-            }
-            : {})
-        })
-      )
+        const proposed = matched.steps(intent)
+        const runnable = proposed.filter((step) => step.capability === undefined || available(step.capability))
+        const skipped = proposed
+          .filter((step) => step.capability !== undefined && !available(step.capability))
+          .map((step) => `Skipped "${step.description}": ${step.capability} has no registered implementation`)
 
-      return new Plan({
-        id: uuidv7(millis) as PlanId,
-        intentId: intent.id,
-        createdAt: now,
-        steps: steps as unknown as readonly [PlanStep, ...Array<PlanStep>],
-        assumptions: template.assumptions.map((description, i) =>
-          new Assumption({ id: uuidv7(millis + i) as AssumptionId, description, tags: [] })
-        ),
-        risks: template.risks.map((description, i) =>
-          new Risk({ id: uuidv7(millis + i) as RiskId, description, tags: [] })
-        ),
-        expectedArtifacts: template.expects.map((expectation, i) =>
-          new ArtifactExpectation({
-            id: uuidv7(millis + i) as ArtifactExpectationId,
-            kind: expectation.kind,
-            description: expectation.description,
-            tags: []
+        const template = runnable.length > 0 ? matched : CLARIFY
+        const risks = [...template.risks, ...skipped]
+
+        const steps = (runnable.length > 0 ? runnable : CLARIFY.steps(intent)).map((step, index) =>
+          new PlanStep({
+            id: uuidv7(millis + index) as PlanStepId,
+            kind: step.kind,
+            description: step.description,
+            requiresApproval: stepRequiresApproval(step.kind, intent.autonomy),
+            ...(step.capability !== undefined
+              ? {
+                toolCall: new ToolCall({
+                  capability: step.capability as CapabilityId,
+                  input: step.input ?? {}
+                  // `tool` is deliberately absent: ADR-017 requires the planner to target a
+                  // capability and never name an implementation. The registry fills it at dispatch.
+                })
+              }
+              : {})
           })
-        ),
-        artifacts: []
+        )
+
+        return new Plan({
+          id: uuidv7(millis) as PlanId,
+          intentId: intent.id,
+          createdAt: now,
+          steps: steps as unknown as readonly [PlanStep, ...Array<PlanStep>],
+          assumptions: template.assumptions.map((description, i) =>
+            new Assumption({ id: uuidv7(millis + i) as AssumptionId, description, tags: [] })
+          ),
+          risks: risks.map((description, i) => new Risk({ id: uuidv7(millis + i) as RiskId, description, tags: [] })),
+          expectedArtifacts: template.expects.map((expectation, i) =>
+            new ArtifactExpectation({
+              id: uuidv7(millis + i) as ArtifactExpectationId,
+              kind: expectation.kind,
+              description: expectation.description,
+              tags: []
+            })
+          ),
+          artifacts: []
+        })
       })
-    })
-})
+  })
+
+/** Plans as though every capability were available. */
+export const make = makeFor(() => true)
 
 export const layer = Layer.succeed(Planner, make)
+
+/** A planner over the capabilities a registry can actually resolve. */
+export const layerFor = (available: (capability: string) => boolean) => Layer.succeed(Planner, makeFor(available))
