@@ -1,0 +1,71 @@
+{
+  "name": "minimum isolation tier (ADR-020)",
+  "description": "Isolation is an ordered ladder, `none < process < container < wasm`, and `isolationBelow` fires when the containment in force for a dispatch is lower on it than the tier named. The comparison is by ladder position, not by string: alphabetically `process` sorts after `container` and `none` after both, so a string comparison would read the two weakest tiers as meeting a container requirement. The `process` and `none` cases below are there to catch exactly that.\n\nUnstated isolation counts as `none`: containment nobody declared is containment nobody can rely on. A request naming no capability never matches, since there is no tool whose containment could be in question.",
+  "policy": {
+    "version": "isolation-1",
+    "defaultEffect": "allow",
+    "rules": [
+      {
+        "id": "deny.unattended_below_container",
+        "description": "Nothing runs unattended at S4 with less than container isolation.",
+        "priority": 0,
+        "effect": "deny",
+        "when": { "at": "tool_dispatch", "autonomy": ["S4"], "isolationBelow": "container" }
+      },
+      {
+        "id": "approve.uncontained",
+        "description": "A tool with no isolation at all needs a human, at any gear.",
+        "priority": 10,
+        "effect": "require_approval",
+        "when": { "at": "tool_dispatch", "isolationBelow": "process" }
+      }
+    ]
+  },
+  "cases": [
+    {
+      "name": "met: container satisfies a container minimum",
+      "request": { "at": "tool_dispatch", "actor": "metis", "autonomy": "S4", "capability": "transform.extract@0.1", "isolation": "container", "idempotent": true },
+      "expect": { "effect": "allow", "basis": "unmatched" }
+    },
+    {
+      "name": "met: wasm is above container on the ladder",
+      "request": { "at": "tool_dispatch", "actor": "metis", "autonomy": "S4", "capability": "transform.extract@0.1", "isolation": "wasm", "idempotent": true },
+      "expect": { "effect": "allow", "basis": "unmatched" }
+    },
+    {
+      "name": "not met: process is below container, though it sorts after it as a string",
+      "request": { "at": "tool_dispatch", "actor": "metis", "autonomy": "S4", "capability": "transform.extract@0.1", "isolation": "process", "idempotent": true },
+      "expect": { "effect": "deny", "basis": "matched", "ruleId": "deny.unattended_below_container" }
+    },
+    {
+      "name": "not met: none is below every tier",
+      "request": { "at": "tool_dispatch", "actor": "metis", "autonomy": "S4", "capability": "transform.extract@0.1", "isolation": "none", "idempotent": true },
+      "expect": {
+        "effect": "deny",
+        "basis": "matched",
+        "ruleId": "deny.unattended_below_container",
+        "consideredRuleIds": ["deny.unattended_below_container", "approve.uncontained"]
+      }
+    },
+    {
+      "name": "not met: unstated isolation is read as none",
+      "request": { "at": "tool_dispatch", "actor": "metis", "autonomy": "S2", "capability": "transform.extract@0.1", "idempotent": true },
+      "expect": { "effect": "require_approval", "basis": "matched", "ruleId": "approve.uncontained" }
+    },
+    {
+      "name": "met: process satisfies a process minimum",
+      "request": { "at": "tool_dispatch", "actor": "metis", "autonomy": "S2", "capability": "transform.extract@0.1", "isolation": "process", "idempotent": true },
+      "expect": { "effect": "allow", "basis": "unmatched" }
+    },
+    {
+      "name": "unmatched: below container, but at a gear the rule does not govern",
+      "request": { "at": "tool_dispatch", "actor": "metis", "autonomy": "S3", "capability": "transform.extract@0.1", "isolation": "process", "idempotent": true },
+      "expect": { "effect": "allow", "basis": "unmatched" }
+    },
+    {
+      "name": "unmatched: a request naming no capability has no containment to judge",
+      "request": { "at": "tool_dispatch", "actor": "metis", "autonomy": "S4" },
+      "expect": { "effect": "allow", "basis": "unmatched" }
+    }
+  ]
+}

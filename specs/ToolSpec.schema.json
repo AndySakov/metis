@@ -48,9 +48,8 @@
       "type": "boolean"
     },
     "isolation": {
-      "description": "How strongly the tool is contained. `process` is the only honest value today: MCP servers are separate processes, so the boundary is the operating system's plus whatever METIS applies at dispatch (ADR-017). This is weaker than the container-or-WASM story in ADR-003. A single-valued enum rather than the old `sandboxed: boolean` — a boolean true would assert containment that does not exist, and adding `wasm` later is an additive change gated on a real WASM host and its own ADR.",
-      "type": "string",
-      "enum": ["process"]
+      "description": "How strongly the tool is contained. `process` is the highest honest value today: MCP servers are separate processes, so the boundary is the operating system's plus whatever METIS applies at dispatch (ADR-017). The registry refuses `container` and `wasm` until a runtime provides them (ADR-020).",
+      "$ref": "#/$defs/Isolation"
     },
     "inputSchema": { "$ref": "#/$defs/JsonSchema" },
     "outputSchema": { "$ref": "#/$defs/JsonSchema" },
@@ -88,6 +87,11 @@
     }
   },
   "$defs": {
+    "Isolation": {
+      "description": "Containment tiers, weakest first: none < process < container < wasm (ADR-020). The order is the contract: a policy rule asking for a minimum tier compares by position on this list, never by string.",
+      "type": "string",
+      "enum": ["none", "process", "container", "wasm"]
+    },
     "JsonSchema": {
       "type": "object",
       "description": "Embedded JSON Schema (2020-12)",

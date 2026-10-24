@@ -14,7 +14,8 @@
 import { Context, Effect, Layer, Schema } from "effect"
 
 import type { CapabilityId } from "../domain/Common.js"
-import type { ToolSpec } from "../domain/ToolSpec.js"
+import type { Isolation, ToolSpec } from "../domain/ToolSpec.js"
+import { isolationRank } from "../domain/ToolSpec.js"
 
 export class ToolNotFound extends Schema.TaggedError<ToolNotFound>()(
   "ToolNotFound",
@@ -31,6 +32,12 @@ export class InvalidToolSpec extends Schema.TaggedError<InvalidToolSpec>()(
     errors: Schema.Array(Schema.String)
   }
 ) {}
+
+/**
+ * The most contained tier METIS can actually provide. Raised only when a runtime for the next tier
+ * exists (ADR-020); until then a higher claim is containment that is not there.
+ */
+export const HIGHEST_BUILT_ISOLATION: Isolation = "process"
 
 /**
  * ADR-006's registration rules, as checks rather than prose.
@@ -59,6 +66,12 @@ export const validationErrors = (spec: ToolSpec): Array<string> => {
     errors.push(
       `version ${spec.version} does not share a major with capability ${spec.capability}; ` +
         "one of the two is wrong"
+    )
+  }
+
+  if (isolationRank(spec.isolation) > isolationRank(HIGHEST_BUILT_ISOLATION)) {
+    errors.push(
+      `declares ${spec.isolation} isolation, but nothing above ${HIGHEST_BUILT_ISOLATION} is built (ADR-020)`
     )
   }
 
