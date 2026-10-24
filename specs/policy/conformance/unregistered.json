@@ -1,0 +1,79 @@
+{
+  "name": "dispatch to a capability absent from the registry",
+  "description": "The planner targets capability ids and the registry resolves them (ADR-006, ADR-017). A dispatch naming an id the registry does not hold has no reviewed descriptor behind it: no declared scopes, no declared idempotency, no conformance vector. No glob in a policy can be trusted to cover it, because the id was never seen when the globs were written.\n\nThe `unregistered` condition reads the `registered` field the executor fills from the registry lookup. Like `nonIdempotent`, silence counts against the request: a capability-bearing request that does not say it is registered is treated as unregistered. A request naming no capability cannot match, since there is nothing to look up.",
+  "policy": {
+    "version": "unregistered-1",
+    "defaultEffect": "allow",
+    "rules": [
+      {
+        "id": "deny.unregistered_capability",
+        "description": "A dispatch to a capability the registry does not hold is refused, at every gear.",
+        "priority": 0,
+        "effect": "deny",
+        "when": { "at": "tool_dispatch", "unregistered": true }
+      },
+      {
+        "id": "allow.research_reads",
+        "description": "Read-only research capabilities are permitted outright.",
+        "priority": 30,
+        "effect": "allow",
+        "when": { "capabilities": ["research.*"] }
+      }
+    ]
+  },
+  "cases": [
+    {
+      "name": "unregistered capability at S0 is denied",
+      "request": { "at": "tool_dispatch", "actor": "metis", "autonomy": "S0", "capability": "shell.exec@1.0", "registered": false, "idempotent": true },
+      "expect": { "effect": "deny", "basis": "matched", "ruleId": "deny.unregistered_capability" }
+    },
+    {
+      "name": "unregistered capability at S1 is denied",
+      "request": { "at": "tool_dispatch", "actor": "metis", "autonomy": "S1", "capability": "shell.exec@1.0", "registered": false, "idempotent": true },
+      "expect": { "effect": "deny", "basis": "matched", "ruleId": "deny.unregistered_capability" }
+    },
+    {
+      "name": "unregistered capability at S2 is denied",
+      "request": { "at": "tool_dispatch", "actor": "metis", "autonomy": "S2", "capability": "shell.exec@1.0", "registered": false, "idempotent": true },
+      "expect": { "effect": "deny", "basis": "matched", "ruleId": "deny.unregistered_capability" }
+    },
+    {
+      "name": "unregistered capability at S3 is denied",
+      "request": { "at": "tool_dispatch", "actor": "metis", "autonomy": "S3", "capability": "shell.exec@1.0", "registered": false, "idempotent": true },
+      "expect": { "effect": "deny", "basis": "matched", "ruleId": "deny.unregistered_capability" }
+    },
+    {
+      "name": "unregistered capability at S4 is denied",
+      "description": "The highest gear buys less human involvement, not more permission.",
+      "request": { "at": "tool_dispatch", "actor": "metis", "autonomy": "S4", "capability": "shell.exec@1.0", "registered": false, "idempotent": true },
+      "expect": { "effect": "deny", "basis": "matched", "ruleId": "deny.unregistered_capability" }
+    },
+    {
+      "name": "a registered capability is not matched by the rule",
+      "request": { "at": "tool_dispatch", "actor": "metis", "autonomy": "S4", "capability": "transform.extract@0.1", "registered": true, "idempotent": true },
+      "expect": { "effect": "allow", "basis": "unmatched" }
+    },
+    {
+      "name": "unstated registration is treated as unregistered",
+      "description": "A caller that forgets to say is read the way that cannot dispatch something unreviewed.",
+      "request": { "at": "tool_dispatch", "actor": "metis", "autonomy": "S4", "capability": "transform.extract@0.1", "idempotent": true },
+      "expect": { "effect": "deny", "basis": "matched", "ruleId": "deny.unregistered_capability" }
+    },
+    {
+      "name": "a broad allow glob does not launder an unregistered id",
+      "description": "`research.*` was written for the research tools that exist. An id that merely shares the prefix is not one of them.",
+      "request": { "at": "tool_dispatch", "actor": "metis", "autonomy": "S4", "capability": "research.exfiltrate@0.1", "registered": false, "idempotent": true },
+      "expect": {
+        "effect": "deny",
+        "basis": "matched",
+        "ruleId": "deny.unregistered_capability",
+        "consideredRuleIds": ["deny.unregistered_capability", "allow.research_reads"]
+      }
+    },
+    {
+      "name": "a request naming no capability cannot be unregistered",
+      "request": { "at": "tool_dispatch", "actor": "metis", "autonomy": "S4" },
+      "expect": { "effect": "allow", "basis": "unmatched" }
+    }
+  ]
+}

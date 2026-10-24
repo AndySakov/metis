@@ -260,6 +260,66 @@ describe("an unresolvable capability fails cleanly", () => {
     expect(report.steps[0].detail).toContain("no implementation registered")
     expect(report.steps[1].status).toBe("skipped")
   }, 30_000)
+
+  it("is denied by a rule when policy has one, and the denial is in the log", async () => {
+    const denyUnregistered = policyFrom({
+      version: "unregistered-1",
+      defaultEffect: "allow",
+      rules: [
+        {
+          id: "deny.unregistered_capability",
+          description: "A dispatch to a capability the registry does not hold is refused.",
+          priority: 0,
+          effect: "deny",
+          when: { at: "tool_dispatch", unregistered: true }
+        }
+      ]
+    })
+
+    const { coverage, events, report } = await Effect.runPromise(
+      Effect.scoped(
+        Effect.gen(function*() {
+          const planner = yield* Planner.Planner
+          const intent = intentFor("Research the state of the art in RAG", "S4")
+          const plan = yield* planner.plan(intent)
+          const report = yield* Executor.execute(intent, plan)
+          const log = yield* EventLogStore
+          const events = yield* Effect.orDie(log.read({}))
+          const coverage = yield* Coverage.report(denyUnregistered)
+          return { coverage, events, report }
+        })
+      ).pipe(Effect.provide(stack(denyUnregistered))) as Effect.Effect<any>
+    )
+
+    // Stopped by a rule rather than by the lookup failing: the difference is whether the event
+    // log, and so the coverage report, can see it.
+    expect(report.status).toBe("denied")
+    const types = events.map((e: { type: string }) => e.type)
+    expect(types).toContain("STEP_DENIED")
+    expect(types).not.toContain("TOOL_STARTED")
+    const rule = coverage.rules.find((r: { ruleId: string }) => r.ruleId === "deny.unregistered_capability")
+    expect(rule.decidedCount).toBe(1)
+  }, 30_000)
+
+  it("a registered capability is dispatched as registered", async () => {
+    const denyUnregistered = policyFrom({
+      version: "unregistered-1",
+      defaultEffect: "allow",
+      rules: [
+        {
+          id: "deny.unregistered_capability",
+          description: "A dispatch to a capability the registry does not hold is refused.",
+          priority: 0,
+          effect: "deny",
+          when: { unregistered: true }
+        }
+      ]
+    })
+    const { coverage, report } = await runLoop("Draft a PRD", "S2", denyUnregistered, false)
+
+    expect(report.status).toBe("completed")
+    expect(coverage.deadRules).toContain("deny.unregistered_capability")
+  }, 30_000)
 })
 
 describe("gear enforcement: trust bounds what runs unattended", () => {

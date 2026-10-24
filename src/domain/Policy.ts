@@ -51,7 +51,9 @@ export class PolicyCondition extends Schema.Class<PolicyCondition>("PolicyCondit
   /** Fires when estimated duration is at least this many seconds. */
   minSeconds: Schema.optional(Schema.Number.pipe(Schema.nonNegative())),
   /** Fires when the tool declares itself non-idempotent (ADR-016). */
-  nonIdempotent: Schema.optional(Schema.Boolean)
+  nonIdempotent: Schema.optional(Schema.Boolean),
+  /** Fires when the capability has no registry entry, so no reviewed descriptor stands behind it. */
+  unregistered: Schema.optional(Schema.Boolean)
 }) {}
 
 export class PolicyRule extends Schema.Class<PolicyRule>("PolicyRule")({
@@ -87,7 +89,9 @@ export class PolicyRequest extends Schema.Class<PolicyRequest>("PolicyRequest")(
   tags: Schema.optionalWith(Schema.Array(Schema.NonEmptyTrimmedString), { default: () => [] }),
   estimatedDollars: Schema.optional(Schema.Number.pipe(Schema.nonNegative())),
   estimatedSeconds: Schema.optional(Schema.Number.pipe(Schema.nonNegative())),
-  idempotent: Schema.optional(Schema.Boolean)
+  idempotent: Schema.optional(Schema.Boolean),
+  /** Whether the registry resolved `capability`. Filled by the executor from the lookup. */
+  registered: Schema.optional(Schema.Boolean)
 }) {}
 
 /**

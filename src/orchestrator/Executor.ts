@@ -219,6 +219,24 @@ export const execute = (
 
         const specs = yield* Effect.either(registry.select(step.toolCall.capability))
         if (specs._tag === "Left") {
+          // Asked anyway, so the dispatch is a recorded decision rather than an invisible lookup
+          // failure, and a rule can refuse it by name. Anything short of a deny still fails: there
+          // is no implementation to approve.
+          const unregistered = yield* gate.check(
+            new PolicyRequest({
+              at: "tool_dispatch",
+              actor: intent.actor,
+              autonomy: intent.autonomy,
+              capability: step.toolCall.capability,
+              tags: intent.inputs.flatMap((input) => input.tags),
+              registered: false
+            }),
+            correlationId
+          )
+          if (unregistered.effect === "deny") {
+            yield* emit("STEP_DENIED", { stepId: step.id, basis: unregistered.basis })
+            return { stepId: step.id, status: "denied" as const, detail: "policy denied dispatch" }
+          }
           yield* emit("STEP_FAILED", { stepId: step.id, reason: specs.left.message })
           return { stepId: step.id, status: "failed" as const, detail: specs.left.message }
         }
@@ -234,7 +252,8 @@ export const execute = (
             capability: step.toolCall.capability,
             scopes: spec.authScopes,
             tags: intent.inputs.flatMap((input) => input.tags),
-            idempotent: spec.idempotent
+            idempotent: spec.idempotent,
+            registered: true
           }),
           correlationId
         )
@@ -339,7 +358,8 @@ export const execute = (
             actor: intent.actor,
             autonomy: intent.autonomy,
             capability: step.toolCall.capability,
-            tags: intent.inputs.flatMap((input) => input.tags)
+            tags: intent.inputs.flatMap((input) => input.tags),
+            registered: true
           }),
           correlationId
         )

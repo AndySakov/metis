@@ -139,6 +139,10 @@ Stated plainly rather than implied away. These are open, not managed.
   and the link-local metadata address — but does not resolve DNS, so a hostname that resolves to a
   private address still reaches the network. Closing that means resolving and re-checking after
   every redirect, which belongs with the WASM sandbox work rather than being half-done in a tool.
+- **Untrusted content can steer `research.fetch`.** The untrusted-content rule is keyed on the
+  `agent.*` namespace, so a fetch whose URL came from untrusted page text is governed by nothing,
+  and a GET's URL is enough to carry data out. The red-team suite keeps this as its one documented
+  escape until a rule keyed on the `public.web` scope replaces the namespace match.
 - **Durability depends on which execution mode was used.** `restate` is durable; `direct` is not,
   and killing the process loses the run. The API reports the mode on every submission, so the
   distinction is visible — but any claim that "plans survive restarts" is only true of the durable

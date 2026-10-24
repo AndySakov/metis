@@ -58,6 +58,11 @@ export const ruleMatches = (rule: PolicyRule, request: PolicyRequest): boolean =
     // declaration, and the safe reading of "not stated" is the one that cannot replay a side effect.
     if (request.idempotent === true) return false
   }
+  if (when.unregistered === true) {
+    // Only a named capability can be looked up. Unstated registration counts as unregistered, for
+    // the same reason unstated idempotency counts as non-idempotent: silence is not a declaration.
+    if (request.capability === undefined || request.registered === true) return false
+  }
 
   return true
 }
