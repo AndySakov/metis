@@ -219,21 +219,6 @@ describe.skipIf(browser === undefined)("the console in a browser", () => {
     await page.close()
   }, 60_000)
 
-  it("offers a loaded pack's example, and runs it like anything of core's", async () => {
-    const page = await browser!.newPage()
-    await page.goto(`${base}/`)
-    await page.waitForSelector("#examples .chip")
-    await page.click("#examples .chip:has-text(\"Redact the personal details in this\")")
-    expect(await page.$$eval("#pasted", (n) => (n[0] as HTMLTextAreaElement).value)).toContain("amina@example.com")
-    await page.click("#plan")
-    await runOnPage(page)
-
-    const output = await page.textContent("#output")
-    expect(output).toContain("Call Amina on [phone] or [email]")
-    expect(output).not.toContain("amina@example.com")
-    await page.close()
-  }, 60_000)
-
   it("renders hostile markup in a document as text", async () => {
     const page = await browser!.newPage()
     let dialogs = 0

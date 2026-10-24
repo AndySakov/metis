@@ -483,17 +483,6 @@ export * as Verification from "./policy/Verification.js"
 export * as Descriptors from "./tools/Descriptors.js"
 
 /**
- * Reading a tool descriptor from disk, with the schemas it points at.
- *
- * A descriptor names its capability's input and output schemas by `$ref`, relative to the
- * descriptor's own file. Those references are resolved here, once, at load: a `ToolSpec` held in
- * the registry carries the schemas themselves, so anything checking an output against what the
- * capability declares (sampled verification, ADR-014) checks the real contract rather than an
- * object with nothing in it but a pointer.
- */
-export * as Descriptors from "./tools/Descriptors.js"
-
-/**
  * `ToolRunner` over MCP (ADR-017).
  *
  * Connects to the server named in a ToolSpec's `mcp.server`, calls the named tool, and returns its
