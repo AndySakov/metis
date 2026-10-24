@@ -51,7 +51,8 @@ beforeAll(async () => {
     anthropicBaseUrl: Option.some(`http://127.0.0.1:${(api.address() as AddressInfo).port}`),
     postgres: false,
     restate: Option.none(),
-    workspace: Option.some(workspace)
+    workspace: Option.some(workspace),
+    modelCli: Option.none()
   }
   // One `backing` value for both, so the test reads the very event log the server writes to.
   const backing = App.services(config)
@@ -224,7 +225,8 @@ describe("pnpm start", () => {
       anthropicBaseUrl: Option.none(),
       postgres: false,
       restate: Option.none(),
-      workspace: Option.none()
+      workspace: Option.none(),
+      modelCli: Option.none()
     }
     expect(Object.keys(App.serversFor(base))).not.toContain("metis.build")
     // The workspace reaches that server alone, as an absolute path.
@@ -233,6 +235,52 @@ describe("pnpm start", () => {
     for (const [name, spawn] of Object.entries(servers)) {
       if (name !== "metis.build") expect(spawn.env?.METIS_WORKSPACE, name).toBeUndefined()
     }
+  })
+
+  it("hands a model CLI its own settings and only the credentials its preset reads", () => {
+    const base: App.AppConfig = {
+      port: PORT,
+      anthropicApiKey: Option.none(),
+      anthropicBaseUrl: Option.none(),
+      postgres: false,
+      restate: Option.none(),
+      workspace: Option.none(),
+      modelCli: Option.none()
+    }
+    expect(Object.keys(App.serversFor(base))).not.toContain("metis.model-cli")
+
+    const saved = { ...process.env }
+    process.env.OPENAI_API_KEY = "openai-secret"
+    process.env.ANTHROPIC_API_KEY = "anthropic-secret"
+    process.env.EXTRA_SETTING = "extra"
+    try {
+      const codex = App.serversFor({
+        ...base,
+        modelCli: Option.some({ cli: "codex", model: Option.some("gpt-5"), env: ["EXTRA_SETTING"] })
+      })
+      expect(codex["metis.model-cli"]!.env).toEqual({
+        METIS_MODEL_CLI: "codex",
+        METIS_MODEL_CLI_MODEL: "gpt-5",
+        OPENAI_API_KEY: "openai-secret",
+        EXTRA_SETTING: "extra"
+      })
+      // Given an API key, Claude Code would bill the API instead of the signed-in plan.
+      const claude = App.serversFor({
+        ...base,
+        modelCli: Option.some({ cli: "claude", model: Option.none(), env: [] })
+      })
+      expect(claude["metis.model-cli"]!.env).toEqual({ METIS_MODEL_CLI: "claude" })
+    } finally {
+      process.env = saved
+    }
+  })
+
+  it("will not start on a model CLI it cannot use", () => {
+    expect(App.modelCliOf({ cli: "chatgpt", model: Option.none(), env: [] })).toHaveProperty("error")
+    expect(App.modelCliOf({ cli: "ollama", model: Option.none(), env: [] })).toMatchObject({
+      error: expect.stringContaining("METIS_MODEL_CLI_MODEL")
+    })
+    expect(App.modelCliOf({ cli: "ollama", model: Option.some("llama3.3"), env: [] })).toHaveProperty("name", "ollama")
   })
 
   it("answers a missing plan with the 404 the spec declares", async () => {

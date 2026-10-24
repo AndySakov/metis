@@ -169,6 +169,12 @@ Stated plainly rather than implied away. These are open, not managed.
   is set, and the API reports the mode on every submission. A durable run also needs Postgres: with
   memory storage Restate resumes the workflow after a restart, but its plan and record are gone,
   and startup warns about exactly that combination.
+- **Some model CLIs keep their own tools.** `metis.model` gives the model no tools, so design
+  inputs can shape a document but not make anything happen. Through `METIS_MODEL_CLI`, that holds
+  for `claude` (every tool switched off), `ollama` and `llm`; `codex` keeps a shell in its read-only
+  sandbox and `gemini` may run its read-only tools, so a design input carrying web content could
+  get either to read local files into what it writes. Startup warns about exactly those. A custom
+  command is unknown to METIS.
 - **Sampling bounds frequency, not severity.** Random verification of executed actions can tell you
   how often things go wrong. It will not reliably catch a single rare catastrophic action. Do not
   conflate the two in code or in any claim made about the system.

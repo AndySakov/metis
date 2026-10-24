@@ -15,12 +15,25 @@
  * Credentials come from this process's environment, which the runner fills per server: only a
  * server configured to receive `ANTHROPIC_API_KEY` ever sees it. Without credentials every call is a
  * tool error naming the missing variable, never a template passed off as a model's answer.
+ *
+ * With `METIS_MODEL_CLI` set, the same server answers through a model CLI instead (`ModelCli.ts`):
+ * `claude -p` on a Claude Code login, `codex exec`, `ollama run`, or a command of your own. The
+ * prompt is the same; the CLI runs in an empty temporary directory, so it finds no project to
+ * read, and whatever it prints is the document. Run that way it is registered as `metis.model-cli`.
  */
+
+import { spawn } from "node:child_process"
+import { mkdtempSync, rmSync } from "node:fs"
+import { tmpdir } from "node:os"
+import { join } from "node:path"
 
 import Anthropic from "@anthropic-ai/sdk"
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js"
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod"
+
+import type { ModelCli } from "../ModelCli.ts"
+import { resolve } from "../ModelCli.ts"
 
 /** Pinned rather than configurable: a descriptor's version should mean one model's behaviour. */
 const MODEL = "claude-opus-5-5"
@@ -86,8 +99,77 @@ let client: Anthropic | undefined
 const hasCredentials = (): boolean =>
   (process.env.ANTHROPIC_API_KEY ?? "") !== "" || (process.env.ANTHROPIC_AUTH_TOKEN ?? "") !== ""
 
+/** How long a CLI may take over one document before it is stopped and the step fails. */
+const CLI_TIMEOUT_MS = Number(process.env.METIS_MODEL_CLI_TIMEOUT_SECONDS ?? 600) * 1000
+
+/** The configured CLI, or why it cannot be used. Read once: the environment does not change. */
+const cli: ModelCli | { error: string } | undefined = process.env.METIS_MODEL_CLI === undefined
+  ? undefined
+  : resolve(process.env.METIS_MODEL_CLI)
+const cliModel = process.env.METIS_MODEL_CLI_MODEL || undefined
+
+/** The last few hundred characters of what a failed CLI said, which is where the reason usually is. */
+const tail = (text: string): string => {
+  const trimmed = text.trim()
+  return trimmed.length > 400 ? `…${trimmed.slice(-400)}` : trimmed
+}
+
+/** One document through a model CLI. Every way it can fall short is a tool error, as for the API. */
+const draftViaCli = (program: ModelCli, task: Task, inputs: Record<string, unknown>): Promise<ToolResult> => {
+  if (program.requiresModel && cliModel === undefined) {
+    return Promise.resolve(failure(`${program.name} needs a model: set METIS_MODEL_CLI_MODEL`))
+  }
+  const call = program.invoke(
+    `${PREAMBLE}\n\n${TASKS[task]}`,
+    `<inputs>\n${JSON.stringify(inputs, null, 2)}\n</inputs>`,
+    cliModel
+  )
+  // An empty directory, so the CLI finds no project, instructions or files to read.
+  const cwd = mkdtempSync(join(tmpdir(), "metis-model-cli-"))
+
+  return new Promise<ToolResult>((settle) => {
+    let stdout = ""
+    let stderr = ""
+    let done = false
+    const finish = (result: ToolResult) => {
+      if (done) return
+      done = true
+      clearTimeout(timer)
+      rmSync(cwd, { recursive: true, force: true })
+      settle(result)
+    }
+
+    const child = spawn(call.command, [...call.args], { cwd, env: process.env, stdio: ["pipe", "pipe", "pipe"] })
+    const timer = setTimeout(() => {
+      child.kill("SIGKILL")
+      finish(failure(`${program.name} took longer than ${CLI_TIMEOUT_MS / 1000} seconds and was stopped`))
+    }, CLI_TIMEOUT_MS)
+
+    child.stdout.on("data", (chunk) => (stdout += chunk))
+    child.stderr.on("data", (chunk) => (stderr += chunk))
+    child.on("error", (error: NodeJS.ErrnoException) =>
+      finish(failure(
+        error.code === "ENOENT"
+          ? `${call.command} is not installed, or not on the PATH METIS was started with`
+          : `could not run ${call.command}: ${error.message}`
+      )))
+    child.on("close", (code) => {
+      if (code !== 0) {
+        return finish(failure(`${program.name} exited with ${code}: ${tail(stderr || stdout) || "no output"}`))
+      }
+      const answer = program.parse(stdout)
+      finish("error" in answer ? failure(answer.error) : { content: [{ type: "text", text: answer.text }] })
+    })
+    // A CLI that exits before reading its input closes the pipe; that is reported by `close`.
+    child.stdin.on("error", () => {})
+    child.stdin.end(call.stdin)
+  })
+}
+
 /** One request, one document. Every way it can fall short is a tool error, not partial text. */
 const draft = async (task: Task, inputs: Record<string, unknown>): Promise<ToolResult> => {
+  if (cli !== undefined) return "error" in cli ? failure(cli.error) : draftViaCli(cli, task, inputs)
+
   if (!hasCredentials()) {
     return failure("metis.model has no Anthropic credentials: set ANTHROPIC_API_KEY for this server")
   }
