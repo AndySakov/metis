@@ -20,8 +20,8 @@ multi-user seams left open but not built.
 
 What exists and works:
 
-- Contract schemas in `specs/` — Intent, IntentDraft, Plan, Artifact, Event, ToolSpec, shared types,
-  20 capability contracts, 28 example tool descriptors.
+- Contract schemas in `specs/` — Intent, IntentDraft, Plan, Artifact, Event, ToolSpec, Pack,
+  shared types, 20 capability contracts, 28 example tool descriptors.
 - Effect Schema domain types in `src/domain/` that decode those contracts, with branded identifiers
   and tagged errors.
 - A PostgreSQL schema in `migrations/`, with domain constraints and a checksum-verifying migration
@@ -101,6 +101,19 @@ What exists and works:
   the document it returns, and only this server receives `ANTHROPIC_API_KEY`: the runner hands each
   tool process its own environment. Without the key, every call is a tool error.
 
+- **Packs: domains added from outside core** (`specs/packs/Pack.schema.json`, `src/packs/`). A
+  pack is a directory with a `pack.json` naming its own MCP servers, the tool descriptors binding
+  their tools to capabilities, planner templates (a pattern to match the goal and the inputs to
+  fill from it, as data), and examples for the console. `METIS_PACKS=packs/redact pnpm start`
+  loads one. Core never imports a pack's code: it runs only as the server processes the pack
+  declares, so its tools go through the same registry, policy, trust gate and event log as core's.
+  A pack is checked before anything of it runs, and one that fails stops METIS: it binds only its
+  own servers, may not use core's `metis.*` names or another pack's, never points outside its
+  directory, and hands its servers only the environment variables it names. Its templates are
+  tried after core's specific ones and before the broad ones, so a document goal stays a document.
+  `packs/redact` is the reference pack: `text.redact` replaces emails, phone numbers, Luhn-valid
+  card numbers and IP addresses in pasted text, held by its own conformance vectors. Packs in the
+  repository are held by the same spec checks as `specs/`.
 - **Durable execution on Restate** (ADR-016), reachable through the API. `POST /plans/{id}/execute`
   submits the plan and reports which path ran it: `restate` is durable — retries, checkpointing,
   real suspension on an approval gate — and `direct` runs in-process and is **not**. The mode is
@@ -111,9 +124,9 @@ What exists and works:
 real MCP subprocess, with the whole run correlated in the event log — and covers the paths that
 matter: an approval that genuinely stops execution until granted, a policy denial that produces no
 artifact, and an unresolvable capability that fails cleanly instead of dispatching something else.
-- An HTTP surface of eight endpoints, reconciled against the OpenAPI document in CI, status codes
-  included: the intent and plan endpoints, plus read-only `GET /tools`, `GET /trust` and
-  `GET /eventlog` (filterable to one plan).
+- An HTTP surface of ten endpoints, reconciled against the OpenAPI document in CI, status codes
+  included: the intent and plan endpoints, plus read-only `GET /tools`, `GET /packs`,
+  `GET /trust` and `GET /eventlog` (filterable to one plan).
 - **A console** at `/` (`src/ingress/console.html`). Type a goal and you see the plan, run it,
   approve what it stops for, and read what it wrote, with Mermaid diagrams rendered. Beside that
   are the plan's record (every policy decision and the rule behind it, trust gates, promotions) and
@@ -186,6 +199,7 @@ metis/
     common/          shared types (Identifier, Timestamp, Actor, Budget, Error, ...)
     capabilities/    per-capability input/output schemas
     tools/examples/  example ToolSpec descriptors
+    packs/           the pack manifest contract
     storage/         conformance vectors
     api/             OpenAPI 3.1
     events/          AsyncAPI 2.6
@@ -194,10 +208,12 @@ metis/
     ingress/         HTTP surface
     mneme/           memory services and their adapters
     orchestrator/    planner and executor
+    packs/           loading and checking packs
     policy/          policy engine, gate, coverage, trust ledger
     tools/           registry, MCP client, and the MCP servers themselves
     db/              migration runner and column codecs
     config/          configuration
+  packs/redact/       the reference pack: manifest, server, contracts, vectors
   test/specs/        the checks that keep specs and code from drifting apart
   test/storage/      conformance vectors run against every adapter
   test/policy/       policy and trust vectors
@@ -287,6 +303,9 @@ and watch that skill's gear climb until it stops asking.
   the account's email as a viewer, and put the sheet's id (from its URL) in the profile as
   `availability.spreadsheetId`. `METIS_STAYS_AVAILABILITY_SNAPSHOT` reads a saved
   `spreadsheets.get` response instead.
+- `METIS_PACKS` loads packs, as a comma-separated list of their directories
+  (`METIS_PACKS=packs/redact`). `GET /packs` lists what was loaded, and the console offers each
+  pack's examples. Installing a pack runs its servers, so load only packs you trust.
 - `METIS_WORKSPACE` lets `build.scaffold` create projects in that directory ("Scaffold a
   TypeScript project called notes-api"). Without it the server that writes to disk is not started.
 - `GET /plans/{id}/execution` reports a plan's latest run from the event log, in either mode. A

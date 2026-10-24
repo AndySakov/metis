@@ -1,4 +1,3 @@
-import { readFileSync } from "node:fs"
 import { resolve } from "node:path"
 
 import { describe, expect, it } from "@effect/vitest"
@@ -6,6 +5,7 @@ import { Effect, Schema } from "effect"
 
 import type { CapabilityId } from "../../src/domain/Common.js"
 import { ToolSpec } from "../../src/domain/ToolSpec.js"
+import { readDescriptor } from "../../src/tools/Descriptors.js"
 import * as McpToolRunner from "../../src/tools/McpToolRunner.js"
 import { ToolRunner } from "../../src/tools/ToolRunner.js"
 
@@ -19,9 +19,10 @@ import { ToolRunner } from "../../src/tools/ToolRunner.js"
 
 const decodeToolSpec = Schema.decodeUnknownSync(ToolSpec)
 
+/** A descriptor as the registry holds it: its capability's schemas resolved. */
 const specFor = (file: string, server: string, tool: string) =>
   decodeToolSpec({
-    ...JSON.parse(readFileSync(resolve(__dirname, `../../specs/tools/examples/${file}`), "utf8")),
+    ...readDescriptor(resolve(__dirname, `../../specs/tools/examples/${file}`)),
     mcp: { server, tool, transport: "stdio" }
   })
 
@@ -82,10 +83,7 @@ describe("implemented capabilities answer over MCP", () => {
 
     for (const { input, name, spec } of IMPLEMENTED) {
       const outcome = await call(spec, input)
-      const findings = findingsFor(spec, outcome.right.output)
-      // `transform.extract` returns `{matches}`; the MCP text channel carries markdown, so the
-      // runner's generic mapping is checked for shape rather than for the exact key.
-      expect(Array.isArray(findings), `${name}`).toBe(true)
+      expect(findingsFor(spec, outcome.right.output), name).toEqual([])
     }
   }, 60_000)
 })

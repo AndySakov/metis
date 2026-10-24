@@ -1,0 +1,10 @@
+{
+  "extends": "./tsconfig.base.json",
+  "include": ["packs"],
+  "compilerOptions": {
+    "types": ["node"],
+    "outDir": "build/packs",
+    "tsBuildInfoFile": ".tsbuildinfo/packs.tsbuildinfo",
+    "rootDir": "packs"
+  }
+}

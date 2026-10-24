@@ -9,6 +9,7 @@ import * as InMemoryEventLogStore from "../../src/mneme/InMemoryEventLogStore.js
 import * as InMemoryPlanStore from "../../src/mneme/InMemoryPlanStore.js"
 import { PlanExecution } from "../../src/orchestrator/PlanExecution.js"
 import * as Planner from "../../src/orchestrator/Planner.js"
+import * as Packs from "../../src/packs/Packs.js"
 import { TrustLedger } from "../../src/policy/TrustLedger.js"
 import { ToolRegistry } from "../../src/tools/ToolRegistry.js"
 
@@ -38,7 +39,8 @@ const { dispose, handler } = HttpApiBuilder.toWebHandler(
       Layer.provide(Planner.layer),
       Layer.provide(Layer.succeed(ToolRegistry, {} as never)),
       Layer.provide(Layer.succeed(TrustLedger, {} as never)),
-      Layer.provide(Layer.succeed(PlanExecution, { submit: () => Effect.die("unused") } as never))
+      Layer.provide(Layer.succeed(PlanExecution, { submit: () => Effect.die("unused") } as never)),
+      Layer.provide(Packs.layer([]))
     ),
     HttpServer.layerContext
   )

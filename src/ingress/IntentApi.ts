@@ -2,9 +2,10 @@ import { HttpApi, HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from "@effect/p
 import { Schema } from "effect"
 
 import { Artifact, ArtifactId } from "../domain/Artifact.js"
-import { Actor, EpochSeconds } from "../domain/Common.js"
+import { Actor, CapabilityId, EpochSeconds } from "../domain/Common.js"
 import { Event, EventType } from "../domain/Event.js"
 import { IntentDraft } from "../domain/Intent.js"
+import { PackExample } from "../domain/Pack.js"
 import { Plan, PlanId, PlanStepId } from "../domain/Plan.js"
 import { ToolSpec } from "../domain/ToolSpec.js"
 import { TrustRecord } from "../domain/Trust.js"
@@ -142,8 +143,18 @@ export class EventLogParams extends Schema.Class<EventLogParams>("EventLogParams
  * What METIS can do and has done, read back: the tools it will dispatch to, the event log, and the
  * gear each skill has earned. Read-only, so watching METIS work never changes what it does.
  */
+/** A loaded pack, as the console shows it: what it adds, and the goals it offers as examples. */
+export class PackSummary extends Schema.Class<PackSummary>("PackSummary")({
+  name: Schema.NonEmptyString,
+  version: Schema.NonEmptyString,
+  description: Schema.NonEmptyString,
+  capabilities: Schema.Array(CapabilityId),
+  examples: Schema.Array(PackExample)
+}) {}
+
 export class InspectApiGroup extends HttpApiGroup.make("inspect")
   .add(HttpApiEndpoint.get("listTools", "/tools").addSuccess(Schema.Array(ToolSpec)))
+  .add(HttpApiEndpoint.get("listPacks", "/packs").addSuccess(Schema.Array(PackSummary)))
   .add(
     HttpApiEndpoint.get("readEventLog", "/eventlog")
       .setUrlParams(EventLogParams)

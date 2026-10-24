@@ -15,6 +15,9 @@
  * - **Nothing is written to disk unless a workspace is configured.** `metis.build` is started only
  *   when `METIS_WORKSPACE` is set, and that directory is the only one it is told about.
  * - **The live policy is `specs/policy/default.json`,** the same file the red-team suite measures.
+ * - **Packs extend it from outside** (`METIS_PACKS`): each adds its own servers, descriptors and
+ *   planner templates, checked at startup by `packs/Packs.ts`, and goes through the same
+ *   registry, policy and event log as everything here.
  *
  * Building the layer starts nothing on its own. `Program.ts` launches it.
  */
@@ -116,6 +119,16 @@ export * as Intent from "./domain/Intent.js"
  * `~1` standing for `/` and `~0` for `~`.
  */
 export * as JsonPointer from "./domain/JsonPointer.js"
+
+/**
+ * A pack: a domain METIS does not know about, added from outside (`specs/packs/Pack.schema.json`).
+ *
+ * The manifest is data. A pack's code runs only as the MCP server processes it declares, so the
+ * orchestrator never imports it, and its tools reach the world through the same registry, policy
+ * and event log as core's. Its planner templates are data too: a pattern to match the goal and the
+ * tool inputs to fill from it, compiled by the planner rather than handed to it as functions.
+ */
+export * as Pack from "./domain/Pack.js"
 
 /**
  * The plan a request turns into: an ordered list of steps, plus what the planner assumed, what it
@@ -352,6 +365,25 @@ export * as PlanWorkflow from "./orchestrator/PlanWorkflow.js"
 export * as Planner from "./orchestrator/Planner.js"
 
 /**
+ * Loading packs: the domains METIS is extended with, each a directory holding a `pack.json`.
+ *
+ * Everything a pack declares is checked here, before anything of it runs, and a pack that fails a
+ * check stops METIS rather than loading in part:
+ *
+ * - **A pack runs its own servers, and binds only them.** A descriptor naming a server the pack
+ *   does not declare would let a pack attach capabilities to core's servers, or to another pack's.
+ * - **No name is taken twice.** `metis.*` server names are core's, and the manifest schema refuses
+ *   them; a name another pack already uses is refused here. Either way, the second definition
+ *   would otherwise silently replace the first.
+ * - **Its environment is what it names.** A server gets the variables its manifest lists, from
+ *   METIS's environment, and no others, the same rule core's servers follow.
+ *
+ * What a pack cannot do from here is run code in the orchestrator. Its templates are data, compiled
+ * by the planner; its code runs in the processes it declares, as any MCP server does.
+ */
+export * as Packs from "./packs/Packs.js"
+
+/**
  * Policy coverage (ADR-014 §2).
  *
  * This answers the question the system could not previously answer: *did any rule have an opinion
@@ -520,6 +552,17 @@ export * as Sheets from "./stays/Sheets.js"
  * Free of Node APIs, so the MCP server can import it under type stripping.
  */
 export * as Triage from "./stays/Triage.js"
+
+/**
+ * Reading a tool descriptor from disk, with the schemas it points at.
+ *
+ * A descriptor names its capability's input and output schemas by `$ref`, relative to the
+ * descriptor's own file. Those references are resolved here, once, at load: a `ToolSpec` held in
+ * the registry carries the schemas themselves, so anything checking an output against what the
+ * capability declares (sampled verification, ADR-014) checks the real contract rather than an
+ * object with nothing in it but a pointer.
+ */
+export * as Descriptors from "./tools/Descriptors.js"
 
 /**
  * `ToolRunner` over MCP (ADR-017).

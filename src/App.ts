@@ -15,6 +15,9 @@
  * - **Nothing is written to disk unless a workspace is configured.** `metis.build` is started only
  *   when `METIS_WORKSPACE` is set, and that directory is the only one it is told about.
  * - **The live policy is `specs/policy/default.json`,** the same file the red-team suite measures.
+ * - **Packs extend it from outside** (`METIS_PACKS`): each adds its own servers, descriptors and
+ *   planner templates, checked at startup by `packs/Packs.ts`, and goes through the same
+ *   registry, policy and event log as everything here.
  *
  * Building the layer starts nothing on its own. `Program.ts` launches it.
  */
@@ -33,7 +36,7 @@ import { Config, Effect, Layer, Option, Redacted, Schema } from "effect"
 
 import { PostgresConfig } from "./config/Config.js"
 import { Policy } from "./domain/Policy.js"
-import { ToolSpec } from "./domain/ToolSpec.js"
+import type { ToolSpec } from "./domain/ToolSpec.js"
 import { TrustPolicy } from "./domain/Trust.js"
 import * as Console from "./ingress/Console.js"
 import { ApiLive } from "./ingress/IntentApiLive.js"
@@ -45,10 +48,13 @@ import * as PostgresEventLogStore from "./mneme/PostgresEventLogStore.js"
 import * as PostgresPlanStore from "./mneme/PostgresPlanStore.js"
 import * as PlanExecution from "./orchestrator/PlanExecution.js"
 import * as Planner from "./orchestrator/Planner.js"
+import type { LoadedPack } from "./packs/Packs.js"
+import * as Packs from "./packs/Packs.js"
 import * as PolicyEngine from "./policy/PolicyEngine.js"
 import * as PolicyGate from "./policy/PolicyGate.js"
 import { ledgerFromLog, sweeper } from "./policy/TrustUpdater.js"
 import * as Verification from "./policy/Verification.js"
+import { readDescriptor } from "./tools/Descriptors.js"
 import type { ServerMap } from "./tools/McpToolRunner.js"
 import * as McpToolRunner from "./tools/McpToolRunner.js"
 import * as ModelCli from "./tools/ModelCli.js"
@@ -88,6 +94,11 @@ export interface AppConfig {
    * of your own. Run as `metis.model-cli` and preferred over `metis.model` when both are set.
    */
   readonly modelCli: Option.Option<ModelCliConfig>
+  /**
+   * Pack directories to load, from `METIS_PACKS` (comma-separated): domains added from outside
+   * core (`specs/packs/Pack.schema.json`). A pack that fails its checks stops METIS.
+   */
+  readonly packs: ReadonlyArray<string>
 }
 
 export interface ModelCliConfig {
@@ -122,6 +133,10 @@ export const AppConfig: Config.Config<AppConfig> = Config.all({
         Config.map((names) => names.split(",").map((name) => name.trim()).filter((name) => name !== ""))
       )
     })
+  ),
+  packs: Config.string("METIS_PACKS").pipe(
+    Config.withDefault(""),
+    Config.map((dirs) => dirs.split(",").map((dir) => dir.trim()).filter((dir) => dir !== ""))
   )
 })
 
@@ -256,16 +271,19 @@ const servedTools = (servers: ServerMap) =>
 /** Model-backed servers in the order the registry prefers them: a configured CLI, then the API. */
 const MODEL_SERVERS = ["metis.model-cli", "metis.model"]
 
-/** Every descriptor whose server serves its tool, model-backed ones first. */
-export const registrySpecs = (servers: ServerMap) =>
+/**
+ * Every descriptor whose server serves its tool, core's and then `extra` (packs'), model-backed
+ * ones first.
+ */
+export const registrySpecs = (servers: ServerMap, extra: ReadonlyArray<ToolSpec> = []) =>
   Effect.gen(function*() {
     const served = yield* servedTools(servers)
     const dir = `${SPECS}tools/examples/`
-    const specs = readdirSync(dir)
+    const core = readdirSync(dir)
       .filter((file) => file.endsWith(".json"))
       .sort()
-      .map((file) => Schema.decodeUnknownSync(ToolSpec)(JSON.parse(readFileSync(`${dir}${file}`, "utf8"))))
-      .filter((spec) => served.has(`${spec.mcp.server}/${spec.mcp.tool}`))
+      .map((file) => readDescriptor(`${dir}${file}`))
+    const specs = [...core, ...extra].filter((spec) => served.has(`${spec.mcp.server}/${spec.mcp.tool}`))
     return [
       ...MODEL_SERVERS.flatMap((server) => specs.filter((spec) => spec.mcp.server === server)),
       ...specs.filter((spec) => !MODEL_SERVERS.includes(spec.mcp.server))
@@ -287,17 +305,21 @@ const stores = (config: AppConfig) =>
     )
     : Layer.mergeAll(InMemoryEventLogStore.layer, InMemoryArtifactStore.layer, InMemoryPlanStore.layer)
 
-const plannerFromRegistry = Layer.effect(
-  Planner.Planner,
-  Effect.gen(function*() {
-    const capabilities = new Set((yield* (yield* ToolRegistry.ToolRegistry).all).map((spec) => spec.capability))
-    return Planner.makeFor((capability) => capabilities.has(capability as never))
-  })
-)
+const plannerFromRegistry = (templates: ReadonlyArray<Planner.Template>) =>
+  Layer.effect(
+    Planner.Planner,
+    Effect.gen(function*() {
+      const capabilities = new Set((yield* (yield* ToolRegistry.ToolRegistry).all).map((spec) => spec.capability))
+      return Planner.makeFor((capability) => capabilities.has(capability as never), templates)
+    })
+  )
 
 /** Everything behind the API, without the HTTP listener. */
-export const services = (config: AppConfig) => {
-  const servers = serversFor(config)
+export const services = (config: AppConfig) =>
+  Layer.unwrapEffect(Effect.map(Effect.orDie(Packs.loadAll(config.packs)), (packs) => servicesWith(config, packs)))
+
+const servicesWith = (config: AppConfig, packs: ReadonlyArray<LoadedPack>) => {
+  const servers: ServerMap = Object.assign({}, serversFor(config), ...packs.map((pack) => pack.servers))
   const tools = Layer.mergeAll(
     Layer.effect(
       ToolRegistry.ToolRegistry,
@@ -306,7 +328,9 @@ export const services = (config: AppConfig) => {
           const cli = modelCliOf(config.modelCli.value)
           if ("error" in cli) return yield* Effect.dieMessage(cli.error)
         }
-        return yield* Effect.orDie(Effect.flatMap(registrySpecs(servers), ToolRegistry.make))
+        return yield* Effect.orDie(
+          Effect.flatMap(registrySpecs(servers, packs.flatMap((pack) => pack.tools)), ToolRegistry.make)
+        )
       })
     ),
     McpToolRunner.layer(servers)
@@ -315,13 +339,14 @@ export const services = (config: AppConfig) => {
     stores(config),
     tools,
     PolicyEngine.layer(livePolicy()),
-    Verification.randomSampler(VERIFICATION_RATE)
+    Verification.randomSampler(VERIFICATION_RATE),
+    Packs.layer(packs)
   )
   const middle = Layer.mergeAll(
     PolicyGate.layer,
     ledgerFromLog(TRUST_POLICY),
     sweeper(TRUST_POLICY, TRUST_SWEEP_INTERVAL),
-    plannerFromRegistry
+    plannerFromRegistry(packs.flatMap((pack) => pack.templates))
   ).pipe(
     Layer.provideMerge(base)
   )
@@ -337,6 +362,7 @@ const announce = (config: AppConfig) =>
     Effect.gen(function*() {
       const registry = yield* ToolRegistry.ToolRegistry
       const specs = yield* registry.all
+      const packs = yield* Packs.Packs
       yield* Effect.log(`METIS listening on http://localhost:${config.port} (console at /)`)
       yield* Effect.log(`storage: ${config.postgres ? "postgres" : "memory (a restart empties it)"}`)
       yield* Effect.log(
@@ -372,6 +398,9 @@ const announce = (config: AppConfig) =>
           onSome: (dir) => `build.scaffold writes under ${resolve(dir)}`
         })
       )
+      for (const pack of packs) {
+        yield* Effect.log(`pack ${pack.manifest.name} ${pack.manifest.version} from ${pack.dir}`)
+      }
       yield* Effect.log(`capabilities: ${[...new Set(specs.map((spec) => spec.capability))].sort().join(", ")}`)
     })
   )

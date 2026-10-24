@@ -156,7 +156,7 @@
 "use strict";
 const $ = (id) => document.getElementById(id);
 const ACTOR = "user:console";
-const state = { plan: null, approved: new Set(), outcomes: new Map(), why: new Map(), untrusted: new Set(), tools: [] };
+const state = { plan: null, approved: new Set(), outcomes: new Map(), why: new Map(), untrusted: new Set(), tools: [], packs: [] };
 
 // ---- Safe rendering --------------------------------------------------------------------------
 // Everything METIS returns can contain text from the open web, so nothing reaches innerHTML
@@ -285,8 +285,13 @@ const EXAMPLES = [
 const renderExamples = () => {
   const have = new Set(state.tools.map((t) => t.capability));
   const box = $("examples");
-  box.replaceChildren(...EXAMPLES.filter((e) => e.needs.every((c) => have.has(c))).map((e) =>
-    el("span", { class: "chip", text: e.goal, title: "Use this goal", onclick: () => {
+  // Core's examples for what is registered, then each loaded pack's own.
+  const examples = [
+    ...EXAMPLES.filter((e) => e.needs.every((c) => have.has(c))).map((e) => ({ ...e, from: "" })),
+    ...state.packs.flatMap((p) => p.examples.map((e) => ({ ...e, from: ` (${p.name} pack)` })))
+  ];
+  box.replaceChildren(...examples.map((e) =>
+    el("span", { class: "chip", text: e.goal, title: `Use this goal${e.from}`, onclick: () => {
       $("goal").value = e.goal;
       $("pasted").value = e.pasted ?? "";
       $("paste-box").open = e.pasted !== undefined;
@@ -555,6 +560,7 @@ $("goal").addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.metaK
 $("run").addEventListener("click", run);
 (async () => {
   try { state.tools = await api("GET", "/tools"); } catch { state.tools = []; }
+  try { state.packs = await api("GET", "/packs"); } catch { state.packs = []; }
   renderExamples();
   renderWriter();
   renderTools();

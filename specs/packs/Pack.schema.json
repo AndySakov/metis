@@ -1,0 +1,311 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schema.metis.dev/packs/Pack.schema.json",
+  "title": "Pack",
+  "description": "A pack extends METIS with a domain it knows nothing about. It brings its own MCP servers, the tool descriptors that bind their tools to capabilities, and the planner templates that send goals to those capabilities. Core never imports a pack's code: a pack runs only as the server processes it declares, so its tools go through the same registry, policy, trust gate and event log as any other. Installing a pack is running its servers, so install only packs you trust. Read from `pack.json` in the pack's directory; every path in it is relative to that directory.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "name",
+    "version",
+    "description",
+    "servers",
+    "tools"
+  ],
+  "properties": {
+    "name": {
+      "$ref": "#/$defs/PackName"
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-[0-9A-Za-z-.]+)?(?:\\+[0-9A-Za-z-.]+)?$"
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1
+    },
+    "servers": {
+      "description": "The MCP servers the pack runs, by name. No two loaded packs may use the same name.",
+      "type": "object",
+      "minProperties": 1,
+      "propertyNames": {
+        "$ref": "#/$defs/ServerName"
+      },
+      "additionalProperties": {
+        "$ref": "#/$defs/Server"
+      }
+    },
+    "tools": {
+      "description": "Tool descriptors (ToolSpec), as paths. Each binds a tool on one of this pack's own servers, never a server of core's or of another pack. Their schema $refs resolve relative to the descriptor.",
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/RelativePath"
+      }
+    },
+    "templates": {
+      "description": "Goals this pack plans for. Tried after core's specific templates (documents, scaffolding) and before its broad ones (research), in the order given.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Template"
+      }
+    },
+    "examples": {
+      "description": "Goals the console offers as one-click examples while the pack is loaded.",
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Example"
+      }
+    }
+  },
+  "$defs": {
+    "PackName": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{0,62}$"
+    },
+    "ServerName": {
+      "description": "`metis.*` is core's: a pack names its servers outside it, so it can never stand in for one of core's.",
+      "type": "string",
+      "pattern": "^(?!metis\\.)[a-z][a-z0-9-]*(\\.[a-z][a-z0-9-]*)+$"
+    },
+    "RelativePath": {
+      "description": "A path inside the pack: relative, and never climbing out of it.",
+      "type": "string",
+      "pattern": "^(?!/)(?!.*(^|/)\\.\\.(/|$))[A-Za-z0-9._/@-]+$"
+    },
+    "EnvName": {
+      "type": "string",
+      "pattern": "^[A-Z][A-Z0-9_]*$"
+    },
+    "Server": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "command"
+      ],
+      "properties": {
+        "command": {
+          "description": "The executable. `node` is the Node running METIS, which runs TypeScript with --experimental-strip-types.",
+          "type": "string",
+          "minLength": 1
+        },
+        "args": {
+          "description": "`${pack}` in an argument is the pack's directory.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "env": {
+          "description": "Variables handed through from METIS's environment, by name, to this server and no other. Nothing else from that environment reaches it, beyond what any process needs to start.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/EnvName"
+          }
+        },
+        "paths": {
+          "description": "Those of `env` that hold paths, resolved against METIS's working directory before they are handed through.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/EnvName"
+          }
+        }
+      }
+    },
+    "Template": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "match",
+        "steps"
+      ],
+      "properties": {
+        "name": {
+          "$ref": "#/$defs/PackName"
+        },
+        "match": {
+          "description": "A regular expression, matched case-insensitively against the goal.",
+          "type": "string",
+          "minLength": 1
+        },
+        "unless": {
+          "description": "A regular expression that, matching the goal, rules the template out.",
+          "type": "string",
+          "minLength": 1
+        },
+        "needsPasted": {
+          "description": "When set, a goal with nothing pasted alongside it plans one ask step with this description instead of the tool steps.",
+          "type": "string",
+          "minLength": 1
+        },
+        "steps": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/Step"
+          }
+        },
+        "assumptions": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "risks": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "expects": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "kind",
+              "description"
+            ],
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "text",
+                  "image",
+                  "audio",
+                  "video",
+                  "file",
+                  "link",
+                  "code",
+                  "binary"
+                ]
+              },
+              "description": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        }
+      }
+    },
+    "Step": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "description",
+        "capability"
+      ],
+      "properties": {
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "capability": {
+          "$ref": "https://schema.metis.dev/common/CapabilityId.schema.json"
+        },
+        "input": {
+          "description": "The tool input. In any string, `{{goal}}` is the goal and `{{pasted}}` is what was pasted with it, or nothing.",
+          "type": "object"
+        },
+        "bindings": {
+          "description": "Input taken from an earlier step's output, as in a Plan's InputBinding, with the step named by its index in this template.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "to",
+              "fromStep",
+              "from"
+            ],
+            "properties": {
+              "to": {
+                "type": "string",
+                "pattern": "^(/([^~/]|~[01])*)*$"
+              },
+              "fromStep": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "from": {
+                "type": "string",
+                "pattern": "^(/([^~/]|~[01])*)*$"
+              }
+            }
+          }
+        }
+      }
+    },
+    "Example": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "goal"
+      ],
+      "properties": {
+        "goal": {
+          "type": "string",
+          "minLength": 1
+        },
+        "pasted": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "name": "redact",
+      "version": "0.1.0",
+      "description": "Strips personal details from pasted text before it goes anywhere else.",
+      "servers": {
+        "redact.tools": {
+          "command": "node",
+          "args": [
+            "--experimental-strip-types",
+            "${pack}/src/server.ts"
+          ]
+        }
+      },
+      "tools": [
+        "tools/text.redact.tool.json"
+      ],
+      "templates": [
+        {
+          "name": "redact",
+          "match": "\\b(redact|scrub|anonymi[sz]e)\\b",
+          "needsPasted": "Paste the text to redact",
+          "steps": [
+            {
+              "description": "Redact emails, card numbers, phone numbers and IP addresses",
+              "capability": "text.redact@0.1",
+              "input": {
+                "text": "{{pasted}}"
+              }
+            }
+          ],
+          "risks": [
+            "Only the kinds of detail listed are found: names and addresses are not"
+          ],
+          "expects": [
+            {
+              "kind": "text",
+              "description": "The text with personal details replaced"
+            }
+          ]
+        }
+      ],
+      "examples": [
+        {
+          "goal": "Redact the personal details in this",
+          "pasted": "Call Amina on +254 712 345 678 or amina@example.com"
+        }
+      ]
+    }
+  ]
+}

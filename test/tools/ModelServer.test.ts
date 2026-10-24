@@ -1,14 +1,13 @@
-import { readFileSync } from "node:fs"
 import type { IncomingHttpHeaders } from "node:http"
 import { createServer } from "node:http"
 import type { AddressInfo } from "node:net"
 import { resolve } from "node:path"
 
 import { afterAll, beforeAll, describe, expect, it } from "@effect/vitest"
-import { Effect, Schema } from "effect"
+import { Effect } from "effect"
 
-import { ToolSpec } from "../../src/domain/ToolSpec.js"
 import { findingsFor } from "../../src/policy/Verification.js"
+import { readDescriptor } from "../../src/tools/Descriptors.js"
 import * as McpToolRunner from "../../src/tools/McpToolRunner.js"
 import { ToolRunner } from "../../src/tools/ToolRunner.js"
 
@@ -24,9 +23,7 @@ import { ToolRunner } from "../../src/tools/ToolRunner.js"
 const SERVER = resolve(__dirname, "../../src/tools/servers/model.ts")
 
 const specFor = (capability: string) =>
-  Schema.decodeUnknownSync(ToolSpec)(
-    JSON.parse(readFileSync(resolve(__dirname, `../../specs/tools/examples/${capability}.claude.tool.json`), "utf8"))
-  )
+  readDescriptor(resolve(__dirname, `../../specs/tools/examples/${capability}.claude.tool.json`))
 
 interface Recorded {
   readonly url: string

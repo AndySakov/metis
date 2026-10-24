@@ -72,7 +72,8 @@ beforeAll(async () => {
     postgres: false,
     restate: Option.none(),
     workspace: Option.some(workspace),
-    modelCli: Option.none()
+    modelCli: Option.none(),
+    packs: []
   }
   // One `backing` value for both, so the test reads the very event log the server writes to.
   const backing = App.services(config)
@@ -254,7 +255,8 @@ describe("pnpm start", () => {
       postgres: false,
       restate: Option.none(),
       workspace: Option.none(),
-      modelCli: Option.none()
+      modelCli: Option.none(),
+      packs: []
     }
     expect(Object.keys(App.serversFor(base))).not.toContain("metis.build")
     // The workspace reaches that server alone, as an absolute path.
@@ -273,7 +275,8 @@ describe("pnpm start", () => {
       postgres: false,
       restate: Option.none(),
       workspace: Option.none(),
-      modelCli: Option.none()
+      modelCli: Option.none(),
+      packs: []
     }
     expect(Object.keys(App.serversFor(base))).not.toContain("metis.model-cli")
 

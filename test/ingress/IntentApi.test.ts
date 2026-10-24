@@ -17,6 +17,7 @@ import * as InMemoryEventLogStore from "../../src/mneme/InMemoryEventLogStore.js
 import * as InMemoryPlanStore from "../../src/mneme/InMemoryPlanStore.js"
 import * as PlanExecution from "../../src/orchestrator/PlanExecution.js"
 import * as Planner from "../../src/orchestrator/Planner.js"
+import * as Packs from "../../src/packs/Packs.js"
 import * as PolicyEngine from "../../src/policy/PolicyEngine.js"
 import * as PolicyGate from "../../src/policy/PolicyGate.js"
 import * as TrustLedger from "../../src/policy/TrustLedger.js"
@@ -80,7 +81,8 @@ const AppLive = ApiLive.pipe(
   Layer.provide(ToolRegistry.layer([])),
   Layer.provide(TrustLedger.layer(trustPolicy, [])),
   Layer.provide(InMemoryEventLogStore.layer),
-  Layer.provide(InMemoryArtifactStore.layer)
+  Layer.provide(InMemoryArtifactStore.layer),
+  Layer.provide(Packs.layer([]))
 )
 
 const ServerLive = HttpApiBuilder.serve().pipe(

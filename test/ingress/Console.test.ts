@@ -1,6 +1,7 @@
 import { createServer } from "node:http"
 import { createRequire } from "node:module"
 import type { AddressInfo } from "node:net"
+import { resolve } from "node:path"
 
 import { afterAll, beforeAll, describe, expect, it } from "@effect/vitest"
 import { ManagedRuntime, Option } from "effect"
@@ -43,7 +44,9 @@ beforeAll(async () => {
     postgres: false,
     restate: Option.none(),
     workspace: Option.none(),
-    modelCli: Option.none()
+    modelCli: Option.none(),
+    // The reference pack, so the page is tested showing what a pack adds.
+    packs: [resolve(__dirname, "../../packs/redact")]
   }
   runtime = ManagedRuntime.make(App.layer(config) as never)
   await runtime.runtime()
@@ -88,6 +91,11 @@ describe("what the console reads", () => {
     expect(capabilities).toContain("design.prd@1.0")
     // No workspace is configured, so nothing that writes to disk is registered.
     expect(capabilities).not.toContain("build.scaffold@0.1")
+    // Each descriptor carries its capability's schemas, resolved at load, so sampled verification
+    // checks an output against the real contract rather than against a bare `$ref`.
+    const prd = tools.find((t: any) => t.capability === "design.prd@1.0")
+    expect(prd.outputSchema.$ref).toBeUndefined()
+    expect(prd.outputSchema.required).toContain("markdown")
   }, 30_000)
 
   it("reports every registered skill's gear, and moves it as trust is earned", async () => {
@@ -209,6 +217,21 @@ describe.skipIf(browser === undefined)("the console in a browser", () => {
     expect(output).toContain("Leads for Westlands 1-bed (3)")
     expect(output).toContain("Nauliza, kuna mtu ana one bedroom karibu na Sarit")
     expect(await page.textContent("#timeline")).toContain("labels: untrusted, pasted")
+    await page.close()
+  }, 60_000)
+
+  it("offers a loaded pack's example, and runs it like anything of core's", async () => {
+    const page = await browser!.newPage()
+    await page.goto(`${base}/`)
+    await page.waitForSelector("#examples .chip")
+    await page.click("#examples .chip:has-text(\"Redact the personal details in this\")")
+    expect(await page.$$eval("#pasted", (n) => (n[0] as HTMLTextAreaElement).value)).toContain("amina@example.com")
+    await page.click("#plan")
+    await runOnPage(page)
+
+    const output = await page.textContent("#output")
+    expect(output).toContain("Call Amina on [phone] or [email]")
+    expect(output).not.toContain("amina@example.com")
     await page.close()
   }, 60_000)
 
