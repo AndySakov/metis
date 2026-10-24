@@ -143,6 +143,10 @@ paths:
                       [accepted, completed, awaiting_approval, denied, failed]
         "404":
           $ref: "#/components/responses/NotFound"
+        "409":
+          description: >
+            The plan exists but cannot run as it stands, for instance because the intent it was
+            planned from is missing, so policy has nothing to evaluate it against.
   /eventlog/{id}:
     put:
       operationId: appendEvent

@@ -1,6 +1,7 @@
 import { existsSync, readdirSync, readFileSync } from "node:fs"
 import { join, resolve } from "node:path"
 
+import { OpenApi } from "@effect/platform"
 import { describe, expect, it } from "@effect/vitest"
 import { parse } from "yaml"
 
@@ -110,6 +111,34 @@ describe("openapi.yaml and the HttpApi definition agree (ADR-011)", () => {
         return spec !== undefined && spec.operationId !== op.operationId
           ? `${op.method} ${op.path}: code=${op.operationId} spec=${spec.operationId}`
           : null
+      })
+      .filter((entry): entry is string => entry !== null)
+
+    expect(mismatched).toEqual([])
+  })
+})
+
+describe("status codes agree between openapi.yaml and the HttpApi definition", () => {
+  type Responses = { responses?: Record<string, unknown> }
+  const spec = openapi as unknown as { paths: Record<string, Record<string, Responses & { "x-status"?: string }>> }
+  const generated = OpenApi.fromApi(IntentApi) as unknown as { paths: Record<string, Record<string, Responses>> }
+
+  /**
+   * `400` is left out of the comparison: the framework answers every malformed request with one,
+   * whatever the endpoint declares, so it says nothing about either side's contract.
+   */
+  const statuses = (operation: Responses | undefined) =>
+    Object.keys(operation?.responses ?? {}).filter((status) => status !== "400").sort()
+
+  it("every implemented operation answers with exactly the statuses the spec declares", () => {
+    const mismatched = specOperations
+      .filter((op) => op.status === "implemented")
+      .map((op) => {
+        const declared = statuses(spec.paths[op.path]?.[op.method])
+        const served = statuses(generated.paths[op.path]?.[op.method])
+        return declared.join(",") === served.join(",")
+          ? null
+          : `${op.method.toUpperCase()} ${op.path}: spec=${declared.join(",")} code=${served.join(",")}`
       })
       .filter((entry): entry is string => entry !== null)
 

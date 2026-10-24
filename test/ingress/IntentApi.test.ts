@@ -227,6 +227,7 @@ describe("GET /plans/:id", () => {
 
     expect(fetched.steps.length).toBe(2)
     expect(missing._tag).toBe("Left")
+    expect(missing.left._tag).toBe("PlanNotFound")
   }, 20_000)
 })
 
@@ -306,7 +307,7 @@ describe("POST /plans/:id/execute", () => {
         body: JSON.stringify({})
       }
     )
-    expect(executed.status).toBeGreaterThanOrEqual(400)
+    expect(executed.status).toBe(404)
   }, 20_000)
 
   it("records the submission in the event log", async () => {
