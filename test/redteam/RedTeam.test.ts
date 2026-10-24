@@ -18,7 +18,8 @@ import { decide } from "../../src/policy/PolicyEngine.js"
  * report would look identical in both cases.
  *
  * This suite is deliberately not exhaustive and cannot be. Rules only catch what they were written
- * for, and one attempt here is expected to get through precisely so the number stays honest.
+ * for, so an attempt that gets through is recorded as a gap rather than removed, and a run with
+ * none through means the suite has run out of known attempts, not that the policy is complete.
  */
 
 const vector = JSON.parse(
