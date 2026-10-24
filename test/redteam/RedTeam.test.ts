@@ -88,10 +88,13 @@ describe("the attempts describe the registry truthfully", () => {
   // `registered` is what the executor would send. An attempt that claims a registered capability is
   // unregistered, or the reverse, tests a request the system can never make.
   const examples = resolve(__dirname, "../../specs/tools/examples")
-  const registered = new Set(
+  const descriptors = new Map(
     readdirSync(examples)
       .filter((file) => file.endsWith(".json"))
-      .map((file) => (JSON.parse(readFileSync(join(examples, file), "utf8")) as { capability: string }).capability)
+      .map((file) =>
+        JSON.parse(readFileSync(join(examples, file), "utf8")) as { capability: string; authScopes: Array<string> }
+      )
+      .map((descriptor) => [descriptor.capability, descriptor] as const)
   )
 
   for (const attempt of vector.attempts) {
@@ -99,7 +102,16 @@ describe("the attempts describe the registry truthfully", () => {
     if (typeof capability !== "string") continue
 
     it(attempt.name, () => {
-      expect(attempt.request.registered, `${capability} registration`).toBe(registered.has(capability))
+      expect(attempt.request.registered, `${capability} registration`).toBe(descriptors.has(capability))
+
+      // The executor sends the descriptor's scopes at dispatch and none at the write point. An
+      // attempt claiming other scopes could be caught, or let through, by a rule that would never
+      // see them — and an escape that depends on a tool having no scopes has to be true of the tool.
+      const descriptor = descriptors.get(capability)
+      if (descriptor === undefined) return
+      const scopes = (attempt.request.scopes ?? []) as Array<string>
+      const sent = attempt.request.at === "tool_dispatch" ? descriptor.authScopes : []
+      expect([...scopes].sort(), `${capability} scopes at ${String(attempt.request.at)}`).toEqual([...sent].sort())
     })
   }
 })

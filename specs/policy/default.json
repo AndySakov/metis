@@ -36,6 +36,13 @@
       "priority": 10,
       "effect": "deny",
       "when": { "at": "tool_dispatch", "scopes": ["public.web"], "tags": ["untrusted"] }
+    },
+    {
+      "id": "approve.untrusted_memory_write",
+      "description": "Untrusted content written into long-term memory needs a human to read it first, at every gear. Keyed on the declared scope rather than a capability id, so it covers every tool that persists memory.",
+      "priority": 10,
+      "effect": "require_approval",
+      "when": { "at": "tool_dispatch", "scopes": ["memory.write"], "tags": ["untrusted"] }
     }
   ]
 }

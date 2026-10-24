@@ -144,6 +144,10 @@ Stated plainly rather than implied away. These are open, not managed.
   seen; the registry only requires declared scopes for http-transport tools. Every current
   descriptor that can reach an arbitrary host declares the scope, so this is a property to keep,
   not a hole today. `metis.model` reaches one fixed host and declares `model.anthropic` instead.
+- **Memory writes are gated, not labelled.** Untrusted input to a tool declaring `memory.write`
+  needs approval, but nothing stores the `untrusted` tag with the record, so an approved write is
+  read back later as ordinary memory. The memory server is not built yet; when it lands, the tag
+  has to be persisted and put back on the content when it is retrieved.
 - **Durability depends on which execution mode was used.** `restate` is durable; `direct` is not,
   and killing the process loses the run. The API reports the mode on every submission, so the
   distinction is visible — but any claim that "plans survive restarts" is only true of the durable

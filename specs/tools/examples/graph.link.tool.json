@@ -15,7 +15,7 @@
   "outputSchema": {
     "$ref": "../../capabilities/graph.link@0.1.output.schema.json"
   },
-  "authScopes": [],
+  "authScopes": ["memory.write"],
   "tests": [
     {
       "name": "simple",
