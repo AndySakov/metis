@@ -21,10 +21,13 @@ import type { IntentId } from "../domain/Intent.js"
 import { Intent } from "../domain/Intent.js"
 import type { PlanId } from "../domain/Plan.js"
 import { ArtifactStore } from "../mneme/ArtifactStore.js"
-import { EventLogStore } from "../mneme/EventLogStore.js"
+import { EventLogStore, EventQuery } from "../mneme/EventLogStore.js"
 import { PlanStore } from "../mneme/PlanStore.js"
 import { PlanExecution } from "../orchestrator/PlanExecution.js"
 import { Planner } from "../orchestrator/Planner.js"
+import { TrustLedger } from "../policy/TrustLedger.js"
+import { skillOf, skillsIn } from "../policy/TrustUpdater.js"
+import { ToolRegistry } from "../tools/ToolRegistry.js"
 import {
   ArtifactNotFound,
   ExecutionNotFound,
@@ -174,4 +177,49 @@ export const IntentApiLive = HttpApiBuilder.group(IntentApi, "intent", (handlers
         }))
   }))
 
-export const ApiLive = HttpApiBuilder.api(IntentApi).pipe(Layer.provide(IntentApiLive))
+export const InspectApiLive = HttpApiBuilder.group(IntentApi, "inspect", (handlers) =>
+  Effect.gen(function*() {
+    const log = yield* EventLogStore
+    const registry = yield* ToolRegistry
+    const ledger = yield* TrustLedger
+
+    return handlers
+      .handle("listTools", () => registry.all)
+      .handle("readEventLog", ({ urlParams }) =>
+        Effect.gen(function*() {
+          const { actor, fromTs, planId, toTs, types } = urlParams
+          const window = new EventQuery({
+            ...(fromTs !== undefined ? { fromTs } : {}),
+            ...(toTs !== undefined ? { toTs } : {}),
+            ...(actor !== undefined ? { actor } : {})
+          })
+          if (planId === undefined) {
+            return yield* Effect.orDie(
+              log.read(new EventQuery({ ...window, ...(types !== undefined ? { types } : {}) }))
+            )
+          }
+
+          // A plan's events are the API's records of it, which name it, and everything its runs
+          // wrote, which share each run's correlation id.
+          const events = yield* Effect.orDie(log.read(window))
+          const names = (event: Event) => (event.payload as { planId?: unknown } | null)?.planId === planId
+          const runs = new Set(events.filter(names).flatMap((event) => event.correlationId ?? []))
+          return events.filter((event) =>
+            (names(event) || (event.correlationId !== undefined && runs.has(event.correlationId))) &&
+            (types === undefined || types.includes(event.type))
+          )
+        }))
+      .handle("listTrust", () =>
+        Effect.gen(function*() {
+          // Every skill METIS can run, and any it has history for that it no longer can.
+          const registered = (yield* registry.all).map((spec) => skillOf(spec.capability))
+          const recorded = skillsIn(yield* Effect.orDie(log.read({})))
+          const skills = [...new Set([...registered, ...recorded])].sort()
+          return yield* Effect.forEach(skills, (skill) => ledger.get(skill))
+        }))
+  }))
+
+export const ApiLive = HttpApiBuilder.api(IntentApi).pipe(
+  Layer.provide(IntentApiLive),
+  Layer.provide(InspectApiLive)
+)
