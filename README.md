@@ -60,6 +60,11 @@ What exists and works:
   `research.summarize`, `research.claim_graph`. `research.fetch` does real HTTP and refuses
   loopback, private and link-local hosts; `research.summarize` is extractive, so a citation always
   points at text that was genuinely supplied.
+- **A model behind the design capabilities.** `metis.model` (`src/tools/servers/model.ts`) answers
+  the four `design.*` capabilities with Claude, as a second implementation beside the
+  deterministic templates in `metis.design`. The model gets no tools, so a call's only effect is
+  the document it returns, and only this server receives `ANTHROPIC_API_KEY`: the runner hands each
+  tool process its own environment. Without the key, every call is a tool error.
 
 - **Durable execution on Restate** (ADR-016), reachable through the API. `POST /plans/{id}/execute`
   submits the plan and reports which path ran it: `restate` is durable — retries, checkpointing,

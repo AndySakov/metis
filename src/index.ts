@@ -449,6 +449,25 @@ export * as ToolRunner from "./tools/ToolRunner.js"
 export * as design from "./tools/servers/design.js"
 
 /**
+ * An MCP server answering the `design.*` capabilities with a Claude model.
+ *
+ * `design.ts` answers the same capability ids with deterministic templates, which proved the
+ * transport but cannot write a document. This server is the second implementation ADR-006 and
+ * ADR-017 anticipate: same contracts, same `{ markdown }` output, chosen between by the registry, so
+ * neither the planner nor a plan changes when it is swapped in.
+ *
+ * The model is given no tools. Each call is a single request whose only effect is the text that
+ * comes back, so inputs carrying untrusted content can steer what the document says but cannot make
+ * this server act. That keeps the server's reach to one fixed host, declared as the
+ * `model.anthropic` scope on its descriptors.
+ *
+ * Credentials come from this process's environment, which the runner fills per server: only a
+ * server configured to receive `ANTHROPIC_API_KEY` ever sees it. Without credentials every call is a
+ * tool error naming the missing variable, never a template passed off as a model's answer.
+ */
+export * as model from "./tools/servers/model.js"
+
+/**
  * An MCP server exposing the `research.*` capabilities that can be implemented honestly.
  *
  * `fetch` performs real HTTP. `summarize` and `claim_graph` are deterministic extractive
