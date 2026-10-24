@@ -12,6 +12,7 @@ import { Context, Effect, Layer } from "effect"
 import type { EpochSeconds } from "../domain/Common.js"
 import type { Policy, PolicyBasis, PolicyEffect, PolicyRequest, PolicyRule } from "../domain/Policy.js"
 import { PolicyDecision } from "../domain/Policy.js"
+import { isolationRank } from "../domain/ToolSpec.js"
 
 /** Fail-safe ordering: the strictest effect wins a priority tie. */
 const SEVERITY: Record<PolicyEffect, number> = { deny: 0, require_approval: 1, allow: 2 }
@@ -62,6 +63,12 @@ export const ruleMatches = (rule: PolicyRule, request: PolicyRequest): boolean =
     // Only a named capability can be looked up. Unstated registration counts as unregistered, for
     // the same reason unstated idempotency counts as non-idempotent: silence is not a declaration.
     if (request.capability === undefined || request.registered === true) return false
+  }
+  if (when.isolationBelow !== undefined) {
+    // Compared by ladder position: as strings, `process` and `none` both sort after `container`.
+    // Unstated isolation is read as `none`, since containment nobody declared cannot be relied on.
+    if (request.capability === undefined) return false
+    if (isolationRank(request.isolation ?? "none") >= isolationRank(when.isolationBelow)) return false
   }
 
   return true

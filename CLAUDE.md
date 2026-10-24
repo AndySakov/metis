@@ -34,7 +34,7 @@ Settled. Do not relitigate without an ADR superseding them.
 
 ## Open decisions
 
-- WASM component host for real tool sandboxing. Still unbuilt, so tool isolation remains process-level only — say so plainly rather than implying otherwise. **ADR-020 fixes the vocabulary**: isolation is an ordered ladder (`none < process < container < wasm`) and a policy input, so a rule can require a tier. No descriptor may claim a tier above `process` until that tier exists.
+- WASM component host for real tool sandboxing. Still unbuilt, so tool isolation remains process-level only — say so plainly rather than implying otherwise. **ADR-020 fixes the vocabulary**: isolation is an ordered ladder (`none < process < container < wasm`) and a policy input, so a rule can require a tier. No descriptor may claim a tier above `process` until that tier exists; the registry rejects one, and `test/specs/` fails on an example that does.
 - Graph store: currently absent (ADR-013). Revisit only if a genuine deep-traversal workload appears.
 - ~~Timestamp representation in storage.~~ **Closed by ADR-019:** epoch seconds as `bigint` at every layer, no `timestamptz`.
 
@@ -88,9 +88,11 @@ contained while touching it.
    egress the untrusted-content rule misses because it is keyed on the `agent.*` namespace rather
    than on the `public.web` scope. The previous escape, a dispatch to an unregistered capability,
    is closed by the `unregistered` condition, which the executor fills from the registry lookup.
-3. **Tool sandboxing.** Isolation is still process-level only. ADR-020 decided the shape — an
-   ordered ladder that policy can require a minimum of — but nothing above `process` is built, and
-   the schema change, rule grammar and conformance vector it calls for are not written yet.
+3. **Tool sandboxing.** Isolation is still process-level only. ADR-020's policy half is in: the
+   `none < process < container < wasm` ladder is the `ToolSpec.isolation` type, the executor puts
+   the resolved tier on every `PolicyRequest`, and `isolationBelow` lets a rule require a minimum,
+   with vectors in `specs/policy/conformance/isolation.json`. What is missing is any runtime above
+   `process`, and the registry refuses a descriptor claiming one until it exists.
 
 ## Traps
 

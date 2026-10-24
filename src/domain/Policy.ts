@@ -10,6 +10,7 @@
 import { Schema } from "effect"
 
 import { Actor, Autonomy, CapabilityId, EpochSeconds, LongText, Uuid7 } from "./Common.js"
+import { Isolation } from "./ToolSpec.js"
 
 export const PolicyRuleId = Schema.String.pipe(
   Schema.pattern(/^[a-z][a-z0-9_.-]*$/),
@@ -53,7 +54,9 @@ export class PolicyCondition extends Schema.Class<PolicyCondition>("PolicyCondit
   /** Fires when the tool declares itself non-idempotent (ADR-016). */
   nonIdempotent: Schema.optional(Schema.Boolean),
   /** Fires when the capability has no registry entry, so no reviewed descriptor stands behind it. */
-  unregistered: Schema.optional(Schema.Boolean)
+  unregistered: Schema.optional(Schema.Boolean),
+  /** Fires when the dispatch's isolation is lower on the ladder than this tier (ADR-020). */
+  isolationBelow: Schema.optional(Isolation)
 }) {}
 
 export class PolicyRule extends Schema.Class<PolicyRule>("PolicyRule")({
@@ -91,7 +94,9 @@ export class PolicyRequest extends Schema.Class<PolicyRequest>("PolicyRequest")(
   estimatedSeconds: Schema.optional(Schema.Number.pipe(Schema.nonNegative())),
   idempotent: Schema.optional(Schema.Boolean),
   /** Whether the registry resolved `capability`. Filled by the executor from the lookup. */
-  registered: Schema.optional(Schema.Boolean)
+  registered: Schema.optional(Schema.Boolean),
+  /** Containment in force for this dispatch. Filled by the executor from the resolved `ToolSpec`. */
+  isolation: Schema.optional(Isolation)
 }) {}
 
 /**

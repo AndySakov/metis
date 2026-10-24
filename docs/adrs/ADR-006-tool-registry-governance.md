@@ -20,8 +20,9 @@ Capability contracts (ADR-003) need governance to ensure stability, safe evoluti
   - JSON Schema validation of `ToolSpec`, input/output schemas.
   - At least one passing conformance test vector per capability version.
   - `authScopes` declared; `isolation` stated honestly. ADR-017 replaced the `sandboxed` boolean
-    with an `isolation` enum whose only value today is `process` — a boolean `true` asserted
-    containment that does not exist.
+    with an `isolation` enum, because a boolean `true` asserted containment that does not exist.
+    ADR-020 widened it to the ladder `none < process < container < wasm`. The registry rejects
+    any tier above `process` until a runtime for it exists.
   - `idempotent` declared explicitly, with no default (ADR-016).
 - Rollout & safety:
   - Hot-swap loader supports canary/shadow rollouts and rollback.

@@ -322,6 +322,35 @@ describe("an unresolvable capability fails cleanly", () => {
   }, 30_000)
 })
 
+describe("isolation reaches policy from the resolved descriptor (ADR-020)", () => {
+  const requiring = (tier: string) =>
+    policyFrom({
+      version: `isolation-${tier}`,
+      defaultEffect: "allow",
+      rules: [
+        {
+          id: "deny.unattended_below_minimum",
+          description: "Nothing runs unattended below the required tier.",
+          priority: 0,
+          effect: "deny",
+          when: { at: "tool_dispatch", autonomy: ["S4"], isolationBelow: tier }
+        }
+      ]
+    })
+
+  it("a process-isolated tool meets a process minimum", async () => {
+    const { report } = await runLoop("Draft a PRD", "S4", requiring("process"), false)
+    expect(report.status).toBe("completed")
+  }, 30_000)
+
+  it("a process-isolated tool is refused where a container is required", async () => {
+    const { coverage, report } = await runLoop("Draft a PRD", "S4", requiring("container"), false)
+    expect(report.status).toBe("denied")
+    const rule = coverage.rules.find((r: { ruleId: string }) => r.ruleId === "deny.unattended_below_minimum")
+    expect(rule.decidedCount).toBe(1)
+  }, 30_000)
+})
+
 describe("gear enforcement: trust bounds what runs unattended", () => {
   it("an untrusted skill cannot run at S4, even with permissive policy", async () => {
     // Policy allows everything; the ledger does not. The gear a skill may hold is earned, and

@@ -20,6 +20,21 @@ export class McpBinding extends Schema.Class<McpBinding>("McpBinding")({
   transport: Schema.optional(Schema.Literal("stdio", "http"))
 }) {}
 
+/**
+ * How strongly a tool is contained, weakest first (ADR-020).
+ *
+ * The order is the meaning: a rule asks for "at least this contained", so tiers are compared by
+ * position on this ladder, never as strings. `container` and `wasm` are vocabulary only until a
+ * runtime provides them; the registry refuses a descriptor that claims either.
+ */
+export const Isolation = Schema.Literal("none", "process", "container", "wasm").annotations({
+  identifier: "Isolation"
+})
+export type Isolation = typeof Isolation.Type
+
+/** Position on the ladder. Higher is more contained. */
+export const isolationRank = (tier: Isolation): number => Isolation.literals.indexOf(tier)
+
 export class ToolTest extends Schema.Class<ToolTest>("ToolTest")({
   name: Schema.NonEmptyTrimmedString,
   input: Schema.Record({ key: Schema.String, value: Schema.Unknown }),
@@ -48,12 +63,12 @@ export class ToolSpec extends Schema.Class<ToolSpec>("ToolSpec")({
    */
   idempotent: Schema.Boolean,
   /**
-   * `process` is the only honest value today. MCP servers are separate processes, so the boundary
-   * is the operating system's plus whatever METIS applies at dispatch — weaker than the
+   * `process` is the highest honest value today. MCP servers are separate processes, so the
+   * boundary is the operating system's plus whatever METIS applies at dispatch — weaker than the
    * container-or-WASM story in ADR-003. A boolean `sandboxed: true` would assert containment that
-   * does not exist.
+   * does not exist, and so would `container` or `wasm` before a runtime provides them.
    */
-  isolation: Schema.Literal("process"),
+  isolation: Isolation,
   inputSchema: Schema.optional(Schema.Record({ key: Schema.String, value: Schema.Unknown })),
   outputSchema: Schema.optional(Schema.Record({ key: Schema.String, value: Schema.Unknown })),
   authScopes: Schema.optionalWith(Schema.Array(Schema.NonEmptyTrimmedString), { default: () => [] }),

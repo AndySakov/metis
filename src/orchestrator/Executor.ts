@@ -253,7 +253,8 @@ export const execute = (
             scopes: spec.authScopes,
             tags: intent.inputs.flatMap((input) => input.tags),
             idempotent: spec.idempotent,
-            registered: true
+            registered: true,
+            isolation: spec.isolation
           }),
           correlationId
         )
@@ -359,7 +360,8 @@ export const execute = (
             autonomy: intent.autonomy,
             capability: step.toolCall.capability,
             tags: intent.inputs.flatMap((input) => input.tags),
-            registered: true
+            registered: true,
+            isolation: spec.isolation
           }),
           correlationId
         )

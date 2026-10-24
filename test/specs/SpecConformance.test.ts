@@ -9,7 +9,7 @@ import { Event } from "../../src/domain/Event.js"
 import { Intent, IntentDraft } from "../../src/domain/Intent.js"
 import { Plan } from "../../src/domain/Plan.js"
 import { Policy, PolicyDecision } from "../../src/domain/Policy.js"
-import { ToolSpec } from "../../src/domain/ToolSpec.js"
+import { Isolation, isolationRank, ToolSpec } from "../../src/domain/ToolSpec.js"
 
 /**
  * ADR-004 makes the files in `specs/` canonical and requires CI to validate examples against
@@ -84,11 +84,43 @@ describe("every ToolSpec example conforms (ADR-006, ADR-017)", () => {
     }
   })
 
+  it("no example declares an isolation tier above process (ADR-020)", () => {
+    // `container` and `wasm` are vocabulary until a runtime provides them. A descriptor claiming
+    // one before then asserts containment that does not exist.
+    for (const file of files) {
+      const spec = Schema.decodeUnknownSync(ToolSpec)(readJson(join(dir, file)))
+      expect(isolationRank(spec.isolation), `${file} claims ${spec.isolation}`).toBeLessThanOrEqual(
+        isolationRank("process")
+      )
+    }
+  })
+
   it("every example declares idempotency explicitly (ADR-016)", () => {
     for (const file of files) {
       const spec = readJson(join(dir, file))
       expect(typeof spec.idempotent, `${file} must declare idempotent`).toBe("boolean")
     }
+  })
+})
+
+describe("the isolation ladder has one definition (ADR-020)", () => {
+  const ladder = (readJson(join(SPECS, "ToolSpec.schema.json")).$defs as Record<string, { enum: Array<string> }>)
+    .Isolation!.enum
+
+  it("the spec's ladder is the code's ladder, in the same order", () => {
+    // Order is the contract: rules compare by position, so a reordered enum changes every decision.
+    expect(ladder).toEqual([...Isolation.literals])
+  })
+
+  it("ToolSpec and the policy condition both reference it rather than restating it", () => {
+    const toolSpec = readJson(join(SPECS, "ToolSpec.schema.json"))
+    const policy = readJson(join(SPECS, "policy/Policy.schema.json"))
+    const condition = (policy.$defs as Record<string, { properties: Record<string, unknown> }>).PolicyCondition!
+
+    expect((toolSpec.properties as Record<string, unknown>).isolation).toMatchObject({ $ref: "#/$defs/Isolation" })
+    expect(condition.properties.isolationBelow).toMatchObject({
+      $ref: "https://schema.metis.dev/ToolSpec.schema.json#/$defs/Isolation"
+    })
   })
 })
 
