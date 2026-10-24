@@ -142,8 +142,8 @@ Stated plainly rather than implied away. These are open, not managed.
 - **Egress control trusts the descriptor.** The egress rule fires on the `public.web` scope a
   descriptor declares. A stdio tool that reaches the network without declaring it would not be
   seen; the registry only requires declared scopes for http-transport tools. Every current
-  descriptor that does network I/O declares the scope, so this is a property to keep, not a hole
-  today.
+  descriptor that can reach an arbitrary host declares the scope, so this is a property to keep,
+  not a hole today. `metis.model` reaches one fixed host and declares `model.anthropic` instead.
 - **Durability depends on which execution mode was used.** `restate` is durable; `direct` is not,
   and killing the process loses the run. The API reports the mode on every submission, so the
   distinction is visible — but any claim that "plans survive restarts" is only true of the durable

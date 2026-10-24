@@ -1,0 +1,35 @@
+{
+  "name": "design-api-spec-claude",
+  "version": "1.0.0",
+  "capability": "design.api_spec@1.0",
+  "mcp": {
+    "server": "metis.model",
+    "tool": "api_spec",
+    "transport": "stdio"
+  },
+  "idempotent": true,
+  "isolation": "process",
+  "inputSchema": {
+    "$ref": "../../capabilities/design.api_spec@1.0.input.schema.json"
+  },
+  "outputSchema": {
+    "$ref": "../../capabilities/design.api_spec@1.0.output.schema.json"
+  },
+  "authScopes": [
+    "model.anthropic"
+  ],
+  "tests": [
+    {
+      "name": "minimal",
+      "input": {
+        "title": "Hello"
+      },
+      "expect": {
+        "type": "object",
+        "required": [
+          "markdown"
+        ]
+      }
+    }
+  ]
+}
