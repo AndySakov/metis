@@ -83,11 +83,13 @@ contained while touching it.
    `agent.*` ones need real browser and device control. Implement them against real backends or not
    at all — a registry entry that does not do what its contract says is worse than an absent one,
    because the planner will target it.
-2. **The red team's one escape.** The suite reports eight attempts, seven caught by rule, none
-   caught by luck, and one through: untrusted content steering `research.fetch`, a real HTTP
-   egress the untrusted-content rule misses because it is keyed on the `agent.*` namespace rather
-   than on the `public.web` scope. The previous escape, a dispatch to an unregistered capability,
-   is closed by the `unregistered` condition, which the executor fills from the registry lookup.
+2. **The red team has no known escape, which is a reason to write more attempts.** The suite
+   reports eight attempts, eight caught by rule, none by luck, none through. The last two escapes
+   are closed: a dispatch to an unregistered capability (the `unregistered` condition, filled by
+   the executor from the registry lookup) and untrusted content steering `research.fetch` (an
+   approval rule keyed on the `public.web` scope, not on a namespace). Zero through means the
+   suite ran out of known attempts, not that the policy is complete. When a new one gets through,
+   add it with `expectedToGetThrough: true` rather than leaving it out.
 3. **Tool sandboxing.** Isolation is still process-level only. ADR-020 decided the shape — an
    ordered ladder that policy can require a minimum of — but nothing above `process` is built, and
    the schema change, rule grammar and conformance vector it calls for are not written yet.
