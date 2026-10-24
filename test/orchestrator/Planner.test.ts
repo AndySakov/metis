@@ -1,3 +1,6 @@
+import { readFileSync } from "node:fs"
+import { resolve } from "node:path"
+
 import { describe, expect, it } from "@effect/vitest"
 import { Effect, Schema } from "effect"
 
@@ -43,9 +46,49 @@ describe("the planner produces valid plans", () => {
     const plan = await planFor("Draft a PRD for a research summarizer")
     expect(plan.steps.map((s) => s.toolCall?.capability)).toEqual([
       "research.search@0.1",
-      "research.summarize@0.1",
       "design.prd@1.0"
     ])
+  })
+
+  it("matches the C4 and API templates", async () => {
+    expect((await planFor("C4 diagrams for a notes app")).steps.map((s) => s.toolCall?.capability)).toEqual([
+      "design.c4@1.0"
+    ])
+    expect((await planFor("Write an API spec for a notes app")).steps.map((s) => s.toolCall?.capability)).toEqual([
+      "design.api_spec@1.0"
+    ])
+  })
+
+  it("gives every tool step an input its capability's contract accepts", async () => {
+    // Steps take fixed inputs: nothing carries one step's output into the next. A step whose input
+    // cannot satisfy its capability's input schema therefore fails every time it runs.
+    const goals = [
+      "Draft a PRD for a research summarizer",
+      "Research the state of the art in RAG",
+      "C4 diagrams for a notes app",
+      "Write an API spec for a notes app"
+    ]
+    for (const goal of goals) {
+      for (const step of (await planFor(goal)).steps) {
+        if (step.toolCall === undefined) continue
+        const schema = JSON.parse(
+          readFileSync(
+            resolve(__dirname, `../../specs/capabilities/${step.toolCall.capability}.input.schema.json`),
+            "utf8"
+          )
+        ) as { required?: Array<string>; properties?: Record<string, unknown>; additionalProperties?: boolean }
+        const keys = Object.keys(step.toolCall.input)
+        for (const key of schema.required ?? []) {
+          expect(keys, `${goal}: ${step.toolCall.capability} requires ${key}`).toContain(key)
+        }
+        if (schema.additionalProperties === false) {
+          for (const key of keys) {
+            expect(Object.keys(schema.properties ?? {}), `${goal}: ${step.toolCall.capability} has no ${key}`)
+              .toContain(key)
+          }
+        }
+      }
+    }
   })
 
   it("asks rather than guessing when it does not recognise the goal", async () => {
@@ -113,5 +156,34 @@ describe("approval gating follows the gear (ADR-002)", () => {
     // prompt would make gated runs a lie.
     expect(Planner.stepRequiresApproval("tool", "S4")).toBe(false)
     expect(Planner.stepRequiresApproval("tool", "S3")).toBe(true)
+  })
+})
+
+describe("planning against what is available", () => {
+  const planWith = (available: ReadonlyArray<string>, goal: string) =>
+    Effect.runPromise(
+      Effect.gen(function*() {
+        const planner = yield* Planner.Planner
+        return yield* planner.plan(intent(goal, "S2"))
+      }).pipe(Effect.provide(Planner.layerFor((capability) => available.includes(capability))))
+    )
+
+  it("leaves out a step with no implementation and says so as a risk", async () => {
+    const plan = await planWith(["design.prd@1.0"], "Draft a PRD for a research summarizer")
+    expect(plan.steps.map((s) => s.toolCall?.capability)).toEqual(["design.prd@1.0"])
+    expect(plan.risks.map((r) => r.description).join("\n")).toContain("research.search@0.1")
+  })
+
+  it("asks instead when nothing the goal needs can run", async () => {
+    const plan = await planWith([], "Research the state of the art in RAG")
+    expect(plan.steps).toHaveLength(1)
+    expect(plan.steps[0]!.kind).toBe("ask")
+    expect(plan.risks.map((r) => r.description).join("\n")).toContain("research.search@0.1")
+  })
+
+  it("changes nothing when everything is available", async () => {
+    const plan = await planWith(["research.search@0.1", "design.prd@1.0"], "Draft a PRD")
+    expect(plan.steps.map((s) => s.toolCall?.capability)).toEqual(["research.search@0.1", "design.prd@1.0"])
+    expect(plan.risks.map((r) => r.description).join("\n")).not.toContain("Skipped")
   })
 })

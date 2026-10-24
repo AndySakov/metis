@@ -1,27 +1,31 @@
-import { HttpApi, HttpApiEndpoint, HttpApiGroup } from "@effect/platform"
+import { HttpApi, HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from "@effect/platform"
 import { Schema } from "effect"
 
 import { Artifact, ArtifactId } from "../domain/Artifact.js"
 import { IntentDraft } from "../domain/Intent.js"
 import { Plan, PlanId, PlanStepId } from "../domain/Plan.js"
 
+// Each error carries the status `specs/api/openapi.yaml` declares for it. Without one, an error is
+// served as 500, and `test/specs/ApiReconciliation.test.ts` fails on the mismatch.
+
 export class IntentParsingError extends Schema.TaggedError<IntentParsingError>()("IntentParsingError", {
   message: Schema.String,
   info: Schema.Unknown
-}) {}
+}, HttpApiSchema.annotations({ status: 422 })) {}
 
 export class PlanNotFound extends Schema.TaggedError<PlanNotFound>()("PlanNotFound", {
   id: PlanId
-}) {}
+}, HttpApiSchema.annotations({ status: 404 })) {}
 
 export class ArtifactNotFound extends Schema.TaggedError<ArtifactNotFound>()("ArtifactNotFound", {
   id: ArtifactId
-}) {}
+}, HttpApiSchema.annotations({ status: 404 })) {}
 
+/** The plan exists but cannot run as it stands, for instance because its intent is missing. */
 export class ExecutionRejected extends Schema.TaggedError<ExecutionRejected>()("ExecutionRejected", {
   id: PlanId,
   message: Schema.String
-}) {}
+}, HttpApiSchema.annotations({ status: 409 })) {}
 
 export class ExecuteRequest extends Schema.Class<ExecuteRequest>("ExecuteRequest")({
   /** Steps the user has already approved. A gated step not named here parks the run. */

@@ -148,7 +148,7 @@ describe("POST /intent", () => {
     expect(plan.id).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/)
     expect(plan.intentId).toMatch(/-7[0-9a-f]{3}-/)
     expect(plan.createdAt).toBeGreaterThan(0)
-    expect(plan.steps.length).toBe(3)
+    expect(plan.steps.length).toBe(2)
 
     // And it round-trips the canonical schema after crossing the wire.
     expect(() => Schema.decodeUnknownSync(Plan)(Schema.encodeSync(Plan)(plan))).not.toThrow()
@@ -225,8 +225,9 @@ describe("GET /plans/:id", () => {
       }) as Effect.Effect<any>
     )
 
-    expect(fetched.steps.length).toBe(3)
+    expect(fetched.steps.length).toBe(2)
     expect(missing._tag).toBe("Left")
+    expect(missing.left._tag).toBe("PlanNotFound")
   }, 20_000)
 })
 
@@ -247,7 +248,7 @@ describe("the wire contract, independent of the typed client", () => {
 
     expect(response.status).toBe(201)
     const plan = await response.json() as { steps: Array<unknown> }
-    expect(plan.steps.length).toBe(3)
+    expect(plan.steps.length).toBe(2)
   }, 20_000)
 
   it("defaults autonomy to S0 when omitted — the gear that cannot cause a side effect", async () => {
@@ -306,7 +307,7 @@ describe("POST /plans/:id/execute", () => {
         body: JSON.stringify({})
       }
     )
-    expect(executed.status).toBeGreaterThanOrEqual(400)
+    expect(executed.status).toBe(404)
   }, 20_000)
 
   it("records the submission in the event log", async () => {

@@ -1,4 +1,28 @@
+/**
+ * The composition root: every service the HTTP API needs, assembled from real implementations.
+ *
+ * Until this existed, the loop only ever ran inside tests, each assembling its own stack. This is
+ * the one assembly that runs for real, so three choices are made here and nowhere else:
+ *
+ * - **Tools are registered only if their server serves them.** Each MCP server is asked for its
+ *   tool list at startup, and a descriptor is kept only when its server answers for its tool. The
+ *   descriptors for the nine unbuilt capabilities therefore never reach the registry, and the
+ *   planner, which plans against the registry, never targets them.
+ * - **Claude answers `design.*` when, and only when, a key is configured.** Its descriptors are
+ *   registered ahead of the templates, so the registry selects them; without a key `metis.model`
+ *   is not started at all and the templates answer.
+ * - **The live policy is `specs/policy/default.json`,** the same file the red-team suite measures.
+ *
+ * Building the layer starts nothing on its own. `Program.ts` launches it.
+ */
+export * as App from "./App.js"
 
+/**
+ * Runs METIS: `pnpm start`.
+ *
+ * Launches `App.layerFromEnv` only when this file is the process's entry point. Every file under
+ * `src/` is re-exported from `src/index.ts`, and importing the package must not start a server.
+ */
 export * as Program from "./Program.js"
 
 /**
