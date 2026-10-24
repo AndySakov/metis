@@ -4,6 +4,8 @@ import { resolve } from "node:path"
 import { describe, expect, it } from "@effect/vitest"
 import { Effect, Layer, Schema } from "effect"
 
+import { TRUST_POLICY } from "../../src/App.js"
+import { Event } from "../../src/domain/Event.js"
 import { uuidv7 } from "../../src/domain/Ids.js"
 import { Intent } from "../../src/domain/Intent.js"
 import { Policy } from "../../src/domain/Policy.js"
@@ -77,7 +79,7 @@ const trusted = (competence: number, compliance: number) =>
 
 const stack = (
   policy: Policy,
-  options: { trust?: ReadonlyArray<TrustRecord>; sample?: boolean } = {}
+  options: { trust?: ReadonlyArray<TrustRecord>; sample?: boolean; trustPolicy?: TrustPolicy } = {}
 ) => {
   const stores = Layer.merge(InMemoryEventLogStore.layer, InMemoryArtifactStore.layer)
   const engine = PolicyEngine.layer(policy)
@@ -89,7 +91,7 @@ const stack = (
     registry,
     McpToolRunner.layer(servers),
     Planner.layer,
-    TrustLedger.layer(trustPolicy, options.trust ?? [trusted(1, 1)]),
+    TrustLedger.layer(options.trustPolicy ?? trustPolicy, options.trust ?? [trusted(1, 1)]),
     options.sample === true ? Verification.alwaysSample : Verification.neverSample
   )
 }
@@ -499,5 +501,43 @@ describe("a run's outcome reaches the skill's competence ledger", () => {
     const record = competence(events)
     expect(record.competenceSignals).toBe(1)
     expect(record.competence).toBe(0)
+  }, 30_000)
+})
+
+describe("a gear lost to idleness is recorded by the next run", () => {
+  it("writes TRUST_DEMOTED from the gear the log last recorded, under the run's correlation id", async () => {
+    const now = Math.floor(Date.now() / 1000)
+    const old = now - 60 * 86_400
+    const seeded = (type: string, payload: Record<string, unknown>) =>
+      Schema.decodeUnknownSync(Event)({ id: uuidv7(), ts: old, type, actor: "metis", payload })
+    // Earned S2 two months ago, then nothing since.
+    const history = [
+      ...Array.from({ length: 6 }, () => seeded("TOOL_COMPLETED", { capability: "design.prd@1.0" })),
+      ...Array.from({ length: 6 }, () => seeded("POLICY_EVALUATED", { capability: "design.prd@1.0", effect: "allow" })),
+      seeded("TRUST_PROMOTED", { skill: "design.prd", from: "S1", to: "S2" })
+    ]
+
+    const { demotions, report } = await Effect.runPromise(
+      Effect.scoped(
+        Effect.gen(function*() {
+          const log = yield* EventLogStore
+          for (const e of history) yield* Effect.orDie(log.append(e))
+          const planner = yield* Planner.Planner
+          const intent = intentFor("Draft a PRD", "S3")
+          const full = yield* planner.plan(intent)
+          const step = full.steps.find((s) => s.toolCall?.capability === "design.prd@1.0")!
+          const report = yield* Executor.execute(intent, { ...full, steps: [step] } as typeof full)
+          const all = yield* Effect.orDie(log.read({}))
+          return {
+            report,
+            demotions: all.filter((e) => e.type === "TRUST_DEMOTED")
+          }
+        })
+      ).pipe(Effect.provide(stack(permissive, { trustPolicy: TRUST_POLICY }))) as Effect.Effect<any>
+    )
+
+    expect(demotions).toHaveLength(1)
+    expect(demotions[0].payload).toMatchObject({ skill: "design.prd", from: "S2" })
+    expect(demotions[0].correlationId).toBe(report.correlationId)
   }, 30_000)
 })

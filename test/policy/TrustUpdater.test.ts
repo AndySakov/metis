@@ -8,7 +8,7 @@ import type { SkillId } from "../../src/domain/Trust.js"
 import { TrustPolicy } from "../../src/domain/Trust.js"
 import { EventLogStore } from "../../src/mneme/EventLogStore.js"
 import * as InMemoryEventLogStore from "../../src/mneme/InMemoryEventLogStore.js"
-import { derive, reconcile, skillOf } from "../../src/policy/TrustUpdater.js"
+import { derive, reconcile, recordedGear, skillOf } from "../../src/policy/TrustUpdater.js"
 
 /**
  * ADR-014's claim under test: competence and compliance move on disjoint evidence, and no amount
@@ -323,5 +323,92 @@ describe("promotion needs evidence, not just a perfect ratio", () => {
   it("S4 needs forty signals in each ledger, however clean", () => {
     expect(derived(Array.from({ length: 19 }, approvedRun).flat()).record.gear).toBe("S3")
     expect(derived(Array.from({ length: 20 }, approvedRun).flat()).record.gear).toBe("S4")
+  })
+})
+
+describe("evidence fades with age (ADR-014: trust that is not re-earned fades)", () => {
+  const live = Schema.decodeUnknownSync(TrustPolicy)({
+    decay: { competenceHalfLifeSeconds: 30 * DAY, complianceHalfLifeSeconds: 14 * DAY },
+    thresholds: [
+      { gear: "S1", minCompetence: 0.2, minCompliance: 0.2, minSignals: 2 },
+      { gear: "S2", minCompetence: 0.5, minCompliance: 0.5, minSignals: 5 },
+      { gear: "S3", minCompetence: 0.7, minCompliance: 0.8, minSignals: 15 },
+      { gear: "S4", minCompetence: 0.8, minCompliance: 0.95, minSignals: 40 }
+    ]
+  })
+
+  const withLog = <A>(events: ReadonlyArray<Event>, effect: Effect.Effect<A, never, EventLogStore>) =>
+    Effect.runPromise(
+      Effect.gen(function*() {
+        const log = yield* EventLogStore
+        for (const e of events) yield* Effect.orDie(log.append(e))
+        return yield* effect
+      }).pipe(Effect.provide(InMemoryEventLogStore.layer)) as Effect.Effect<A>
+    )
+
+  const T = 1_700_000_000
+  const at = (ts: number, e: Event): Event => Schema.decodeUnknownSync(Event)({ ...Schema.encodeSync(Event)(e), ts })
+  const approvedRun = (ts: number) =>
+    [event("APPROVAL_GRANTED", {}), completed(), cleanEvaluation(), cleanEvaluation()].map((e) => at(ts, e))
+  const derivedAt = (events: ReadonlyArray<Event>, now: number) =>
+    derive(events, SKILL, live, now as EpochSeconds).record
+
+  it("a skill that earned S2 and then went unused loses it", () => {
+    const history = [...approvedRun(T), ...approvedRun(T), ...approvedRun(T)]
+    expect(derivedAt(history, T).gear).toBe("S2")
+
+    // One competence half-life later: six competence signals are worth three, and six compliance
+    // signals (half-life fourteen days) are worth about one and a third, under S1's two.
+    const idle = derivedAt(history, T + 30 * DAY)
+    expect(idle.competenceSignals).toBe(3)
+    expect(idle.complianceSignals).toBeLessThan(2)
+    expect(idle.gear).toBe("S0")
+  })
+
+  it("recent failures outweigh old successes", () => {
+    const history = [
+      ...Array.from({ length: 10 }, () => at(T - 60 * DAY, completed())),
+      ...Array.from({ length: 3 }, () => at(T, failed()))
+    ]
+    // Unweighted that is 10 of 13. Two half-lives old, the ten successes count for 2.5 against three
+    // fresh failures.
+    expect(derivedAt(history, T).competence).toBeLessThan(0.5)
+  })
+
+  it("signals from the same day count in full", () => {
+    // Age is counted in whole days. Weighting by the second would make two signals a moment old
+    // worth 1.9999995, and a threshold of two unreachable.
+    const record = derivedAt([...approvedRun(T)], T + 23 * 3600)
+    expect(record.competenceSignals).toBe(2)
+    expect(record.gear).toBe("S1")
+  })
+
+  it("the gear a skill last recorded is where a decay demotion is measured from", async () => {
+    const now = Math.floor(Date.now() / 1000)
+    const earned = [...approvedRun(now - 30 * DAY), ...approvedRun(now - 30 * DAY), ...approvedRun(now - 30 * DAY)]
+    const promotion = Schema.decodeUnknownSync(Event)({
+      id: uuidv7(),
+      ts: now - 30 * DAY,
+      type: "TRUST_PROMOTED",
+      actor: "metis",
+      payload: { skill: SKILL, from: "S1", to: "S2" }
+    })
+
+    const demotions = await withLog(
+      [...earned, promotion],
+      Effect.gen(function*() {
+        const log = yield* EventLogStore
+        expect(recordedGear(yield* Effect.orDie(log.read({})), SKILL)).toBe("S2")
+        yield* reconcile(SKILL, recordedGear(yield* Effect.orDie(log.read({})), SKILL), live)
+        const all = yield* Effect.orDie(log.read({}))
+        return all.filter((e) => e.type === "TRUST_DEMOTED").map((e) => e.payload as { from: string; to: string })
+      })
+    )
+
+    expect(demotions).toEqual([expect.objectContaining({ from: "S2", to: "S0" })])
+  })
+
+  it("a skill with no recorded gear is at S0", () => {
+    expect(recordedGear([completed()], SKILL)).toBe("S0")
   })
 })

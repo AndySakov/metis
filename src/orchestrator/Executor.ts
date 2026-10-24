@@ -33,7 +33,7 @@ import { EventLogStore } from "../mneme/EventLogStore.js"
 import { checksumOf } from "../mneme/InMemoryArtifactStore.js"
 import { PolicyGate } from "../policy/PolicyGate.js"
 import { TrustLedger } from "../policy/TrustLedger.js"
-import { reconcile, skillOf } from "../policy/TrustUpdater.js"
+import { reconcile, recordedGear, skillOf } from "../policy/TrustUpdater.js"
 import type { Sampler } from "../policy/Verification.js"
 import { verify } from "../policy/Verification.js"
 import { ToolRegistry } from "../tools/ToolRegistry.js"
@@ -177,12 +177,9 @@ export const execute = (
 
     yield* emit("PLAN_STARTED", { planId: plan.id, intentId: plan.intentId, steps: plan.steps.length })
 
-    // Each skill's gear before the run, so a run that moves one can say from where (ADR-014).
     const skills = [
       ...new Set(plan.steps.flatMap((step) => step.toolCall === undefined ? [] : [skillOf(step.toolCall.capability)]))
     ]
-    const gearsBefore = yield* Effect.forEach(skills, (skill) =>
-      Effect.map(trust.get(skill), (record) => [skill, record.gear] as const))
 
     let halted = false
     let finalStatus: ExecutionStatus = "completed"
@@ -210,11 +207,13 @@ export const execute = (
       }
     }
 
-    // Promotions and demotions are written as they happen, with their justification. A gear that
-    // changed silently would be a ramp nobody could audit.
+    // Promotions and demotions are written with their justification, measured from the gear the log
+    // last recorded (ADR-014). That includes a demotion decay earned while the skill sat idle, which
+    // would be invisible if measured from the gear the skill held when this run began.
     const trustPolicy = yield* trust.policy
-    for (const [skill, before] of gearsBefore) {
-      yield* reconcile(skill, before, trustPolicy, correlationId)
+    const recorded = yield* Effect.orDie(log.read({}))
+    for (const skill of skills) {
+      yield* reconcile(skill, recordedGear(recorded, skill), trustPolicy, correlationId)
     }
 
     yield* emit("PLAN_FINISHED", { planId: plan.id, status: finalStatus })
@@ -242,9 +241,7 @@ export const execute = (
               actor: intent.actor,
               autonomy: intent.autonomy,
               capability: step.toolCall.capability,
-              tags: intent.inputs.flatMap((input) =>
-                input.tags
-              ),
+              tags: intent.inputs.flatMap((input) => input.tags),
               registered: false
             }),
             correlationId

@@ -77,7 +77,10 @@ export class TrustRecord extends Schema.Class<TrustRecord>("TrustRecord")({
   compliance: Score,
   gear: Autonomy,
   updatedAt: EpochSeconds,
-  /** How many signals each score rests on. Absent means none, which no evidence bar accepts. */
-  competenceSignals: Schema.optionalWith(Schema.Int.pipe(Schema.nonNegative()), { default: () => 0 }),
-  complianceSignals: Schema.optionalWith(Schema.Int.pipe(Schema.nonNegative()), { default: () => 0 })
+  /**
+   * The evidence each score rests on: its signals, each weighted by age, so a signal one half-life
+   * old counts half. Absent means none, which no evidence bar accepts.
+   */
+  competenceSignals: Schema.optionalWith(Schema.Number.pipe(Schema.nonNegative()), { default: () => 0 }),
+  complianceSignals: Schema.optionalWith(Schema.Number.pipe(Schema.nonNegative()), { default: () => 0 })
 }) {}
