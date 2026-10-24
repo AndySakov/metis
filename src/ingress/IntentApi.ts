@@ -2,6 +2,7 @@ import { HttpApi, HttpApiEndpoint, HttpApiGroup, HttpApiSchema } from "@effect/p
 import { Schema } from "effect"
 
 import { Artifact, ArtifactId } from "../domain/Artifact.js"
+import { EpochSeconds } from "../domain/Common.js"
 import { IntentDraft } from "../domain/Intent.js"
 import { Plan, PlanId, PlanStepId } from "../domain/Plan.js"
 
@@ -46,6 +47,18 @@ export class StepOutcome extends Schema.Class<StepOutcome>("StepOutcome")({
   detail: Schema.optional(Schema.String)
 }) {}
 
+/** A plan with no run in the log yet. */
+export class ExecutionNotFound extends Schema.TaggedError<ExecutionNotFound>()("ExecutionNotFound", {
+  id: PlanId
+}, HttpApiSchema.annotations({ status: 404 })) {}
+
+/** A plan's latest run, as the event log recorded it. */
+export class ExecutionRecord extends Schema.Class<ExecutionRecord>("ExecutionRecord")({
+  status: Schema.Literal("completed", "awaiting_approval", "denied", "failed"),
+  steps: Schema.Array(StepOutcome),
+  finishedAt: EpochSeconds
+}) {}
+
 export class ExecutionAccepted extends Schema.Class<ExecutionAccepted>("ExecutionAccepted")({
   executionId: Schema.String,
   mode: Schema.Literal("restate", "direct"),
@@ -73,6 +86,13 @@ export class IntentApiGroup extends HttpApiGroup.make("intent")
       .setPath(Schema.Struct({ id: PlanId }))
       .addSuccess(Plan)
       .addError(PlanNotFound)
+  )
+  .add(
+    HttpApiEndpoint.get("getExecution", "/plans/:id/execution")
+      .setPath(Schema.Struct({ id: PlanId }))
+      .addSuccess(ExecutionRecord)
+      .addError(PlanNotFound)
+      .addError(ExecutionNotFound)
   )
   .add(
     HttpApiEndpoint.post("executePlan", "/plans/:id/execute")

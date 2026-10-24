@@ -214,8 +214,14 @@ ANTHROPIC_API_KEY=... pnpm start     # http://localhost:8787, METIS_PORT to chan
 - `ANTHROPIC_API_KEY` makes Claude answer the `design.*` capabilities; without it the templates do.
 - `POSTGRES_*` (as for `pnpm migrate`) stores everything in Postgres; without `POSTGRES_DATABASE`
   everything is in memory and a restart empties it.
-- Execution runs in-process (`mode: "direct"`), which is not durable. The Restate path is built
-  and tested but not wired into `pnpm start` yet.
+- `RESTATE_INGRESS_URL` (and `RESTATE_ADMIN_URL`, default `http://127.0.0.1:9070`) runs plans as
+  Restate workflows served from METIS's own process (port `METIS_RESTATE_PORT`, default 9080): a
+  run parks on an approval and survives a restart. Pair it with Postgres, or the plans and record a
+  resumed run needs are gone. Without it, plans run in-process (`mode: "direct"`), which is not
+  durable. `node_modules/.bin/restate-server` is a Restate server to point it at.
+- `GET /plans/{id}/execution` reports a plan's latest run from the event log, in either mode. A
+  durable execute returns `accepted` before anything has run, so this is where its outcome, and the
+  `artifactId` of what it wrote, is read.
 
 ```bash
 curl -s -X POST localhost:8787/intent -H 'content-type: application/json' \

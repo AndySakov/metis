@@ -113,6 +113,55 @@ paths:
                 format: binary
         "404":
           $ref: "#/components/responses/NotFound"
+  /plans/{id}/execution:
+    get:
+      operationId: getExecution
+      x-status: implemented
+      summary: The latest run of a plan
+      description: >
+        Read from the event log, so it answers the same way whichever path ran the plan. A `restate`
+        submission returns before anything has run; this is where its outcome is found, including
+        a step parked awaiting approval and the `artifactId` of anything it wrote. A durable run
+        re-executes after each approval, and this reports the latest of those runs.
+      parameters:
+        - $ref: "#/components/parameters/Identifier"
+      responses:
+        "200":
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: false
+                required: [status, steps, finishedAt]
+                properties:
+                  status:
+                    type: string
+                    enum: [completed, awaiting_approval, denied, failed]
+                  steps:
+                    type: array
+                    items:
+                      type: object
+                      additionalProperties: false
+                      required: [stepId, status]
+                      properties:
+                        stepId:
+                          $ref: ../common/Identifier.schema.json
+                        status:
+                          type: string
+                          enum: [completed, awaiting_approval, denied, failed, skipped]
+                        artifactId:
+                          $ref: ../common/Identifier.schema.json
+                        detail:
+                          type: string
+                  finishedAt:
+                    $ref: ../common/Timestamp.schema.json
+        "404":
+          description: No such plan, or the plan has never run.
+          content:
+            application/json:
+              schema:
+                $ref: ../common/Error.schema.json
   /plans/{id}/execute:
     post:
       operationId: executePlan

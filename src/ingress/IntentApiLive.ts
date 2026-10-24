@@ -10,7 +10,7 @@
  */
 
 import { HttpApiBuilder } from "@effect/platform"
-import { Effect, Layer } from "effect"
+import { Effect, Layer, Schema } from "effect"
 
 import type { Artifact, ArtifactId } from "../domain/Artifact.js"
 import type { EpochSeconds } from "../domain/Common.js"
@@ -25,7 +25,14 @@ import { EventLogStore } from "../mneme/EventLogStore.js"
 import { PlanStore } from "../mneme/PlanStore.js"
 import { PlanExecution } from "../orchestrator/PlanExecution.js"
 import { Planner } from "../orchestrator/Planner.js"
-import { ArtifactNotFound, ExecutionRejected, IntentApi, PlanNotFound } from "./IntentApi.js"
+import {
+  ArtifactNotFound,
+  ExecutionNotFound,
+  ExecutionRecord,
+  ExecutionRejected,
+  IntentApi,
+  PlanNotFound
+} from "./IntentApi.js"
 
 export const IntentApiLive = HttpApiBuilder.group(IntentApi, "intent", (handlers) =>
   Effect.gen(function*() {
@@ -82,6 +89,29 @@ export const IntentApiLive = HttpApiBuilder.group(IntentApi, "intent", (handlers
           const plan = yield* Effect.orDie(plans.getPlan(path.id as PlanId))
           if (plan === undefined) return yield* new PlanNotFound({ id: path.id as PlanId })
           return plan
+        }))
+      .handle("getExecution", ({ path }) =>
+        Effect.gen(function*() {
+          const id = path.id as PlanId
+          const plan = yield* Effect.orDie(plans.getPlan(id))
+          if (plan === undefined) return yield* new PlanNotFound({ id })
+
+          const finished = yield* Effect.orDie(log.read({ types: ["PLAN_FINISHED" as EventType] }))
+          const latest = finished
+            .filter((event) => (event.payload as { planId?: unknown } | null)?.planId === id)
+            .at(-1)
+          if (latest === undefined) return yield* new ExecutionNotFound({ id })
+
+          // Decoded rather than cast: a payload the schema rejects is a defect in what the executor
+          // wrote, and should surface as one rather than be served.
+          const payload = latest.payload as { status?: unknown; steps?: unknown }
+          return yield* Effect.orDie(
+            Schema.decodeUnknown(ExecutionRecord)({
+              status: payload.status,
+              steps: payload.steps,
+              finishedAt: latest.ts
+            })
+          )
         }))
       .handle("executePlan", ({ path, payload }) =>
         Effect.gen(function*() {

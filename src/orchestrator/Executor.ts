@@ -167,12 +167,11 @@ export const execute = (
 
     if (planDecision.effect === "deny") {
       yield* emit("PLAN_DENIED", { planId: plan.id, basis: planDecision.basis })
-      return {
-        planId: plan.id,
-        status: "denied" as const,
-        steps: plan.steps.map((step) => ({ stepId: step.id, status: "skipped" as const })),
-        correlationId
-      }
+      const skipped = plan.steps.map((step) => ({ stepId: step.id, status: "skipped" as const }))
+      // Every run ends in PLAN_FINISHED, a denied one included, so a plan's latest outcome can
+      // always be read back from the log.
+      yield* emit("PLAN_FINISHED", { planId: plan.id, status: "denied", steps: skipped })
+      return { planId: plan.id, status: "denied" as const, steps: skipped, correlationId }
     }
 
     yield* emit("PLAN_STARTED", { planId: plan.id, intentId: plan.intentId, steps: plan.steps.length })
@@ -216,7 +215,9 @@ export const execute = (
       yield* reconcile(skill, recordedGear(recorded, skill), trustPolicy, correlationId)
     }
 
-    yield* emit("PLAN_FINISHED", { planId: plan.id, status: finalStatus })
+    // The step results ride on the event, so `GET /plans/{id}/execution` can answer from the log
+    // for a durable run that the submitting request never saw finish.
+    yield* emit("PLAN_FINISHED", { planId: plan.id, status: finalStatus, steps: results })
 
     return { planId: plan.id, status: finalStatus, steps: results, correlationId }
 

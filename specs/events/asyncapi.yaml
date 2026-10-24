@@ -17,6 +17,17 @@ channels:
         description: "Event.type = PLAN_CREATED"
         payload:
           $ref: ../Event.schema.json
+  plan/finished:
+    subscribe:
+      message:
+        name: PlanFinished
+        description: >
+          Event.type = PLAN_FINISHED, written at the end of every run of a plan, whichever path ran
+          it. Payload: `planId`, `status` (completed, awaiting_approval, denied or failed) and
+          `steps`, one `{ stepId, status, artifactId?, detail? }` per plan step.
+          `GET /plans/{id}/execution` is read from the latest of these for a plan.
+        payload:
+          $ref: ../Event.schema.json
   tool/started:
     subscribe:
       message:

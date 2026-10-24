@@ -65,13 +65,29 @@ export interface AppConfig {
   readonly anthropicBaseUrl: Option.Option<string>
   /** Postgres when `POSTGRES_DATABASE` is set, otherwise memory, which a restart empties. */
   readonly postgres: boolean
+  /**
+   * Durable execution, when `RESTATE_INGRESS_URL` is set: plans run as Restate workflows served from
+   * this process and survive a restart. Otherwise they run in-process, and every execute response
+   * says `mode: "direct"`.
+   */
+  readonly restate: Option.Option<PlanExecution.RestateOptions>
 }
 
 export const AppConfig: Config.Config<AppConfig> = Config.all({
   port: Config.port("METIS_PORT").pipe(Config.withDefault(8787)),
   anthropicApiKey: Config.option(Config.redacted("ANTHROPIC_API_KEY")),
   anthropicBaseUrl: Config.option(Config.string("METIS_ANTHROPIC_BASE_URL")),
-  postgres: Config.option(Config.string("POSTGRES_DATABASE")).pipe(Config.map(Option.isSome))
+  postgres: Config.option(Config.string("POSTGRES_DATABASE")).pipe(Config.map(Option.isSome)),
+  restate: Config.option(
+    Config.all({
+      ingressUrl: Config.string("RESTATE_INGRESS_URL"),
+      adminUrl: Config.string("RESTATE_ADMIN_URL").pipe(Config.withDefault("http://127.0.0.1:9070")),
+      endpointPort: Config.port("METIS_RESTATE_PORT").pipe(Config.withDefault(9080)),
+      endpointUrl: Config.option(Config.string("METIS_RESTATE_ENDPOINT_URL")).pipe(
+        Config.map(Option.getOrUndefined)
+      )
+    })
+  )
 })
 
 /**
@@ -202,7 +218,11 @@ export const services = (config: AppConfig) => {
   const middle = Layer.mergeAll(PolicyGate.layer, ledgerFromLog(TRUST_POLICY), plannerFromRegistry).pipe(
     Layer.provideMerge(base)
   )
-  return PlanExecution.directLayer.pipe(Layer.provideMerge(middle))
+  const execution = Option.match(config.restate, {
+    onNone: () => PlanExecution.directLayer,
+    onSome: (options) => PlanExecution.servedRestateLayer(options)
+  })
+  return execution.pipe(Layer.provideMerge(middle))
 }
 
 const announce = (config: AppConfig) =>
@@ -212,6 +232,17 @@ const announce = (config: AppConfig) =>
       const specs = yield* registry.all
       yield* Effect.log(`METIS listening on http://localhost:${config.port}`)
       yield* Effect.log(`storage: ${config.postgres ? "postgres" : "memory (a restart empties it)"}`)
+      yield* Effect.log(
+        Option.match(config.restate, {
+          onNone: () => "execution: direct (in-process, not durable): set RESTATE_INGRESS_URL for Restate",
+          onSome: (options) => `execution: restate via ${options.ingressUrl} (durable)`
+        })
+      )
+      if (Option.isSome(config.restate) && !config.postgres) {
+        // Restate would resume the workflow after a restart, but the plans, artifacts and event log
+        // it resumes against would be gone.
+        yield* Effect.logWarning("restate without postgres: a run survives a restart, but its plan and record do not")
+      }
       yield* Effect.log(
         Option.isSome(config.anthropicApiKey)
           ? "design.* answered by Claude (metis.model)"
