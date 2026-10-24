@@ -21,7 +21,7 @@ multi-user seams left open but not built.
 What exists and works:
 
 - Contract schemas in `specs/` — Intent, IntentDraft, Plan, Artifact, Event, ToolSpec, shared types,
-  17 capability contracts, 17 example tool descriptors.
+  18 capability contracts, 26 example tool descriptors.
 - Effect Schema domain types in `src/domain/` that decode those contracts, with branded identifiers
   and tagged errors.
 - A PostgreSQL schema in `migrations/`, with domain constraints and a checksum-verifying migration
@@ -70,6 +70,13 @@ What exists and works:
   those: it is not a web-wide search. `research.fetch` does real HTTP and refuses loopback, private
   and link-local hosts; `research.summarize` is extractive, so a citation always points at text
   that was genuinely supplied.
+- **Lead triage for a short-let** (`stays.triage`, `src/stays/Triage.ts`). Paste a WhatsApp
+  group export and METIS returns the messages that are someone *looking* for a place the unit
+  could fill, best first. It reads direction before anything else, since these groups are almost
+  all hosts advertising. It understands English, Swahili and Sheng, takes the unit's measured
+  drive-time catchment, and resolves "leo", "kesho" and "tarehe 15 mpaka 18" in the unit's own
+  time zone. Deterministic, held by conformance vectors in `specs/stays/conformance/`, the first
+  of them the owner's own worked examples. The pasted chat is labelled `untrusted`.
 - **A project scaffolder that writes to disk.** `build.scaffold` (`src/tools/servers/build.ts`)
   creates a `node-ts` or `python` project under `METIS_WORKSPACE` and nowhere else: the name must
   be one safe path segment, and it never writes over an existing directory. It is declared
@@ -107,7 +114,7 @@ artifact, and an unresolvable capability that fails cleanly instead of dispatchi
 
 What does **not** exist yet, despite being described in `docs/`:
 
-- Seven of the seventeen capabilities remain descriptors: `run.notebook`, `graph.link`, `vector.upsert`, and the four `agent.*` ones, which need real browser and device control. Implementing any of them against canned
+- Seven of the eighteen capabilities remain descriptors: `run.notebook`, `graph.link`, `vector.upsert`, and the four `agent.*` ones, which need real browser and device control. Implementing any of them against canned
   responses would be worse than leaving them out — the registry would claim a capability that does
   not do what its contract says.
 - The monorepo layout, `examples/`, voice, device control, the Adaptive Agent Foundry.
@@ -258,6 +265,9 @@ and watch that skill's gear climb until it stops asking.
   run parks on an approval and survives a restart. Pair it with Postgres, or the plans and record a
   resumed run needs are gone. Without it, plans run in-process (`mode: "direct"`), which is not
   durable. `node_modules/.bin/restate-server` is a Restate server to point it at.
+- `METIS_STAYS_PROFILE` points `stays.triage` at your unit (`specs/stays/UnitProfile.schema.json`);
+  without it the repository's example Westlands 1-bed is used. Keep a real unit's profile out of
+  the repository.
 - `METIS_WORKSPACE` lets `build.scaffold` create projects in that directory ("Scaffold a
   TypeScript project called notes-api"). Without it the server that writes to disk is not started.
 - `GET /plans/{id}/execution` reports a plan's latest run from the event log, in either mode. A

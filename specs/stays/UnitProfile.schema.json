@@ -1,0 +1,187 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schema.metis.dev/stays/UnitProfile.schema.json",
+  "title": "UnitProfile",
+  "description": "What lead triage needs to know about one short-let unit: its size, its time zone, and which areas are close enough that a guest asking for them would take it. Area tiers come from measured drive times, plus judgement where the numbers mislead (a route that is fast only without traffic). Matching is by name, case-insensitive, so landmarks and nicknames are listed alongside estates. The repository ships an example; a real unit's profile stays on the owner's machine (METIS_STAYS_PROFILE).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "name",
+    "timezone",
+    "bedrooms",
+    "areas"
+  ],
+  "properties": {
+    "id": {
+      "$ref": "#/$defs/UnitId"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 200
+    },
+    "timezone": {
+      "description": "IANA time zone. Relative dates (\"tonight\", \"leo\") resolve against today here.",
+      "type": "string",
+      "minLength": 1
+    },
+    "bedrooms": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 20
+    },
+    "areas": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "accept",
+        "borderline",
+        "reject"
+      ],
+      "properties": {
+        "accept": {
+          "description": "Close enough: a lead naming any of these is a lead.",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "borderline": {
+          "description": "Worth a human look: a lead, flagged.",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "reject": {
+          "description": "Too far, or a different market: not a lead unless an accepted area is also named.",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "UnitId": {
+      "description": "A hand-authored slug naming the unit, readable in reports. Not a UUIDv7: it is chosen by the owner, not generated.",
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9-]*$"
+    }
+  },
+  "examples": [
+    {
+      "id": "example-westlands-1br",
+      "name": "Westlands 1-bed",
+      "timezone": "Africa/Nairobi",
+      "bedrooms": 1,
+      "areas": {
+        "accept": [
+          "Westlands",
+          "Parklands",
+          "Highridge",
+          "Nairobi CBD",
+          "CBD",
+          "town",
+          "Riverside",
+          "Muthaiga",
+          "Pangani",
+          "Upper Hill",
+          "Upperhill",
+          "Ngara",
+          "Kileleshwa",
+          "Kile",
+          "Hurlingham",
+          "Kilimani",
+          "Milimani",
+          "Lavington",
+          "Spring Valley",
+          "Yaya Centre",
+          "Yaya",
+          "Adams Arcade",
+          "Adams",
+          "Gigiri",
+          "Village Market",
+          "Runda",
+          "Loresho",
+          "Kitisuru",
+          "Nyari",
+          "Kangemi",
+          "Mountain View",
+          "Sarit",
+          "Sarit Centre",
+          "ABC Place",
+          "Chiromo",
+          "Rhapta",
+          "Raphta",
+          "Mpaka Road",
+          "Woodvale",
+          "Brookside",
+          "Delta",
+          "GTC",
+          "Museum Hill",
+          "Waiyaki Way",
+          "Peponi",
+          "Kyuna",
+          "Lower Kabete",
+          "General Mathenge",
+          "Deep Sea"
+        ],
+        "borderline": [
+          "Dagoretti Corner",
+          "Dagoretti",
+          "JKIA",
+          "Two Rivers",
+          "Ruaka",
+          "Kikuyu",
+          "Lang'ata",
+          "Langata",
+          "Karen"
+        ],
+        "reject": [
+          "Ongata Rongai",
+          "Rongai",
+          "Thindigua",
+          "Kiambu Road",
+          "Kiambu Rd",
+          "Ngong",
+          "Ngong town",
+          "Eastlands",
+          "Donholm",
+          "Buruburu",
+          "Umoja",
+          "Kayole",
+          "Utawala",
+          "Athi River",
+          "Syokimau",
+          "Ruiru",
+          "Juja",
+          "Thika",
+          "Thika Road",
+          "Thika Rd",
+          "Mlolongo",
+          "South B",
+          "South C",
+          "Kasarani",
+          "Embakasi",
+          "Bungoma",
+          "Kericho",
+          "Nyali",
+          "Watamu",
+          "Mombasa",
+          "Kisumu",
+          "Nakuru",
+          "Eldoret",
+          "Diani",
+          "Malindi",
+          "Naivasha"
+        ]
+      }
+    }
+  ]
+}

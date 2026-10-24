@@ -202,6 +202,13 @@ export const serversFor = (config: AppConfig): ServerMap => ({
     ? { "metis.build": { ...node("build.ts"), env: { METIS_WORKSPACE: resolve(config.workspace.value) } } }
     : {}),
   "metis.design": node("design.ts"),
+  // The short-let unit's profile stays on this machine; without one, the repository's example.
+  "metis.stays": {
+    ...node("stays.ts"),
+    env: process.env.METIS_STAYS_PROFILE === undefined
+      ? {}
+      : { METIS_STAYS_PROFILE: resolve(process.env.METIS_STAYS_PROFILE) }
+  },
   "metis.research": {
     ...node("research.ts"),
     // Where `research.search` sends its queries, when something other than Wikipedia and arXiv

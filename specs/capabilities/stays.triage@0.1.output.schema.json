@@ -1,0 +1,111 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schema.metis.dev/capabilities/stays.triage@0.1.output.schema.json",
+  "title": "stays.triage@0.1 output",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "unit": {
+      "description": "The profile's name.",
+      "type": "string"
+    },
+    "results": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "text",
+          "verdict",
+          "reason",
+          "direction",
+          "unit",
+          "areaTier",
+          "datesStated"
+        ],
+        "properties": {
+          "text": {
+            "type": "string"
+          },
+          "sender": {
+            "type": "string"
+          },
+          "group": {
+            "type": "string"
+          },
+          "at": {
+            "type": "string"
+          },
+          "verdict": {
+            "type": "string",
+            "enum": [
+              "lead",
+              "noise"
+            ]
+          },
+          "reason": {
+            "type": "string"
+          },
+          "direction": {
+            "type": "string",
+            "enum": [
+              "seeking",
+              "offering",
+              "unclear"
+            ]
+          },
+          "unit": {
+            "type": "string",
+            "enum": [
+              "match",
+              "weak",
+              "larger",
+              "unstated"
+            ]
+          },
+          "area": {
+            "type": "string"
+          },
+          "areaTier": {
+            "type": "string",
+            "enum": [
+              "accept",
+              "borderline",
+              "reject",
+              "unstated"
+            ]
+          },
+          "checkIn": {
+            "type": "string",
+            "format": "date"
+          },
+          "checkOut": {
+            "type": "string",
+            "format": "date"
+          },
+          "datesStated": {
+            "type": "boolean"
+          },
+          "confidence": {
+            "description": "Leads only.",
+            "type": "string",
+            "enum": [
+              "high",
+              "medium",
+              "low"
+            ]
+          }
+        }
+      }
+    },
+    "markdown": {
+      "description": "The sweep as the owner reads it: leads first, then what was dropped and why.",
+      "type": "string"
+    }
+  },
+  "required": [
+    "unit",
+    "results",
+    "markdown"
+  ]
+}

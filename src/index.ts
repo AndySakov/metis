@@ -134,6 +134,15 @@ export * as Plan from "./domain/Plan.js"
 export * as Policy from "./domain/Policy.js"
 
 /**
+ * Short-let domain types: the unit a lead is triaged against.
+ *
+ * Mirrors `specs/stays/UnitProfile.schema.json`. The triage engine (`src/stays/Triage.ts`) takes
+ * the decoded value; it is decoded here first so a malformed profile fails at startup, not as a
+ * wrong verdict on a real lead.
+ */
+export * as Stays from "./domain/Stays.js"
+
+/**
  * The MCP binding (ADR-017).
  *
  * Names the server logically and the tool within it. Connection details — command line, URL,
@@ -440,6 +449,27 @@ export * as TrustUpdater from "./policy/TrustUpdater.js"
 export * as Verification from "./policy/Verification.js"
 
 /**
+ * Lead triage for a short-let: which messages in a pasted group chat are people looking for a place
+ * to stay that this unit could fill, and when.
+ *
+ * Deterministic on purpose. The groups it reads are ~99% hosts advertising, the cost of a missed
+ * lead is a booking, and the cost of a false one is a wasted glance, so the rules below are the
+ * ones learned from sweeping them, written as code that conformance vectors can hold still:
+ *
+ * 1. **Direction before anything else.** A perfect advert for the right unit is still noise. Verbs
+ *    of seeking win over a number; a phone number, a nightly price or a rate card mean supply.
+ * 2. **What is sought must be a place to stay.** The same groups trade cars and cleaners.
+ * 3. **Unit.** The unit's bedroom count or unstated matches; a studio or bedsitter is a weak match;
+ *    more bedrooms is not.
+ * 4. **Location** from the unit's measured catchment. Nothing named is still a lead; any named area
+ *    in range makes it one; only named-and-far rejects.
+ * 5. **Dates** resolved against today *in the unit's time zone*, never invented.
+ *
+ * Free of Node APIs, so the MCP server can import it under type stripping.
+ */
+export * as Triage from "./stays/Triage.js"
+
+/**
  * `ToolRunner` over MCP (ADR-017).
  *
  * Connects to the server named in a ToolSpec's `mcp.server`, calls the named tool, and returns its
@@ -559,6 +589,19 @@ export * as model from "./tools/servers/model.js"
  * and a key; until one is chosen, these two are what METIS can search honestly.
  */
 export * as research from "./tools/servers/research.js"
+
+/**
+ * An MCP server for the short-let: `stays.*` capabilities over one unit's profile.
+ *
+ * `triage` reads a pasted group chat and says which messages are people looking for a place this
+ * unit could fill. The rules are in `src/stays/Triage.ts` and held by conformance vectors; this
+ * server only parses the paste, applies them, and writes the report.
+ *
+ * The unit is described by a profile (`specs/stays/UnitProfile.schema.json`) read once at startup
+ * from `METIS_STAYS_PROFILE`, or the example Westlands 1-bed in the repository when unset. A
+ * malformed profile stops the server, rather than producing confident verdicts against nonsense.
+ */
+export * as stays from "./tools/servers/stays.js"
 
 /**
  * An MCP server exposing the `transform.*` capabilities.

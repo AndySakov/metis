@@ -26,6 +26,8 @@
   @media (max-width: 960px) { main { grid-template-columns: minmax(0, 1fr); padding: 8px 16px 32px; } header { padding: 16px 16px 8px; } }
   section.card { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 16px; margin-bottom: 16px; }
   h2 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin: 0 0 12px; font-weight: 600; }
+  #paste-box { margin-top: 8px; } #paste-box summary { font-size: 13px; color: var(--muted); cursor: pointer; }
+  #pasted { margin-top: 6px; min-height: 120px; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12.5px; }
   textarea { width: 100%; min-height: 64px; resize: vertical; font: inherit; color: inherit; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; }
   select, button { font: inherit; }
   select { background: var(--bg); color: inherit; border: 1px solid var(--line); border-radius: 8px; padding: 7px 8px; }
@@ -90,6 +92,10 @@
     <section class="card">
       <h2>Ask</h2>
       <textarea id="goal" placeholder="e.g. Summarize https://en.wikipedia.org/wiki/Metis_(mythology)"></textarea>
+      <details id="paste-box">
+        <summary>Paste text with it (a group chat, an ad): sent as untrusted</summary>
+        <textarea id="pasted" placeholder="Paste a WhatsApp export or copied messages here"></textarea>
+      </details>
       <div class="row">
         <label class="small muted" for="autonomy">Autonomy</label>
         <select id="autonomy" title="The gear you ask for. A skill only runs unattended at a gear its trust supports.">
@@ -256,13 +262,30 @@ const EXAMPLES = [
   { needs: ["design.c4@1.0"], goal: "C4 diagrams for an offline-first notes app with sync" },
   { needs: ["design.api_spec@1.0"], goal: "Write an API spec for a notes app" },
   { needs: ["build.scaffold@0.1"], goal: "Scaffold a TypeScript project called notes-api" },
-  { needs: [], goal: "Research the state of the art in RAG" }
+  { needs: ["research.search@0.1"], goal: "Research the state of the art in RAG" },
+  {
+    needs: ["stays.triage@0.1"],
+    goal: "Any leads in this group chat?",
+    pasted: [
+      "[10/08/2026, 01:12:33] Wanjiru: Nahitaji keja ya one bedroom Westlands usiku wa leo, budget 7k",
+      "[10/08/2026, 01:20:10] Host Ke: 1 BEDROOM WESTLANDS ✅ Furnished ✅ Ksh7000/night 📞 0712345678",
+      "[10/08/2026, 07:45:02] Brian: Any bnb 2 bedroom Kilimani this weekend?",
+      "[10/08/2026, 08:03:51] Agent Mary: Client anataka one bedroom around Parklands, 3 nights from Friday",
+      "[10/08/2026, 08:30:15] Otieno: Who has a place in Kasarani for the weekend?",
+      "[10/08/2026, 09:02:40] Njeri: Nauliza, kuna mtu ana one bedroom karibu na Sarit? 20-22"
+    ].join("\n")
+  }
 ];
 const renderExamples = () => {
   const have = new Set(state.tools.map((t) => t.capability));
   const box = $("examples");
   box.replaceChildren(...EXAMPLES.filter((e) => e.needs.every((c) => have.has(c))).map((e) =>
-    el("span", { class: "chip", text: e.goal, title: "Use this goal", onclick: () => { $("goal").value = e.goal; $("goal").focus(); } })
+    el("span", { class: "chip", text: e.goal, title: "Use this goal", onclick: () => {
+      $("goal").value = e.goal;
+      $("pasted").value = e.pasted ?? "";
+      $("paste-box").open = e.pasted !== undefined;
+      $("goal").focus();
+    } })
   ));
 };
 
@@ -351,7 +374,10 @@ const createPlan = async () => {
   if (!goal) return;
   $("plan").disabled = true;
   try {
-    const plan = await api("POST", "/intent", { actor: ACTOR, goal, autonomy: $("autonomy").value });
+    const pasted = $("pasted").value.trim();
+    // Pasted text is anyone's: a group chat or an ad, so policy sees it as untrusted.
+    const inputs = pasted ? [{ name: "pasted", value: pasted, tags: ["untrusted", "pasted"] }] : [];
+    const plan = await api("POST", "/intent", { actor: ACTOR, goal, autonomy: $("autonomy").value, inputs });
     remember(plan.id, goal);
     await openPlan(plan);
   } catch (e) { $("ask-error").textContent = e.message; $("ask-error").hidden = false; }
