@@ -11,7 +11,7 @@
  * fire, so it is computed in one place and tested directly.
  */
 
-import { Context, Effect, Layer } from "effect"
+import { Context, Effect, Either, Layer } from "effect"
 
 import type { Autonomy, CapabilityId, EpochSeconds } from "../domain/Common.js"
 import { uuidv7 } from "../domain/Ids.js"
@@ -20,6 +20,10 @@ import type { JsonPointer } from "../domain/JsonPointer.js"
 import type { PackTemplate } from "../domain/Pack.js"
 import type { ArtifactExpectationId, AssumptionId, PlanId, PlanStepId, RiskId } from "../domain/Plan.js"
 import { ArtifactExpectation, Assumption, InputBinding, Plan, PlanStep, Risk, ToolCall } from "../domain/Plan.js"
+import type { ToolSpec } from "../domain/ToolSpec.js"
+import type { Turn } from "../tools/Model.js"
+import { planWithModel } from "./ModelPlanner.js"
+import { fill } from "./Placeholders.js"
 
 /**
  * Whether a step needs a human before it runs, given the gear (ADR-002).
@@ -261,18 +265,6 @@ const CLARIFY: Template = {
 export const templateFor = (goal: string, extra: ReadonlyArray<Template> = []): Template =>
   [...TEMPLATES, ...extra, ...BROAD].find((t) => t.matches(goal)) ?? CLARIFY
 
-/** `{{goal}}` and `{{pasted}}` in every string of a pack step's input, filled from the intent. */
-const fill = (value: unknown, goal: string, pasted: string): unknown => {
-  if (typeof value === "string") {
-    return value.replaceAll("{{goal}}", goal).replaceAll("{{pasted}}", pasted).trim()
-  }
-  if (Array.isArray(value)) return value.map((item) => fill(item, goal, pasted))
-  if (value !== null && typeof value === "object") {
-    return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, fill(item, goal, pasted)]))
-  }
-  return value
-}
-
 /**
  * A pack's template, compiled. A pack states its templates as data, so this is the only code that
  * decides what they do: match the goal, ask for a paste when one is needed, and fill the inputs.
@@ -306,6 +298,126 @@ export class Planner extends Context.Tag("orchestrator/Planner")<Planner, {
   readonly plan: (intent: Intent) => Effect.Effect<Plan>
 }>() {}
 
+/** What the planner needs to plan with the model: the registered tools, and the model to ask. */
+export interface ModelPlanning {
+  readonly specs: ReadonlyArray<ToolSpec>
+  readonly complete: (system: string, turns: ReadonlyArray<Turn>) => Effect.Effect<string, { readonly message: string }>
+}
+
+/**
+ * The template a goal plans from, asking the model when no specific template matches: core's
+ * specific templates and packs' first, then the model's plan, then core's broad templates and the
+ * question. Why the model's plan was not used, when it was asked, comes back as a risk.
+ */
+const choose = (intent: Intent, extra: ReadonlyArray<Template>, model: ModelPlanning | undefined) =>
+  Effect.gen(function*() {
+    const specific = [...TEMPLATES, ...extra].find((t) => t.matches(intent.goal))
+    if (specific !== undefined || model === undefined) {
+      return { template: specific ?? templateFor(intent.goal, extra), notes: [] as Array<string> }
+    }
+    const result = yield* planWithModel(intent, pastedOf(intent), model.specs, model.complete)
+    if (Either.isLeft(result)) return { template: templateFor(intent.goal, extra), notes: [result.left] }
+    const planned = result.right
+    const template: Template = {
+      name: "model",
+      matches: () => true,
+      steps: () => planned.steps,
+      assumptions: planned.assumptions,
+      risks: planned.risks,
+      expects: [{ kind: "text", description: "What the last step produces" }]
+    }
+    return { template, notes: [] as Array<string> }
+  })
+
+/**
+ * The plan for `intent` from `matched`: steps that cannot run are left out and said so, and a plan
+ * left with nothing to run asks instead. Throws if the result breaks a rule of `Plan` itself.
+ */
+const build = (
+  intent: Intent,
+  millis: number,
+  available: (capability: string) => boolean,
+  matched: Template,
+  notes: ReadonlyArray<string>
+): Plan => {
+  const now = Math.floor(millis / 1000) as EpochSeconds
+  const proposed = matched.steps(intent)
+  // A step is left out if its capability is not available, or if a step it takes input from
+  // was left out: it could only ever fail for want of that input.
+  const kept: Array<boolean> = []
+  const skipped: Array<string> = []
+  for (const [index, step] of proposed.entries()) {
+    const missing = step.capability !== undefined && !available(step.capability)
+    const orphaned = (step.bindings ?? []).find((binding) => kept[binding.fromStep] !== true)
+    kept[index] = !missing && orphaned === undefined
+    if (missing) {
+      skipped.push(`Skipped "${step.description}": ${step.capability} has no registered implementation`)
+    } else if (orphaned !== undefined) {
+      skipped.push(
+        `Skipped "${step.description}": it needs the output of "${
+          proposed[orphaned.fromStep]!.description
+        }", which was skipped`
+      )
+    }
+  }
+  const runnable = proposed.flatMap((step, index) => kept[index] ? [{ step, index }] : [])
+
+  const template = runnable.length > 0 ? matched : CLARIFY
+  const risks = [...template.risks, ...notes, ...skipped]
+
+  const chosen = runnable.length > 0 ? runnable : CLARIFY.steps(intent).map((step, index) => ({ step, index }))
+  const ids = new Map(chosen.map(({ index }, position) => [index, uuidv7(millis + position) as PlanStepId]))
+  const steps = chosen.map(({ index, step }) =>
+    new PlanStep({
+      id: ids.get(index)!,
+      kind: step.kind,
+      description: step.description,
+      requiresApproval: stepRequiresApproval(step.kind, intent.autonomy),
+      ...(step.capability !== undefined
+        ? {
+          toolCall: new ToolCall({
+            capability: step.capability as CapabilityId,
+            input: step.input ?? {},
+            ...(step.bindings !== undefined
+              ? {
+                bindings: step.bindings.map((binding) =>
+                  new InputBinding({
+                    to: binding.to as JsonPointer,
+                    fromStep: ids.get(binding.fromStep)!,
+                    from: binding.from as JsonPointer
+                  })
+                )
+              }
+              : {})
+            // `tool` is deliberately absent: ADR-017 requires the planner to target a
+            // capability and never name an implementation. The registry fills it at dispatch.
+          })
+        }
+        : {})
+    })
+  )
+
+  return new Plan({
+    id: uuidv7(millis) as PlanId,
+    intentId: intent.id,
+    createdAt: now,
+    steps: steps as unknown as readonly [PlanStep, ...Array<PlanStep>],
+    assumptions: template.assumptions.map((description, i) =>
+      new Assumption({ id: uuidv7(millis + i) as AssumptionId, description, tags: [] })
+    ),
+    risks: risks.map((description, i) => new Risk({ id: uuidv7(millis + i) as RiskId, description, tags: [] })),
+    expectedArtifacts: template.expects.map((expectation, i) =>
+      new ArtifactExpectation({
+        id: uuidv7(millis + i) as ArtifactExpectationId,
+        kind: expectation.kind,
+        description: expectation.description,
+        tags: []
+      })
+    ),
+    artifacts: []
+  })
+}
+
 /**
  * A planner that plans only what can run.
  *
@@ -314,89 +426,28 @@ export class Planner extends Context.Tag("orchestrator/Planner")<Planner, {
  * through executing it. If that leaves nothing to run, the plan asks instead, carrying the same
  * risks. `available` answers for capability ids only: the planner still never names a tool.
  */
-export const makeFor = (available: (capability: string) => boolean, extra: ReadonlyArray<Template> = []) =>
+export const makeFor = (
+  available: (capability: string) => boolean,
+  extra: ReadonlyArray<Template> = [],
+  model?: ModelPlanning
+) =>
   Planner.of({
     plan: (intent) =>
       Effect.gen(function*() {
         const millis = yield* Effect.clockWith((clock) => clock.currentTimeMillis)
-        const now = Math.floor(millis / 1000) as EpochSeconds
-        const matched = templateFor(intent.goal, extra)
-
-        const proposed = matched.steps(intent)
-        // A step is left out if its capability is not available, or if a step it takes input from
-        // was left out: it could only ever fail for want of that input.
-        const kept: Array<boolean> = []
-        const skipped: Array<string> = []
-        for (const [index, step] of proposed.entries()) {
-          const missing = step.capability !== undefined && !available(step.capability)
-          const orphaned = (step.bindings ?? []).find((binding) => kept[binding.fromStep] !== true)
-          kept[index] = !missing && orphaned === undefined
-          if (missing) {
-            skipped.push(`Skipped "${step.description}": ${step.capability} has no registered implementation`)
-          } else if (orphaned !== undefined) {
-            skipped.push(
-              `Skipped "${step.description}": it needs the output of "${
-                proposed[orphaned.fromStep]!.description
-              }", which was skipped`
-            )
-          }
-        }
-        const runnable = proposed.flatMap((step, index) => kept[index] ? [{ step, index }] : [])
-
-        const template = runnable.length > 0 ? matched : CLARIFY
-        const risks = [...template.risks, ...skipped]
-
-        const chosen = runnable.length > 0 ? runnable : CLARIFY.steps(intent).map((step, index) => ({ step, index }))
-        const ids = new Map(chosen.map(({ index }, position) => [index, uuidv7(millis + position) as PlanStepId]))
-        const steps = chosen.map(({ index, step }) =>
-          new PlanStep({
-            id: ids.get(index)!,
-            kind: step.kind,
-            description: step.description,
-            requiresApproval: stepRequiresApproval(step.kind, intent.autonomy),
-            ...(step.capability !== undefined
-              ? {
-                toolCall: new ToolCall({
-                  capability: step.capability as CapabilityId,
-                  input: step.input ?? {},
-                  ...(step.bindings !== undefined
-                    ? {
-                      bindings: step.bindings.map((binding) =>
-                        new InputBinding({
-                          to: binding.to as JsonPointer,
-                          fromStep: ids.get(binding.fromStep)!,
-                          from: binding.from as JsonPointer
-                        })
-                      )
-                    }
-                    : {})
-                  // `tool` is deliberately absent: ADR-017 requires the planner to target a
-                  // capability and never name an implementation. The registry fills it at dispatch.
-                })
-              }
-              : {})
-          })
+        const { notes, template: matched } = yield* choose(intent, extra, model)
+        if (matched.name !== "model") return build(intent, millis, available, matched, notes)
+        // The model's plan passed its check, but `Plan` has the last word: if it still refuses, the
+        // goal is planned the other ways, with the reason on the record rather than a failed request.
+        return yield* Effect.try(() => build(intent, millis, available, matched, notes)).pipe(
+          Effect.orElse(() => Effect.succeed(null)),
+          Effect.map((plan) =>
+            plan ?? build(intent, millis, available, templateFor(intent.goal, extra), [
+              ...notes,
+              "the model's plan was not a valid plan, so it was set aside"
+            ])
+          )
         )
-
-        return new Plan({
-          id: uuidv7(millis) as PlanId,
-          intentId: intent.id,
-          createdAt: now,
-          steps: steps as unknown as readonly [PlanStep, ...Array<PlanStep>],
-          assumptions: template.assumptions.map((description, i) =>
-            new Assumption({ id: uuidv7(millis + i) as AssumptionId, description, tags: [] })
-          ),
-          risks: risks.map((description, i) => new Risk({ id: uuidv7(millis + i) as RiskId, description, tags: [] })),
-          expectedArtifacts: template.expects.map((expectation, i) =>
-            new ArtifactExpectation({
-              id: uuidv7(millis + i) as ArtifactExpectationId,
-              kind: expectation.kind,
-              description: expectation.description,
-              tags: []
-            })
-          ),
-          artifacts: []
-        })
       })
   })
 
@@ -406,5 +457,8 @@ export const make = makeFor(() => true)
 export const layer = Layer.succeed(Planner, make)
 
 /** A planner over the capabilities a registry can actually resolve, and the templates packs add. */
-export const layerFor = (available: (capability: string) => boolean, extra: ReadonlyArray<Template> = []) =>
-  Layer.succeed(Planner, makeFor(available, extra))
+export const layerFor = (
+  available: (capability: string) => boolean,
+  extra: ReadonlyArray<Template> = [],
+  model?: ModelPlanning
+) => Layer.succeed(Planner, makeFor(available, extra, model))

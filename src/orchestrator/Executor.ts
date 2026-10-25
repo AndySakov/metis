@@ -70,7 +70,6 @@ export interface ExecuteOptions {
 
 const METIS = "metis" as Actor
 
-/** Which output field of a capability is the artifact body, if any. */
 /**
  * The labels on anything a tool declaring `public.web` returns: it read the open web, so what it
  * hands back is untrusted wherever it goes next (`Common.ts`, `TaggedValue`).
@@ -79,13 +78,18 @@ const WEB_CONTENT = ["untrusted", "web"] as const
 
 const union = (...lists: ReadonlyArray<ReadonlyArray<string>>): ReadonlyArray<string> => [...new Set(lists.flat())]
 
+/**
+ * The artifact a step's output is stored as: its document, when it has one, and otherwise the
+ * output itself as a JSON block, so a structured result (`{ matches: [...] }`) is kept and shown
+ * like any other rather than dropped.
+ */
 const artifactBody = (output: unknown): string | undefined => {
   if (output === null || typeof output !== "object") return undefined
   const record = output as Record<string, unknown>
   for (const key of ["markdown", "text", "content"]) {
     if (typeof record[key] === "string") return record[key] as string
   }
-  return undefined
+  return Object.keys(record).length === 0 ? undefined : `\`\`\`json\n${JSON.stringify(record, null, 2)}\n\`\`\``
 }
 
 /**
