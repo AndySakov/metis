@@ -57,6 +57,7 @@ import * as Verification from "./policy/Verification.js"
 import { readDescriptor } from "./tools/Descriptors.js"
 import type { ServerMap } from "./tools/McpToolRunner.js"
 import * as McpToolRunner from "./tools/McpToolRunner.js"
+import * as Model from "./tools/Model.js"
 import * as ModelCli from "./tools/ModelCli.js"
 import * as ToolRegistry from "./tools/ToolRegistry.js"
 
@@ -289,12 +290,23 @@ const stores = (config: AppConfig) =>
     )
     : Layer.mergeAll(InMemoryEventLogStore.layer, InMemoryArtifactStore.layer, InMemoryPlanStore.layer)
 
+/**
+ * The planner over what the registry holds and the templates packs add, planning with the model
+ * too when one is configured: a goal no template matches is then planned by the model and checked,
+ * rather than answered with a question.
+ */
 const plannerFromRegistry = (templates: ReadonlyArray<Planner.Template>) =>
   Layer.effect(
     Planner.Planner,
     Effect.gen(function*() {
-      const capabilities = new Set((yield* (yield* ToolRegistry.ToolRegistry).all).map((spec) => spec.capability))
-      return Planner.makeFor((capability) => capabilities.has(capability as never), templates)
+      const specs = yield* (yield* ToolRegistry.ToolRegistry).all
+      const capabilities = new Set(specs.map((spec) => spec.capability))
+      const model = yield* Effect.serviceOption(Model.Model)
+      return Planner.makeFor(
+        (capability) => capabilities.has(capability as never),
+        templates,
+        Option.match(model, { onNone: () => undefined, onSome: ({ complete }) => ({ specs, complete }) })
+      )
     })
   )
 
@@ -336,9 +348,14 @@ const servicesWith = (config: AppConfig, packs: ReadonlyArray<LoadedPack>) => {
     ),
     McpToolRunner.layer(servers, samplingFor(config, packs))
   )
+  // The configured model, for METIS's own use: planning goals no template matches.
+  const modelServer = samplingFor(config, packs).via
+  const withModel = modelServer === undefined
+    ? tools
+    : Model.layerVia(modelServer).pipe(Layer.provideMerge(tools))
   const base = Layer.mergeAll(
     stores(config),
-    tools,
+    withModel,
     PolicyEngine.layer(livePolicy()),
     Verification.randomSampler(VERIFICATION_RATE),
     Packs.layer(packs)

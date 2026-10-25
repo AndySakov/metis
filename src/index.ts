@@ -303,6 +303,36 @@ export * as SuperMemory from "./mneme/SuperMemory.js"
 export * as Executor from "./orchestrator/Executor.js"
 
 /**
+ * Planning with the model, for goals no template matches.
+ *
+ * Templates plan only what they were written for, and everything else used to come back as a
+ * question. With a model configured, such a goal is planned from the capabilities the registry
+ * actually holds: the model is shown each one's input contract, and proposes steps.
+ *
+ * The proposal is checked here before it becomes a plan, so the model's word is never taken for
+ * it: every step must name a registered capability, its input must fit that capability's schema
+ * (fields bound from an earlier step's output count as given), and a binding may only take from an
+ * earlier step and a field that step declares. A failing proposal goes back once with what failed;
+ * a second failure, like a model that cannot be reached, falls back to the planner's other paths
+ * with the reason recorded as a risk.
+ *
+ * The model sees the goal, which the user wrote, and never the text pasted with it, which could be
+ * anyone's: it learns only that a paste exists, and writes `{{pasted}}` where it belongs. The paste
+ * goes into the steps afterwards, as data carrying its labels, so it cannot steer the plan.
+ * Everything the plan does still passes policy, approval and the trust gate at execution.
+ */
+export * as ModelPlanner from "./orchestrator/ModelPlanner.js"
+
+/**
+ * Placeholders in a planned step's input, filled from the intent at planning time.
+ *
+ * A plan proposed by something that must not see the user's pasted text (a pack's template, or
+ * the model) names it as `{{pasted}}`, and the goal as `{{goal}}`. The text goes in here, as data
+ * the step will carry with its labels, never as words the proposer read.
+ */
+export * as Placeholders from "./orchestrator/Placeholders.js"
+
+/**
  * Submitting a plan for execution.
  *
  * Two implementations, and the difference between them is the whole durability story:
@@ -502,6 +532,16 @@ export * as Descriptors from "./tools/Descriptors.js"
  * How many it asked for is reported with the result, and so reaches the event log.
  */
 export * as McpToolRunner from "./tools/McpToolRunner.js"
+
+/**
+ * The configured model, as a service METIS itself can ask: one completion, text in and text out.
+ *
+ * It is answered by the same model server that answers `design.*` and packs' sampling requests
+ * (`metis.model-cli` or `metis.model`), through that server's `complete` tool, so the CLI or the
+ * key stays in that one process and every model call METIS makes goes the same way. The model gets
+ * no tools: whatever it returns is text for the caller to check, never an action.
+ */
+export * as Model from "./tools/Model.js"
 
 /**
  * Model CLIs: any command-line program that takes a prompt and prints an answer, used as the model

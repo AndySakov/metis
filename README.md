@@ -34,8 +34,20 @@ What exists and works:
   promotion that requires both, derived live from the event log. Every gear change is written back
   as an event: by the run that earned it, or, for a demotion earned by idleness, by an hourly sweep
   that `pnpm start` runs, so the log shows when a skill lost its gear rather than when it next ran.
-- A **planner** — template-matched and deliberately dumb — that turns an Intent into a structurally
-  valid Plan, targeting capabilities and never naming a tool implementation.
+- A **planner** that turns an Intent into a structurally valid Plan, targeting capabilities and
+  never naming a tool implementation. Templates answer the goals they were written for. With a
+  model configured (`METIS_MODEL_CLI=claude`, or an API key), any other goal is planned by the model
+  from what the registry holds, packs' capabilities included (`src/orchestrator/ModelPlanner.ts`).
+  The model is shown each capability's input contract and the goal, and never the text pasted
+  with it: it writes `{{pasted}}` where the paste belongs, and the text goes in afterwards with its
+  `untrusted` label, so a paste cannot steer the plan. Its proposal is checked before it becomes a
+  plan: every capability registered, every input fitting its schema, every binding taking from an
+  earlier step's declared output into a place the input leaves open. A failing proposal goes back
+  once with what failed; after that, or with no model, the goal falls to the broad templates or a
+  question, with the reason recorded as a risk. A model plan also carries a risk saying it was
+  planned by the model, and runs under the same policy, approvals and trust gate as any other.
+  A step whose output has no document (`{ matches: [...] }`) is stored as a JSON block, so
+  structured results are kept and shown.
 - **Steps that chain.** A tool call can bind part of its input to an earlier step's output
   (`ToolCall.bindings`, JSON Pointers on both sides), so "Summarize https://..." fetches the page
   and summarizes what it fetched. The value carries its labels: anything a `public.web` tool
