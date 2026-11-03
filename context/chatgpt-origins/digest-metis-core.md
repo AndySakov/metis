@@ -123,7 +123,7 @@ Sources (`transcripts/`): **J** 2025-06-08 building-jarvis; **O** 2025-08-10 ima
 | Python–Rust CAIA bridge | C | ADR-015 |
 | ULID ids, npm, Next.js canvas | O | UUIDv7 enforced; pnpm; web console at `/` |
 
-**Artifact comparison.** The archived `imagineering-copilot-v1-roadmap.md` is the *earlier, stack-specific* draft (Neo4j/PG, NestJS, Next.js, OCI, Rust agent with OctoPrint/AirPrint/iPad adapters, gRPC+GraphQL, K8s+vault) and lacks phases 4a–9a. The repo copy is the later stack-neutral revision plus a historical banner; nothing of substance was lost. The archived phase-0 files hold PG migrations and a Neo4j bootstrap, both superseded by `migrations/0001_initial.sql`, and an OpenAPI that is a strict subset of `specs/api/openapi.yaml`. `artifacts/mae-spec-draft-v1.md` (Modular Agent Ecosystem) was outside this pass.
+**Artifact comparison.** The archived `imagineering-copilot-v1-roadmap.md` is the *earlier, stack-specific* draft (Neo4j/PG, NestJS, Next.js, OCI, Rust agent with OctoPrint/AirPrint/iPad adapters, gRPC+GraphQL, K8s+vault) and lacks phases 4a–9a. The repo copy is the later stack-neutral revision plus a historical banner; nothing of substance was lost. The archived phase-0 files hold PG migrations and a Neo4j bootstrap, both superseded by `migrations/0001_initial.sql`, and an OpenAPI that is a strict subset of `specs/api/openapi.yaml`. `artifacts/mae-spec.md` (Modular Agent Ecosystem) was outside this pass.
 
 ---
 

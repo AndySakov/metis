@@ -17,7 +17,7 @@
       "chatgpt_title": "Human Brain Functions",
       "created": "2025-06-09",
       "updated": "2025-10-19",
-      "relevance": "MAE (Modular Agent Ecosystem) spec sessions; ChatGPT auto-titled it after the first question only. Final spec in artifacts/mae-spec-draft-v1.md",
+      "relevance": "MAE (Modular Agent Ecosystem) spec sessions; ChatGPT auto-titled it after the first question only. Final spec in artifacts/mae-spec.md",
       "file": "transcripts/2025-06-09_mae-spec-sessions.md"
     },
     {
@@ -71,9 +71,9 @@
   ],
   "artifacts": [
     {
-      "file": "artifacts/mae-spec-draft-v1.md",
+      "file": "artifacts/mae-spec.md",
       "source": "68470b84-9130-8004-a27c-67eda5e196b9",
-      "how": "last copy of mae/README.md that ChatGPT read from Temi's Cursor window (ChatGPT 'work with apps'); the final edit afterwards only inserted a table of contents"
+      "how": "full mae/README.md from Temi's local MAE workspace (working copy, last modified 2025-08-08; last git commit 2025-06-19). ChatGPT only ever saw a copy truncated at §11.10."
     },
     {
       "file": "artifacts/imagineering-copilot-v1-roadmap.md",

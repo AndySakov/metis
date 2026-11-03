@@ -16,12 +16,13 @@ a test or code.
 | `digest-mae.md` | The same for MAE (Modular Agent Ecosystem, network name Phantomgrid). MAE was a June 2025 protocol spec that came before METIS: agents and modules on an EVM L2. It covers how MAE relates to METIS, Temi's own decisions, and brain-spec ideas that still apply. |
 | `manifest.json` | One entry per packaged conversation: ChatGPT id, title, dates, why it matters, file. |
 | `transcripts/` | User and assistant turns along the final branch of each conversation. Tool calls and hidden reasoning are dropped. `## USER` is Temi. |
-| `artifacts/` | Documents rebuilt from the chats. The MAE spec is the last copy ChatGPT read from the Cursor workspace. The roadmap and Phase 0 files were rebuilt by replaying ChatGPT's canvas edits. Their successors are in `docs/planning/`. |
+| `artifacts/` | Documents rebuilt from the chats. The MAE spec is the full `mae/README.md` from the local MAE workspace, last edited 2025-08-08. The roadmap and Phase 0 files were rebuilt by replaying ChatGPT's canvas edits. Their successors are in `docs/planning/`. |
 
 ## Known gaps
 
-- `artifacts/mae-spec-draft-v1.md` is cut off inside §11.10. ChatGPT only ever saw a truncated
-  copy. The full file was `mae/README.md` in a local workspace and is not included yet.
+- `digest-mae.md` was written from the truncated copy ChatGPT saw, which ends inside §11.10.
+  `artifacts/mae-spec.md` is now the full file (§1–§22, last edited 2025-08-08), so §12–§22 are
+  in the artifact but not in the digest.
 - The two monetization turns at the end of the imagineering conversation are left out of this
   public copy, along with the parts of the digest that drew on them.
 - Conversations that are only nearby (the Stagehand research crawler, the truth-engine thought

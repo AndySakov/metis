@@ -1,8 +1,8 @@
 # Delta digest: MAE (Modular Agent Ecosystem) / Phantomgrid
 
-Sources: `artifacts/mae-spec-draft-v1.md` (kept in Cursor as `/Users/andysakov/Code/js/projectz/mae/README.md`) and `transcripts/2025-06-09_mae-spec-sessions.md` (159 user turns). U-numbers count Temi's turns in order.
+Sources: the MAE spec as ChatGPT saw it (truncated; the full file is now `artifacts/mae-spec.md`) and `transcripts/2025-06-09_mae-spec-sessions.md` (159 user turns). U-numbers count Temi's turns in order.
 
-Caveat: the snapshot is cut off inside §11.10, so later-added sections (§15 tokenomics, §19 Configurator, §20 cypherpunk compliance, glossary, dispute DAO) are missing. Defects: §3.1.6 "Planner DSL" heading is empty (its table sits under §3.1.7), and §11.5 still promises GDPR alignment and "OFAC screening built into Registry", contradicting Temi's cypherpunk decision (U41).
+Caveat: this digest was written from the truncated copy ChatGPT saw (it ends inside §11.10). The full spec in `artifacts/mae-spec.md` adds §12–§22 (example workflows, observability/SLOs, wallet key lifecycle, token economics, module migration, disaster recovery, DoS protection, side-channel hardening, cypherpunk compliance, the Configurator, conclusion), which are not digested here. In the full spec the OFAC line is gone. Defects: §3.1.6 "Planner DSL" heading is empty (its table sits under §3.1.7), and §11.5 still promises GDPR alignment and "OFAC screening built into Registry", contradicting Temi's cypherpunk decision (U41).
 
 ## 1. What MAE is
 
