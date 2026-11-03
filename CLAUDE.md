@@ -73,40 +73,62 @@ examples are decoded with the real schemas, every identifier in every spec is ch
 `$ref`s must resolve, and the OpenAPI document is reconciled against the `HttpApi` definition
 (ADR-011's required check). Adding a contract without adding it to these tests re-opens the door.
 
-## Next — reach, then isolation
+## Now: the idea-to-prototype loop
 
-The loop runs, survives a crash, and writes its own trust back. Durability landed in
-`PlanWorkflow.ts`; the trust writers landed in `TrustUpdater.ts`; the adversarial suite exists and
-reports a number. What is thin now is how much of the world it can touch, and how well it is
-contained while touching it.
+METIS's job for this stretch is to take one of Temi's ideas from a paragraph to a tested
+prototype, and to say honestly which ideas deserve that. Everything runs on one record per idea,
+the **dossier**: the thesis; the 5 to 10 assumptions it rests on, each with a range, a confidence,
+its evidence and the cheapest test that would settle it; dated forecasts; sourced evidence carrying
+when it became knowable; and a verdict (explore, park or kill) with the next test.
 
-1. **The seven descriptor-only capabilities.** `research.search` is real over Wikipedia and arXiv;
-   a web-wide index still needs a provider and key. The
-   `agent.*` ones need real browser and device control. Implement them against real backends or not
-   at all — a registry entry that does not do what its contract says is worse than an absent one,
-   because the planner will target it.
-2. **The red team has no known escape, which is a reason to write more attempts.** The suite
-   reports twelve attempts, twelve caught by rule, none by luck, none through. The last escapes
-   closed were memory poisoning: untrusted content written into long-term memory by
-   `vector.upsert` or `graph.link`. Both now declare a `memory.write` scope, and
-   `approve.untrusted_memory_write` asks a human before untrusted input reaches a tool with that
-   scope (vectors in `specs/policy/conformance/memory.json`). It asks rather than denies, unlike
-   egress: nothing leaves the machine, and a deny would stop METIS remembering anything it read on
-   the web. What is still open is the other half: nothing stores the `untrusted` tag with the
-   record, so an approved write still comes back as ordinary memory. Fix that when the memory
-   server lands. Earlier escapes: an unregistered capability (the `unregistered` condition) and
-   untrusted content steering `research.fetch` (a deny rule on the `public.web` scope). Since step bindings landed, these labels come from
-   the loop itself: a page `research.fetch` returns is `untrusted` wherever it flows next. Zero
-   through means the suite ran out of known attempts, not that the policy is complete. When a new
-   one gets through, add it with `expectedToGetThrough: true` rather than leaving it out.
-3. **Tool sandboxing.** Isolation is still process-level only. ADR-020's policy half is in: the
-   `none < process < container < wasm` ladder is the `ToolSpec.isolation` type, the executor puts
-   the resolved tier on every `PolicyRequest`, and `isolationBelow` lets a rule require a minimum,
-   with vectors in `specs/policy/conformance/isolation.json`. What is missing is any runtime above
-   `process`, and the registry refuses a descriptor claiming one until it exists.
+**How work is chosen.**
+
+- One milestone is active at a time. Work only on it. A change that does not move the active
+  milestone's done criteria waits, however good it is.
+- The framework is frozen: no new ADRs, policy rule forms or trust features unless the active
+  milestone cannot ship without them, and then only the general mechanism.
+- A milestone is done when its criteria hold on real ideas, not when the code exists.
+- The test set is Temi's ten real ideas. They live outside this repository, which is public: never
+  commit an idea, a dossier or a forecast about one. Fixtures in `specs/` and `test/` use invented
+  ideas.
+
+**Milestones.**
+
+1. **Vet** (active; starts once the ten ideas are written down). An idea in, a dossier out:
+   assumptions, base rates with sources, kill criteria, forecasts written to a ledger, a verdict.
+   Done when all ten ideas have run, Temi agrees with at least seven verdicts, and at least one
+   changed what he would do. Its first decision is whether the dossier and ledger live in core or
+   in a pack.
+2. **Research.** Real web search and fetch, cited into each assumption's evidence. Needs a search
+   provider and key, which Temi supplies. Done when he would trust its research over doing it
+   himself.
+3. **Prototype.** A brief for an idea's riskiest assumption, built by an existing coding agent in
+   `METIS_WORKSPACE` under policy, with the result written back to the dossier. Do not build a
+   coding agent. Done when one idea goes from brief to running prototype in a day.
+4. **Stress test.** Monte Carlo over the assumptions' ranges, giving an outcome distribution and a
+   ranking of which assumption swings it most, plus a panel of model-played skeptics (customer,
+   competitor, investor). Done when, for three ideas, that ranking picks which test to run first.
+5. **Watch.** A weekly digest of what moved for live ideas' assumptions, with forecasts resolved
+   against what happened. Not a news reader. Done when four digests have been read and acted on.
+
+**Later**, once the ledger has enough resolved forecasts to calibrate against: an agent-based world
+model and point-in-time backtests.
+
+**Parked** until a milestone needs them:
+
+- The seven descriptor-only capabilities. Implement them against real backends or not at all: a
+  registry entry that does not do what its contract says is worse than an absent one, because the
+  planner will target it.
+- More red-team attempts. The suite reports twelve attempts, all caught by rule, none through,
+  which means it ran out of known attempts, not that the policy is complete. One known gap stays
+  open: nothing stores the `untrusted` tag with a memory record, so an approved untrusted write
+  comes back as ordinary memory. Fix it when a memory server lands.
+- Tool isolation above `process`. ADR-020's policy half is in; no runtime above `process` exists,
+  and the registry refuses a descriptor claiming one.
 
 ## Traps
 
+- **Do not work outside the active milestone.** The project drifted once already: 26 PRs in one day, all framework, none of it in daily use. If a task does not move the active milestone's done criteria, stop and say so. Do not pick work from "Parked" or from `docs/planning/`.
 - **Do not let the drift re-open.** It is closed and held closed by tests. A new contract that is not covered by `test/specs/` is a new second source of truth waiting to diverge.
 - **Do not write another planning document.** This project's failure mode is design-ahead-of-code. The ratio has since inverted — source, tests and contracts outweigh prose by roughly five to one — but the pull is still there. When in doubt, write code or a test, not a doc — and specifically, do not design the policy engine's schemas before writing the engine.
 - **Do not let policy become a config file with no tests.** It now has vectors in `specs/policy/conformance/` covering effects, the fail-safe tie-break, and the unmatched case. Every new rule form needs a case; a rule shape with no vector is untested safety code.
