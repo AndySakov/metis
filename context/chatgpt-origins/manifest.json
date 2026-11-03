@@ -1,0 +1,94 @@
+{
+  "package": "chatgpt-origins",
+  "exported_from": "ChatGPT data export dated 2026-01-08 (633 conversations)",
+  "packaged": "2026-11-03",
+  "authority": "historical source material; ADRs, CLAUDE.md and code win on any conflict",
+  "conversations": [
+    {
+      "chatgpt_id": "6845532c-33c8-8004-a559-8c925a30d3b2",
+      "chatgpt_title": "Building Jarvis with Current Tech",
+      "created": "2025-06-08",
+      "updated": "2025-08-10",
+      "relevance": "pre-METIS deep research: can Jarvis/Griot be built with current tech",
+      "file": "transcripts/2025-06-08_building-jarvis-with-current-tech.md"
+    },
+    {
+      "chatgpt_id": "68470b84-9130-8004-a27c-67eda5e196b9",
+      "chatgpt_title": "Human Brain Functions",
+      "created": "2025-06-09",
+      "updated": "2025-10-19",
+      "relevance": "MAE (Modular Agent Ecosystem) spec sessions; ChatGPT auto-titled it after the first question only. Final spec in artifacts/mae-spec-draft-v1.md",
+      "file": "transcripts/2025-06-09_mae-spec-sessions.md"
+    },
+    {
+      "chatgpt_id": "689897a9-0984-8320-920b-5ee3a54978aa",
+      "chatgpt_title": "Imagineering copilot design",
+      "created": "2025-08-10",
+      "updated": "2025-08-14",
+      "relevance": "origin of METIS: requirements, naming, v1 roadmap, phase 0, web memory, brain, agent foundry, limits, on-prem datacenter. Monetization turns withheld (private).",
+      "file": "transcripts/2025-08-10_imagineering-copilot-design.md"
+    },
+    {
+      "chatgpt_id": "6898a022-9ac8-832f-bf9c-808f6722656e",
+      "chatgpt_title": "JARVIS copilot traits",
+      "created": "2025-08-10",
+      "updated": "2025-08-10",
+      "relevance": "traits to configure into a JARVIS-like copilot",
+      "file": "transcripts/2025-08-10_jarvis-copilot-traits.md"
+    },
+    {
+      "chatgpt_id": "68a3b152-74d4-8331-88f1-b104cc1771cb",
+      "chatgpt_title": "CAIA and METIS comparison",
+      "created": "2025-08-18",
+      "updated": "2025-08-19",
+      "relevance": "CAIA (neuro-symbolic causal/active-inference system) compared with METIS",
+      "file": "transcripts/2025-08-18_caia-and-metis-comparison.md"
+    },
+    {
+      "chatgpt_id": "68f3beea-2fe4-8327-b5de-dde8a8cba957",
+      "chatgpt_title": "Naming memory fabric",
+      "created": "2025-10-18",
+      "updated": "2025-10-19",
+      "relevance": "naming the memory layer (origin of mneme)",
+      "file": "transcripts/2025-10-18_naming-memory-fabric.md"
+    },
+    {
+      "chatgpt_id": "68f4c44e-8b58-8333-ad33-4e9138230419",
+      "chatgpt_title": "LangChain vs Vercel SDK",
+      "created": "2025-10-19",
+      "updated": "2025-10-19",
+      "relevance": "agent framework choice (LangGraph pick, since superseded by Effect + Restate)",
+      "file": "transcripts/2025-10-19_langchain-vs-vercel-sdk.md"
+    },
+    {
+      "chatgpt_id": "6946e295-8c44-832c-b14e-7d95cd2c9cc9",
+      "chatgpt_title": "RDMA tech in Mac Studio",
+      "created": "2025-12-20",
+      "updated": "2025-12-20",
+      "relevance": "Mac Studio RDMA cluster ideas and a recap of METIS",
+      "file": "transcripts/2025-12-20_rdma-tech-in-mac-studio.md"
+    }
+  ],
+  "artifacts": [
+    {
+      "file": "artifacts/mae-spec-draft-v1.md",
+      "source": "68470b84-9130-8004-a27c-67eda5e196b9",
+      "how": "last copy of mae/README.md that ChatGPT read from Temi's Cursor window (ChatGPT 'work with apps'); the final edit afterwards only inserted a table of contents"
+    },
+    {
+      "file": "artifacts/imagineering-copilot-v1-roadmap.md",
+      "source": "689897a9-0984-8320-920b-5ee3a54978aa",
+      "how": "ChatGPT canvas rebuilt by replaying its create/update operations; repo copy: docs/planning/metis_v_1_roadmap.md"
+    },
+    {
+      "file": "artifacts/metis-phase-0-artifacts.md",
+      "source": "689897a9-0984-8320-920b-5ee3a54978aa",
+      "how": "canvas replay; repo successor: docs/planning/metis_phase_0_artifacts.md"
+    },
+    {
+      "file": "artifacts/metis-phase-0-stack-neutral-artifacts-revised.md",
+      "source": "689897a9-0984-8320-920b-5ee3a54978aa",
+      "how": "canvas replay; revised stack-neutral version"
+    }
+  ]
+}

@@ -220,6 +220,7 @@ metis/
   test/policy/       policy and trust vectors
   docs/adrs/         decision records
   docs/planning/     rebuild plan, roadmap, limits
+  context/           source material from the ChatGPT-era design chats; history, not authority
 ```
 
 There is no `/apps`, `/packages` or `/infra`. Earlier drafts described a monorepo; it was never
