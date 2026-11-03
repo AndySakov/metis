@@ -363,12 +363,13 @@ impossible. It is deliberately unflattering; keep it that way.
 
 ## Roadmap
 
-`docs/planning/REBUILD-PLAN.md` is authoritative. Stage 0 (fix the drift) is complete; Stage 1 is
-the four services with implementations and tests.
+The current milestones are in `CLAUDE.md` under "Now": the idea-to-prototype loop (vet, research,
+prototype, stress test, watch), one milestone at a time, each done only when it holds on real ideas.
 
-`docs/planning/metis_v_1_roadmap.md` is the original ten-phase plan, retained for the capability
-detail in it. Where it conflicts with the rebuild plan — particularly on the monorepo, the DAG
-scheduler and container-packaged tools — the rebuild plan and the ADRs win.
+`docs/planning/REBUILD-PLAN.md` took METIS from the audit to a running loop. Its Stages 0 through 4
+are complete, and it is kept as history. `docs/planning/metis_v_1_roadmap.md` is the original
+ten-phase plan, retained for the capability detail in it. Where either conflicts with the ADRs, the
+ADRs win.
 
 Success is not "how many phases are done". It is two questions:
 
